@@ -32,25 +32,25 @@ Issues = "https://github.com/Demi/b-simulant/issues"
 Source = "https://github.com/Demi/b-simulant"
 
 [tool.hatch.version]
-path = "src/b_simulant/__about__.py"
+path = "src/bsim/__about__.py"
 
 [tool.hatch.envs.types]
 extra-dependencies = [
   "mypy>=1.0.0",
 ]
 [tool.hatch.envs.types.scripts]
-check = "mypy --install-types --non-interactive {args:src/b_simulant tests}"
+check = "mypy --install-types --non-interactive {args:src/bsim tests}"
 
 [tool.coverage.run]
-source_pkgs = ["b_simulant", "tests"]
+source_pkgs = ["bsim", "tests"]
 branch = true
 parallel = true
 omit = [
-  "src/b_simulant/__about__.py",
+  "src/bsim/__about__.py",
 ]
 
 [tool.coverage.paths]
-b_simulant = ["src/b_simulant", "*/b-simulant/src/b_simulant"]
+bsim = ["src/bsim", "*/b-simulant/src/bsim"]
 tests = ["tests", "*/b-simulant/tests"]
 
 [tool.coverage.report]
