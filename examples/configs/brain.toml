@@ -1,0 +1,16 @@
+[modules.eye]
+class = "examples.wiring_builder_demo.Eye"
+
+[modules.lgn]
+class = "examples.wiring_builder_demo.LGN"
+
+[modules.sc]
+class = "examples.wiring_builder_demo.SC"
+
+[[wiring]]
+from = "eye.out.visual_stream"
+to = ["lgn.in.retina"]
+
+[[wiring]]
+from = "lgn.out.thalamus"
+to = ["sc.in.vision"]
