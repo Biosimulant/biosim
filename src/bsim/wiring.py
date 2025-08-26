@@ -31,7 +31,7 @@ def _parse_ref(ref: str) -> Tuple[str, Optional[str], str]:
 class WiringBuilder:
     world: BioWorld
     registry: Dict[str, BioModule] = field(default_factory=dict)
-    _pending_connections: List[Tuple[str, str, List[str]]] = field(default_factory=list)
+    _pending_connections: List[Tuple[str, List[str]]] = field(default_factory=list)
 
     def add(self, name: str, module: BioModule) -> "WiringBuilder":
         if name in self.registry and self.registry[name] is not module:
@@ -41,31 +41,31 @@ class WiringBuilder:
         return self
 
     def connect(self, src_ref: str, dst_refs: Iterable[str]) -> "WiringBuilder":
-        self._pending_connections.append((src_ref, "_", list(dst_refs)))
+        self._pending_connections.append((src_ref, list(dst_refs)))
         return self
 
     def apply(self) -> None:
-        for src_ref, _unused, dst_refs in self._pending_connections:
-            src_name, src_dir, topic = _parse_ref(src_ref)
+        for src_ref, dst_refs in self._pending_connections:
+            src_name, _src_dir, topic = _parse_ref(src_ref)
             src_mod = self.registry.get(src_name)
             if src_mod is None:
-                raise KeyError(f"Unknown module name: {src_name}")
+                raise KeyError(f"connect {src_ref}: unknown module name '{src_name}'")
             # Validate source port if declared
             declared_out = set(src_mod.outputs())
             if declared_out and topic not in declared_out:
                 raise ValueError(
-                    f"Module '{src_name}' has no output port '{topic}'. "
+                    f"connect {src_ref}: module '{src_name}' has no output port '{topic}'. "
                     f"Declared outputs: {sorted(declared_out)}"
                 )
             for dst_ref in dst_refs:
-                dst_name, dst_dir, dst_port = _parse_ref(dst_ref)
+                dst_name, _dst_dir, dst_port = _parse_ref(dst_ref)
                 dst_mod = self.registry.get(dst_name)
                 if dst_mod is None:
-                    raise KeyError(f"Unknown module name: {dst_name}")
+                    raise KeyError(f"connect {src_ref} -> {dst_ref}: unknown module '{dst_name}'")
                 declared_in = set(dst_mod.inputs())
                 if declared_in and dst_port not in declared_in:
                     raise ValueError(
-                        f"Module '{dst_name}' has no input port '{dst_port}'. "
+                        f"connect {src_ref} -> {dst_ref}: module '{dst_name}' has no input port '{dst_port}'. "
                         f"Declared inputs: {sorted(declared_in)}"
                     )
                 self.world.connect_biomodules(src_mod, topic, dst_mod)

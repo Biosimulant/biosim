@@ -3,8 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING, Tuple
+import logging
 
 from .solver import Solver
+logger = logging.getLogger(__name__)
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from .modules import BioModule
 
@@ -37,6 +39,7 @@ class BioWorld:
     _signal_routes: Dict[Tuple["BioModule", str], List["BioModule"]] = field(
         default_factory=dict, init=False, repr=False
     )
+    _loaded_emitted: bool = field(default=False, init=False, repr=False)
 
     def on(self, listener: Listener) -> None:
         """Register a listener for world events."""
@@ -66,8 +69,8 @@ class BioWorld:
             try:
                 module.on_event(event, payload, self)
             except Exception:
-                # Modules should not break the world loop.
-                # Consider emitting BioWorldEvent.ERROR if needed.
+                # Modules should not break the world loop. Log and continue.
+                logger.exception("BioModule.on_event raised during %s", event)
                 return
 
         self._biomodule_listeners[module] = _module_listener
@@ -109,7 +112,8 @@ class BioWorld:
             try:
                 dst.on_signal(topic, payload, source=src, world=self)
             except Exception:
-                # Keep delivery robust; consider emitting ERROR later.
+                # Keep delivery robust; log and continue.
+                logger.exception("BioModule.on_signal raised for topic '%s'", topic)
                 continue
 
     # Internal: emit to all listeners
@@ -119,8 +123,8 @@ class BioWorld:
             try:
                 listener(event, data)
             except Exception:
-                # Listeners should not break the world; errors are swallowed.
-                # If needed, we could route this through a dedicated event.
+                # Listeners should not break the world; log and continue.
+                logger.exception("world listener raised during %s", event)
                 continue
 
     def simulate(self, *, steps: int, dt: float) -> Any:
@@ -130,9 +134,10 @@ class BioWorld:
         call. Propagates solver-emitted events via the provided `emit` callback.
         """
 
-        # Emit a LOADED event only the first time simulate is called, or always?
-        # For simplicity, emit LOADED on each simulate call to signal readiness.
-        self._emit(BioWorldEvent.LOADED, {"steps": steps, "dt": dt})
+        # Emit LOADED only once to indicate readiness.
+        if not self._loaded_emitted:
+            self._emit(BioWorldEvent.LOADED, {"steps": steps, "dt": dt})
+            self._loaded_emitted = True
         self._emit(BioWorldEvent.BEFORE_SIMULATION, {"steps": steps, "dt": dt})
 
         def emit(event: BioWorldEvent, payload: Optional[Dict[str, Any]] = None) -> None:
@@ -158,3 +163,14 @@ class BioWorld:
         from .wiring import load_wiring as _load_wiring
 
         _load_wiring(self, path)
+
+    def describe_wiring(self) -> List[Tuple[str, str, str]]:
+        """Return a simple description of current biosignal connections.
+
+        Each tuple is (source_module, topic, dest_module) using class names.
+        """
+        desc: List[Tuple[str, str, str]] = []
+        for (src, topic), dsts in self._signal_routes.items():
+            for dst in dsts:
+                desc.append((src.__class__.__name__, topic, dst.__class__.__name__))
+        return desc
