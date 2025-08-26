@@ -3,7 +3,14 @@
 # SPDX-License-Identifier: MIT
 from .__about__ import __version__
 from .world import BioWorld, BioWorldEvent
-from .solver import Solver, FixedStepSolver
+from .solver import (
+    Solver,
+    FixedStepSolver,
+    DefaultBioSolver,
+    Process,
+    TemperatureParams,
+    ScalarRateParams,
+)
 from .modules import BioModule
 from .wiring import (
     WiringBuilder,
@@ -19,6 +26,10 @@ __all__ = [
     "BioWorldEvent",
     "Solver",
     "FixedStepSolver",
+    "DefaultBioSolver",
+    "Process",
+    "TemperatureParams",
+    "ScalarRateParams",
     "BioModule",
     "WiringBuilder",
     "build_from_spec",

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 
 class Solver(ABC):
@@ -44,3 +45,155 @@ class FixedStepSolver(Solver):
             time += dt
             emit(BioWorldEvent.STEP, {"i": i, "t": time})
         return {"time": time, "steps": steps}
+
+
+# --- Extensible Processes and DefaultBioSolver ---
+
+
+class Process(ABC):
+    """A state update strategy applied by DefaultBioSolver each step.
+
+    Implementations read from the current state and propose updates for one
+    or more named quantities by returning a patch mapping quantity -> new value.
+    They may also expose initial state for their outputs.
+    """
+
+    # Return the initial state for quantities managed by this process.
+    def init_state(self) -> Dict[str, float]:
+        return {}
+
+    # Compute a mapping of quantity -> new value for this step.
+    @abstractmethod
+    def update(self, state: Dict[str, Any], dt: float) -> Dict[str, float]:
+        raise NotImplementedError
+
+
+@dataclass
+class TemperatureParams:
+    initial: float = 0.0
+    # Additive change per simulation step (unit-value per step)
+    delta_per_step: float = 0.0
+    # Rate-based change per unit time (unit-value per second)
+    rate_per_time: float = 0.0
+    # Optional bounds (min, max) for clamping
+    bounds: Optional[Tuple[float, float]] = None
+
+
+class TemperatureProcess(Process):
+    def __init__(self, params: TemperatureParams) -> None:
+        self.params = params
+
+    def init_state(self) -> Dict[str, float]:
+        return {"temperature": float(self.params.initial)}
+
+    def update(self, state: Dict[str, Any], dt: float) -> Dict[str, float]:
+        current = float(state.get("temperature", self.params.initial))
+        next_val = current + self.params.delta_per_step + self.params.rate_per_time * dt
+        if self.params.bounds is not None:
+            lo, hi = self.params.bounds
+            # clamp
+            if next_val < lo:
+                next_val = lo
+            elif next_val > hi:
+                next_val = hi
+        return {"temperature": next_val}
+
+
+@dataclass
+class ScalarRateParams:
+    name: str
+    initial: float
+    # Rate per unit time (value change per second)
+    rate_per_time: float = 0.0
+    # Bounds for clamping
+    bounds: Optional[Tuple[float, float]] = None
+
+
+class ScalarRateProcess(Process):
+    """Generic first-order rate process: value += rate_per_time * dt (then clamp)."""
+
+    def __init__(self, params: ScalarRateParams) -> None:
+        self.params = params
+
+    def init_state(self) -> Dict[str, float]:
+        return {self.params.name: float(self.params.initial)}
+
+    def update(self, state: Dict[str, Any], dt: float) -> Dict[str, float]:
+        current = float(state.get(self.params.name, self.params.initial))
+        next_val = current + self.params.rate_per_time * dt
+        if self.params.bounds is not None:
+            lo, hi = self.params.bounds
+            if next_val < lo:
+                next_val = lo
+            elif next_val > hi:
+                next_val = hi
+        return {self.params.name: next_val}
+
+
+class DefaultBioSolver(Solver):
+    """Extensible solver with configurable bio-quantities and processes.
+
+    Features:
+    - Retains FixedStepSolver behavior (emits STEP events, returns time/steps).
+    - Adds optional built-in processes for temperature, water, oxygen.
+    - Accepts custom processes implementing the `Process` interface.
+
+    Parameters (all optional):
+    - temperature: TemperatureParams
+    - water: ScalarRateParams (name must be "water")
+    - oxygen: ScalarRateParams (name must be "oxygen")
+    - processes: additional custom processes
+    """
+
+    def __init__(
+        self,
+        *,
+        temperature: Optional[TemperatureParams] = None,
+        water: Optional[ScalarRateParams] = None,
+        oxygen: Optional[ScalarRateParams] = None,
+        processes: Optional[List[Process]] = None,
+    ) -> None:
+        # Assemble process list in a stable order.
+        procs: List[Process] = []
+        if temperature is not None:
+            procs.append(TemperatureProcess(temperature))
+        if water is not None:
+            procs.append(ScalarRateProcess(water))
+        if oxygen is not None:
+            procs.append(ScalarRateProcess(oxygen))
+        if processes:
+            procs.extend(processes)
+        self._processes = procs
+
+        # Initialize state from processes.
+        state: Dict[str, float] = {}
+        for p in self._processes:
+            state.update(p.init_state())
+        self._initial_state = state
+
+    def simulate(
+        self,
+        *,
+        steps: int,
+        dt: float,
+        emit: Callable[["BioWorldEvent", Dict[str, Any]], None],
+    ) -> Dict[str, Any]:
+        from .world import BioWorldEvent
+
+        time = 0.0
+        # Make a working copy of the initial state for this run
+        state: Dict[str, Any] = dict(self._initial_state)
+
+        for i in range(steps):
+            time += dt
+            # Apply each process in order; later processes see earlier updates
+            for p in self._processes:
+                patch = p.update(state, dt)
+                if patch:
+                    state.update(patch)
+            emit(BioWorldEvent.STEP, {"i": i, "t": time})
+
+        # Return final state alongside standard fields
+        result: Dict[str, Any] = {"time": time, "steps": steps}
+        result.update(state)
+        return result

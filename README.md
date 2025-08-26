@@ -45,6 +45,35 @@ pip install -e .
 python examples/basic_usage.py
 ```
 
+### Quick Start: DefaultBioSolver
+
+`DefaultBioSolver` extends the fixed-step behavior with configurable bio-quantities and processes (temperature, water, oxygen, etc.). It preserves the same event flow via `BioWorld` (`LOADED → BEFORE_SIMULATION → STEP* → AFTER_SIMULATION`).
+
+Minimal usage:
+
+```python
+import bsim
+
+solver = bsim.DefaultBioSolver(
+    temperature=bsim.TemperatureParams(
+        initial=300.0,          # Kelvin
+        delta_per_step=1.0,     # +1 K per step
+        rate_per_time=0.5,      # +0.5 K per second
+        bounds=(273.15, 315.15)
+    ),
+    water=bsim.ScalarRateParams(name="water", initial=1.0, rate_per_time=-0.6, bounds=(0.0, 1.0)),
+    oxygen=bsim.ScalarRateParams(name="oxygen", initial=0.3, rate_per_time=-0.2, bounds=(0.0, 1.0)),
+)
+
+world = bsim.BioWorld(solver=solver)
+result = world.simulate(steps=3, dt=1.0)
+print(result)  # {'time': 3.0, 'steps': 3, 'temperature': ..., 'water': ..., 'oxygen': ...}
+```
+
+See a fuller demonstration (including a custom process) in:
+
+- `examples/default_bio_solver.py`
+
 ## License
 
 `bsim` is distributed under the terms of the [MIT](https://spdx.org/licenses/MIT.html) license.
