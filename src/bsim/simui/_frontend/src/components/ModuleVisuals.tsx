@@ -30,12 +30,33 @@ function FullscreenButton({ isFullscreen, onClick }: { isFullscreen: boolean; on
   )
 }
 
+function InfoButton({ isActive, onClick }: { isActive: boolean; onClick: () => void }) {
+  return (
+    <button
+      className={`btn btn-small btn-outline info-btn ${isActive ? 'active' : ''}`}
+      onClick={onClick}
+      title={isActive ? 'Hide description' : 'Show description'}
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <circle cx="12" cy="12" r="10" />
+        <path d="M12 16v-4" />
+        <path d="M12 8h.01" />
+      </svg>
+    </button>
+  )
+}
+
 function VisualizationCard({ visual, index }: { visual: VisualSpec; index: number }) {
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [showDescription, setShowDescription] = useState(false)
   const Renderer = RENDERERS[visual.render]
 
   const toggleFullscreen = useCallback(() => {
     setIsFullscreen(prev => !prev)
+  }, [])
+
+  const toggleDescription = useCallback(() => {
+    setShowDescription(prev => !prev)
   }, [])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -61,6 +82,7 @@ function VisualizationCard({ visual, index }: { visual: VisualSpec; index: numbe
   }
 
   const title = (visual.data as any)?.title || `${visual.render.charAt(0).toUpperCase() + visual.render.slice(1)} #${index + 1}`
+  const hasDescription = !!visual.description
 
   const cardContent = (
     <>
@@ -68,9 +90,15 @@ function VisualizationCard({ visual, index }: { visual: VisualSpec; index: numbe
         <h4 className="card-title">{title}</h4>
         <div className="card-actions">
           <span className="card-type">{visual.render}</span>
+          {hasDescription && <InfoButton isActive={showDescription} onClick={toggleDescription} />}
           <FullscreenButton isFullscreen={isFullscreen} onClick={toggleFullscreen} />
         </div>
       </div>
+      {showDescription && visual.description && (
+        <div className="card-description">
+          {visual.description}
+        </div>
+      )}
       <div className="card-content">
         <Renderer data={visual.data} isFullscreen={isFullscreen} />
       </div>

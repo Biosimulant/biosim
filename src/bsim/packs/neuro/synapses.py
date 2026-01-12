@@ -162,12 +162,18 @@ class ExpSynapseCurrent(BioModule):
         if not self._current_history:
             return None
 
+        weight_sign = "excitatory" if self.weight > 0 else "inhibitory"
         return {
             "render": "timeseries",
             "data": {
                 "series": [{"name": "Mean I", "points": self._current_history}],
                 "title": f"ExpSynapseCurrent ({self.n_pre}→{self.n_post}, p={self.p_connect})",
             },
+            "description": (
+                f"Mean synaptic current from {self.n_pre} pre- to {self.n_post} post-synaptic neurons. "
+                f"Connection probability: {self.p_connect*100:.0f}%, weight: {self.weight} ({weight_sign}), "
+                f"decay τ: {self.tau*1000:.1f}ms. Current rises on incoming spikes and decays exponentially."
+            ),
         }
 
     def get_connectivity_stats(self) -> Dict[str, Any]:

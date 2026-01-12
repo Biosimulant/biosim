@@ -27,6 +27,8 @@ class Environment(BioModule):
         temperature_variation: Random variation in temperature per step.
         seasonal_cycle: If True, apply sinusoidal seasonal variation.
         season_period: Period of seasonal cycle in simulation time units.
+        sync_from_solver: If True, read temperature/water from solver state
+            (enables UI control via DefaultBioSolver).
     """
 
     def __init__(
@@ -38,6 +40,7 @@ class Environment(BioModule):
         temperature_variation: float = 0.0,
         seasonal_cycle: bool = False,
         season_period: float = 365.0,
+        sync_from_solver: bool = False,
     ) -> None:
         self._temperature = temperature
         self._water = water
@@ -46,8 +49,10 @@ class Environment(BioModule):
         self._temp_variation = temperature_variation
         self._seasonal_cycle = seasonal_cycle
         self._season_period = season_period
+        self._sync_from_solver = sync_from_solver
 
         self._base_temperature = temperature
+        self._base_water = water
         self._time: float = 0.0
         self._history: List[Dict[str, float]] = []
 
@@ -102,6 +107,15 @@ class Environment(BioModule):
 
         t = float(payload.get("t", self._time))
         self._time = t
+
+        # Optionally sync from solver state (for UI control)
+        if self._sync_from_solver:
+            solver_state = getattr(world.solver, "_initial_state", None)
+            if solver_state:
+                if "temperature" in solver_state:
+                    self.temperature = float(solver_state["temperature"])
+                if "water" in solver_state:
+                    self.water = float(solver_state["water"])
 
         # Compute current environmental state
         current_temp = self._compute_temperature(t)

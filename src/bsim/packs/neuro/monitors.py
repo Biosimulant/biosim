@@ -100,6 +100,12 @@ class SpikeMonitor(BioModule):
 
     def visualize(self) -> Optional["VisualSpec"]:
         """Generate an SVG raster plot of collected spikes."""
+        description = (
+            "Spike raster plot showing neural activity over time. "
+            "Each row represents a neuron, and each vertical tick marks a spike event. "
+            "Dense regions indicate high synchronous activity across the population."
+        )
+
         if not self._events:
             # Return empty placeholder
             empty_svg = self._generate_empty_svg()
@@ -112,6 +118,7 @@ class SpikeMonitor(BioModule):
                     "width": self.width,
                     "height": self.height,
                 },
+                "description": description,
             }
 
         svg = self._generate_raster_svg()
@@ -127,6 +134,7 @@ class SpikeMonitor(BioModule):
                 "width": self.width,
                 "height": self.height,
             },
+            "description": description,
         }
 
     def _generate_empty_svg(self) -> str:
@@ -297,6 +305,11 @@ class RateMonitor(BioModule):
                     {"name": "Population Rate (Hz)", "points": self._rate_series}
                 ]
             },
+            "description": (
+                f"Population firing rate computed over a {self.window_size*1000:.0f}ms sliding window. "
+                f"Rate = (spikes in window) / (window size × {self.n_neurons} neurons). "
+                "Higher values indicate more synchronized or active network states."
+            ),
         }
 
 
@@ -368,6 +381,11 @@ class StateMonitor(BioModule):
         return {
             "render": "timeseries",
             "data": {"series": series_list},
+            "description": (
+                "Membrane potential (Vm) traces of sampled neurons over time. "
+                "Sharp upward deflections reaching ~30mV indicate action potentials (spikes). "
+                "After spiking, the membrane resets to a lower potential before gradually depolarizing again."
+            ),
         }
 
 
@@ -487,4 +505,9 @@ class NeuroMetrics(BioModule):
                 "columns": ["Metric", "Value"],
                 "rows": rows,
             },
+            "description": (
+                "Summary statistics of neural activity. "
+                "ISI CV (coefficient of variation of inter-spike intervals) measures firing regularity: "
+                "CV≈0 = perfectly regular, CV≈1 = Poisson-like irregular, CV>1 = bursty firing patterns."
+            ),
         }

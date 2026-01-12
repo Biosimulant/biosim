@@ -38,14 +38,21 @@ from bsim.packs.ecology import (
 
 def setup_predator_prey_world() -> bsim.BioWorld:
     """Set up a classic predator-prey ecosystem."""
-    world = bsim.BioWorld(solver=bsim.FixedStepSolver())
+    # Use DefaultBioSolver with temperature for UI control
+    from bsim.solver import DefaultBioSolver, TemperatureParams
 
-    # Environment
+    solver = DefaultBioSolver(
+        temperature=TemperatureParams(initial=20.0, bounds=(0.0, 50.0)),
+    )
+    world = bsim.BioWorld(solver=solver)
+
+    # Environment syncs temperature from solver (enables UI slider)
     env = Environment(
         temperature=20.0,
         water=80.0,
         food_availability=1.0,
         seasonal_cycle=False,
+        sync_from_solver=True,  # Read temperature from solver state
     )
 
     # Populations - tuned for stable predator-prey coexistence
@@ -224,15 +231,22 @@ This simulation models a more complex ecosystem with **wolves** preying on both 
 
 def setup_three_species_world() -> bsim.BioWorld:
     """Set up a three-species food chain: grass -> rabbits -> foxes."""
-    world = bsim.BioWorld(solver=bsim.FixedStepSolver())
+    # Use DefaultBioSolver with temperature for UI control
+    from bsim.solver import DefaultBioSolver, TemperatureParams
 
-    # Environment with seasonal variation
+    solver = DefaultBioSolver(
+        temperature=TemperatureParams(initial=20.0, bounds=(-10.0, 50.0)),
+    )
+    world = bsim.BioWorld(solver=solver)
+
+    # Environment with seasonal variation (syncs base temp from solver)
     env = Environment(
         temperature=20.0,
         water=80.0,
         food_availability=1.2,
         seasonal_cycle=True,
         season_period=100.0,  # Faster seasons for demo
+        sync_from_solver=True,  # Base temperature from solver, seasonal on top
     )
 
     # Populations

@@ -96,6 +96,11 @@ class PoissonInput:
                 "series": [{"name": "spike_count", "points": points}],
                 "title": f"PoissonInput (n={self.n}, rate={self.rate_hz}Hz)",
             },
+            "description": (
+                f"Poisson spike generator with {self.n} independent sources firing at {self.rate_hz}Hz. "
+                "Shows number of spikes generated per timestep. Poisson processes model random, "
+                "independent spike arrival typical of background synaptic input."
+            ),
         }
 
 
@@ -183,6 +188,11 @@ class StepCurrent:
                 "series": [{"name": "I", "points": self._current_history}],
                 "title": f"StepCurrent (I={self.I_default})",
             },
+            "description": (
+                f"Current injection with default amplitude {self.I_default} (arbitrary units). "
+                "This current is directly added to the target neuron's membrane equation, "
+                "driving it toward threshold and producing spikes when sufficiently strong."
+            ),
         }
 
 

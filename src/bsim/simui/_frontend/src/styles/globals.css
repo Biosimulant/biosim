@@ -93,8 +93,15 @@ a { color: var(--accent); text-decoration: none; }
 .visualization-card .card-title { margin: 0; font-size: 14px; }
 .visualization-card .card-actions { display: flex; align-items: center; gap: 8px; }
 .visualization-card .card-type { color: var(--muted); font-size: 12px; }
+.visualization-card .card-description { padding: 10px 12px; background: var(--bg); border-bottom: 1px solid var(--border); font-size: 13px; line-height: 1.5; color: var(--muted); }
 .visualization-card .card-content { padding: 8px; }
 .visualization-card.placeholder { visibility: hidden; }
+
+/* Info button */
+.info-btn { padding: 4px 6px !important; display: flex; align-items: center; justify-content: center; }
+.info-btn svg { display: block; }
+.info-btn.active { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.info-btn.active svg { stroke: var(--bg); }
 
 /* Fullscreen overlay */
 .fullscreen-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: var(--gap-4); }

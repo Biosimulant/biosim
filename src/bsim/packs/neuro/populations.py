@@ -253,4 +253,9 @@ class IzhikevichPopulation(BioModule):
                 "series": series_list,
                 "title": f"IzhikevichPopulation (n={self.n}) Membrane Potential",
             },
+            "description": (
+                f"Membrane potential of {len(self._v_history)} sampled Izhikevich neurons (a={self.a}, b={self.b}, c={self.c}, d={self.d}). "
+                "The model captures various firing patterns: Regular Spiking (RS), Fast Spiking (FS), Bursting, etc. "
+                "Spikes occur when Vm reaches ~30mV, followed by a reset to the 'c' parameter value."
+            ),
         }

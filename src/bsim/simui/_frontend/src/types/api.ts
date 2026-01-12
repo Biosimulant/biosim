@@ -15,7 +15,7 @@ export type Control = NumberControl | ButtonControl
 
 export type EventRecord = { id: number; ts: string; event: string; payload?: Record<string, unknown> }
 
-export type VisualSpec = { render: string; data: Record<string, unknown> }
+export type VisualSpec = { render: string; data: Record<string, unknown>; description?: string }
 export type ModuleVisuals = { module: string; visuals: VisualSpec[] }
 
 export type UiSpec = {
