@@ -59,4 +59,3 @@ Remove drift and footguns: align docs/CI with reality, fix dependency boundaries
   - Create a minimal environment or run CI job that installs without `[ui]` and imports `bsim`.
 - Full test suite:
   - `PYTHONPATH=src .venv/bin/python -m pytest -q`
-

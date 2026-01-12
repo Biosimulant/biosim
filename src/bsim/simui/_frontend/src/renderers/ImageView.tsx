@@ -9,4 +9,3 @@ export default function ImageView({ data }: { data: { src?: string; alt?: string
     </div>
   )
 }
-

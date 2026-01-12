@@ -61,4 +61,3 @@ export function makeApi(baseUrl: string) {
     subscribeSSE
   }
 }
-

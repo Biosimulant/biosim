@@ -44,4 +44,3 @@ export type TickData = {
   visuals: ModuleVisuals[]
   event: EventRecord
 }
-

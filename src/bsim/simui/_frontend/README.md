@@ -31,4 +31,3 @@ python -m bsim.simui.build
 ```
 
 That script installs deps and runs the Vite build, copying `dist/app.js` into `src/bsim/simui/static/app.js`.
-

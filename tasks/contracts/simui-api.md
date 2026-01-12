@@ -73,4 +73,3 @@ Returns `{ ok: bool }`
 ## Error handling
 
 - Errors should be returned as JSON with a clear message; 4xx for client issues, 5xx for server faults.
-

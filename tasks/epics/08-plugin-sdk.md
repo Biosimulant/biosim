@@ -25,4 +25,3 @@ Enable third-party packages to provide modules/solvers (and optionally renderers
 3. Add registry module in `bsim`.
 4. Integrate wiring loader with registry mode.
 5. Add tests using an in-repo “fake plugin” pattern.
-

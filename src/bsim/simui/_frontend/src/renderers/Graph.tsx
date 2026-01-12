@@ -41,4 +41,3 @@ export default function Graph({ data }: { data: { nodes?: Node[]; edges?: Edge[]
     </svg>
   )
 }
-

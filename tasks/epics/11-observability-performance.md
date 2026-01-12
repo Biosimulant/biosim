@@ -18,4 +18,3 @@ Provide sufficient introspection for debugging and avoid obvious performance/mem
 1. Bounded buffers (SimUI events).
 2. Optional “trace” mode to record events to disk.
 3. Add a simple profiling example/guide if needed.
-

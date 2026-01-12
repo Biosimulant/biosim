@@ -44,7 +44,7 @@ export default function Footer() {
                   <button className="btn btn-small" onClick={() => { if (listRef.current) { listRef.current.scrollTop = listRef.current.scrollHeight; setAutoScroll(true) } }} title="Scroll to bottom">⬇️</button>
                 </div>
               </div>
-              <div ref={listRef} className="event-list" style={{ maxHeight: 220 }} onScroll={onScroll}>
+              <div ref={listRef} className="event-list" onScroll={onScroll}>
                 {events.slice().reverse().map((ev) => (
                   <div key={ev.id} className="event-item">
                     <time className="event-timestamp" dateTime={ev.ts}>{ev.ts}</time>
@@ -59,4 +59,3 @@ export default function Footer() {
     </div>
   )
 }
-

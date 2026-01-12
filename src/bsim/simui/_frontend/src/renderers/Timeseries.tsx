@@ -44,4 +44,3 @@ export default function Timeseries({ data }: { data: { series?: Series[] } }) {
     </svg>
   )
 }
-

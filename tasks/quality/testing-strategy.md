@@ -27,4 +27,3 @@ Last updated: 2026-01-12
 
 - `PYTHONPATH=src .venv/bin/python -m pytest -q`
 - (optional) coverage: `PYTHONPATH=src .venv/bin/python -m pytest --cov=bsim --cov-report=term-missing`
-

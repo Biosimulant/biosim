@@ -38,7 +38,7 @@ export function UiProvider({ children }: { children: React.ReactNode }) {
     setVisuals: setVisualsState,
     setEvents: setEventsState,
     appendEvent: (e) => setEventsState((prev) => [...prev, e]),
-    setControls: (c) => setControlsState((prev) => ({ ...prev, ...c })),
+    setControls: (c) => setControlsState((prev) => ({ ...prev, ...c }) as ControlsState),
     setVisibleModules: setVisibleModulesState,
   }), [])
 
@@ -74,7 +74,15 @@ export function useVisualsByModule(): Map<string, ModuleVisuals['visuals']> {
   const { state } = useUi()
   return useMemo(() => {
     const map = new Map<string, ModuleVisuals['visuals']>()
-    for (const m of state.visuals) map.set(m.module, m.visuals || [])
+    for (const m of state.visuals) {
+      const existing = map.get(m.module)
+      if (existing) {
+        // Merge visuals for modules with the same class name
+        map.set(m.module, [...existing, ...(m.visuals || [])])
+      } else {
+        map.set(m.module, m.visuals || [])
+      }
+    }
     return map
   }, [state.visuals])
 }

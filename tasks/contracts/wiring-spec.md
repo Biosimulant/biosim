@@ -58,4 +58,3 @@ Default (safe) mode:
 
 Allow-imports mode:
 - Enable dotted import resolution for trusted local configs.
-

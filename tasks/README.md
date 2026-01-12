@@ -48,4 +48,3 @@ When you work on an epic, update its file:
   - `tasks/quality/definition-of-done.md`
   - `tasks/quality/testing-strategy.md`
   - `tasks/quality/security-and-safety.md`
-

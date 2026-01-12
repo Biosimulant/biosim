@@ -29,4 +29,3 @@ Establish baseline conventions so the project can scale without “drift”: con
 ## Test plan
 
 - N/A (docs/policy). Verify links resolve and instructions match repo reality.
-

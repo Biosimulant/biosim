@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
-import urllib.parse
+import base64
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from bsim import BioWorld, BioWorldEvent
@@ -102,10 +102,12 @@ class SpikeMonitor(BioModule):
         """Generate an SVG raster plot of collected spikes."""
         if not self._events:
             # Return empty placeholder
+            empty_svg = self._generate_empty_svg()
+            empty_b64 = base64.b64encode(empty_svg.encode("utf-8")).decode("ascii")
             return {
                 "render": "image",
                 "data": {
-                    "src": self._generate_empty_svg(),
+                    "src": f"data:image/svg+xml;base64,{empty_b64}",
                     "alt": "Raster plot (no spikes)",
                     "width": self.width,
                     "height": self.height,
@@ -113,9 +115,9 @@ class SpikeMonitor(BioModule):
             }
 
         svg = self._generate_raster_svg()
-        # Use data URI with proper encoding
-        svg_encoded = urllib.parse.quote(svg, safe="")
-        data_uri = f"data:image/svg+xml,{svg_encoded}"
+        # Use data URI with base64 encoding for reliable rendering
+        svg_b64 = base64.b64encode(svg.encode("utf-8")).decode("ascii")
+        data_uri = f"data:image/svg+xml;base64,{svg_b64}"
 
         return {
             "render": "image",

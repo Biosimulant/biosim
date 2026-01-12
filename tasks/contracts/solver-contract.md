@@ -54,4 +54,3 @@ The world forwards solver events to listeners/modules via the `emit` callback.
 ## Compatibility notes
 
 This contract is intended to remain stable within v0.x with documented changes only.
-

@@ -23,4 +23,3 @@ export default function Table({ data }: { data: TableData }) {
     </div>
   )
 }
-

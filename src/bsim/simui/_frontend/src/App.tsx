@@ -32,7 +32,6 @@ function AppCore() {
         break
       }
       case 'tick': {
-        // STEP event with status, visuals, and the event
         const tick = msg.data as TickData
         if (tick?.status) actions.setStatus(tick.status)
         if (Array.isArray(tick?.visuals)) actions.setVisuals(tick.visuals)
@@ -96,15 +95,15 @@ function AppCore() {
           <h1 className="app-title">{state.spec?.title || 'BioSim UI'}</h1>
           <div className="app-status">{connected && <div className="sse-indicator" title="SSE Connected" />}</div>
         </header>
-        <aside className="app-sidebar">
+        <aside className="app-sidebar-left">
           <Sidebar onRun={run} onPause={pause} onResume={resume} onReset={reset} />
         </aside>
         <main className="app-main">
           <MainContent />
         </main>
-        <footer className="app-footer">
+        <aside className="app-sidebar-right">
           <Footer />
-        </footer>
+        </aside>
       </div>
     </div>
   )

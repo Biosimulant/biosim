@@ -20,4 +20,3 @@ Add at least one practical interoperability path (import/export) without attempt
    - a custom intermediate JSON schema with adapters.
 2. Implement import/export + tests.
 3. Document limitations.
-

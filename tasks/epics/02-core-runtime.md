@@ -48,4 +48,3 @@ Make the simulation runtime robust, predictable, and well-specified: event order
 
 - Keep behavior backward compatible where possible.
 - If stop return value changes, document in `docs/bioworld.md` and add a migration note.
-

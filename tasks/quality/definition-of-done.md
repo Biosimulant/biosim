@@ -29,4 +29,3 @@ This is the checklist used to declare a task/epic “done”.
 
 - No local artifacts committed (`.venv/`, `.pytest_cache/`, etc.).
 - CI remains green or updated accordingly.
-

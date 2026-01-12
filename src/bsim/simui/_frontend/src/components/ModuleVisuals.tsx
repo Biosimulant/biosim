@@ -124,4 +124,3 @@ function ModuleVisuals({ moduleName, visuals }: { moduleName: string; visuals: V
 }
 
 export default memo(ModuleVisuals)
-

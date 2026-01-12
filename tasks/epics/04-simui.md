@@ -44,4 +44,3 @@ Ship a small but reliable local UI for controlling runs and visualizing module o
 - Add/extend tests around:
   - event pagination and bounded behavior,
   - API error codes and schema stability.
-

@@ -37,4 +37,3 @@ Provide a stable, versioned wiring/config schema that supports real projects: cl
 ## Test plan
 
 - `PYTHONPATH=src .venv/bin/python -m pytest -q`
-

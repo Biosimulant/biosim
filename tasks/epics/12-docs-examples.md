@@ -25,4 +25,3 @@ Ensure docs/examples reflect reality (APIs, CLI, UI tech stack, scripts), and ar
    - wiring files,
    - visuals,
    - SimUI.
-

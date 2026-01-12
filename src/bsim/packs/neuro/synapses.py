@@ -63,6 +63,9 @@ class ExpSynapseCurrent(BioModule):
         self._time: float = 0.0
         self._last_dt: float = 0.001
 
+        # History for visualization
+        self._current_history: List[List[float]] = []  # [[t, mean_I], ...]
+
     def _build_connectivity(self) -> None:
         """Build random sparse connectivity matrix."""
         self._adjacency = {}
@@ -89,6 +92,7 @@ class ExpSynapseCurrent(BioModule):
         self._I = [0.0] * self.n_post
         self._spike_buffer = []
         self._time = 0.0
+        self._current_history = []
         # Optionally rebuild connectivity with same seed for reproducibility
         self._rng = random.Random(self.seed)
         self._build_connectivity()
@@ -146,8 +150,25 @@ class ExpSynapseCurrent(BioModule):
         for i in range(self.n_post):
             self._I[i] *= decay
 
+        # Record history for visualization (mean current)
+        mean_I = sum(self._I) / self.n_post if self.n_post > 0 else 0.0
+        self._current_history.append([t, mean_I])
+
         # Emit current to target population
         world.publish_biosignal(self, topic="current", payload={"t": t, "I": list(self._I)})
+
+    def visualize(self) -> Optional[Dict[str, Any]]:
+        """Return a timeseries visualization of mean synaptic current."""
+        if not self._current_history:
+            return None
+
+        return {
+            "render": "timeseries",
+            "data": {
+                "series": [{"name": "Mean I", "points": self._current_history}],
+                "title": f"ExpSynapseCurrent ({self.n_pre}→{self.n_post}, p={self.p_connect})",
+            },
+        }
 
     def get_connectivity_stats(self) -> Dict[str, Any]:
         """Return connectivity statistics (useful for debugging/verification)."""

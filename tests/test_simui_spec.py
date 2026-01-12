@@ -55,4 +55,3 @@ def test_temperature_control_detection_and_override(bsim, fastapi_client):
     assert "temperature" in ctl_names
     r = client.post("/ui/api/run", json={"steps": 2, "dt": 0.5, "temperature": 33.3})
     assert r.status_code in (202, 409)
-

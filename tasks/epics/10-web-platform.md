@@ -20,4 +20,3 @@ Define integration boundaries so a separate backend can run simulations and serv
 
 1. Extend contracts in `tasks/contracts/` to be platform-ready.
 2. Ensure SimUI uses the same contracts and versions them explicitly.
-

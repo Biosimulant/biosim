@@ -35,4 +35,3 @@ Provide a first-class CLI workflow to execute YAML/TOML wiring specs, matching d
 ## Test plan
 
 - `PYTHONPATH=src .venv/bin/python -m pytest -q`
-

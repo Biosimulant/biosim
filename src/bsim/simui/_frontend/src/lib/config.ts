@@ -15,4 +15,3 @@ export function resolveConfig(): FrontendConfig {
   const baseUrl = mountPath
   return { baseUrl }
 }
-

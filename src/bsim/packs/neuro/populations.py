@@ -113,6 +113,9 @@ class IzhikevichPopulation(BioModule):
         self._time: float = 0.0
         self._last_dt: float = 0.001
 
+        # History for visualization (sampled neurons)
+        self._v_history: Dict[int, List[List[float]]] = {}  # neuron_idx -> [[t, v], ...]
+
         self._init_state()
 
     def _init_state(self) -> None:
@@ -121,6 +124,7 @@ class IzhikevichPopulation(BioModule):
         self._u = [self.u_init] * self.n
         self._I_ext = [0.0] * self.n
         self._time = 0.0
+        self._v_history = {}
 
     def subscriptions(self) -> Set["BioWorldEvent"]:
         from bsim import BioWorldEvent
@@ -213,6 +217,13 @@ class IzhikevichPopulation(BioModule):
         state_indices = [i for i in self.sample_indices if i < self.n]
         state_v = [self._v[i] for i in state_indices]
         state_u = [self._u[i] for i in state_indices]
+
+        # Record history for visualization
+        for idx, v in zip(state_indices, state_v):
+            if idx not in self._v_history:
+                self._v_history[idx] = []
+            self._v_history[idx].append([t, v])
+
         world.publish_biosignal(
             self,
             topic="state",
@@ -223,3 +234,23 @@ class IzhikevichPopulation(BioModule):
                 "u": state_u,
             },
         )
+
+    def visualize(self) -> Optional[Dict[str, Any]]:
+        """Return a timeseries visualization of membrane potentials."""
+        if not self._v_history:
+            return None
+
+        series_list = []
+        for idx in sorted(self._v_history.keys()):
+            series_list.append({
+                "name": f"Neuron {idx}",
+                "points": self._v_history[idx],
+            })
+
+        return {
+            "render": "timeseries",
+            "data": {
+                "series": series_list,
+                "title": f"IzhikevichPopulation (n={self.n}) Membrane Potential",
+            },
+        }
