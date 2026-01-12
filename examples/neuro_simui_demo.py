@@ -136,6 +136,93 @@ def setup_microcircuit_world() -> bsim.BioWorld:
     return world
 
 
+SINGLE_NEURON_DESCRIPTION = """
+## Single Neuron Simulation
+
+This simulation demonstrates a single **Izhikevich neuron** receiving constant current injection.
+
+### Components
+
+| Module | Description |
+|--------|-------------|
+| **StepCurrent** | Injects 10 pA of constant current |
+| **IzhikevichPopulation** | Single RS (Regular Spiking) neuron |
+| **SpikeMonitor** | Records spike times as a raster plot |
+| **StateMonitor** | Tracks membrane potential over time |
+
+### Izhikevich Model
+
+The neuron follows the Izhikevich model equations:
+
+```
+dv/dt = 0.04v² + 5v + 140 - u + I
+du/dt = a(bv - u)
+```
+
+When `v >= 30 mV`, the neuron fires and resets:
+- `v → c`
+- `u → u + d`
+
+### What to Observe
+
+- **Membrane Potential**: Watch the characteristic RS firing pattern with adaptation
+- **Spike Raster**: Each vertical line represents a spike event
+- **Firing Rate**: Note how the neuron settles into a regular rhythm
+"""
+
+MICROCIRCUIT_DESCRIPTION = """
+## E/I Balanced Microcircuit
+
+This simulation models a small cortical microcircuit with **excitatory (E)** and **inhibitory (I)** neuron populations, demonstrating emergent network dynamics.
+
+### Network Architecture
+
+```
+┌─────────────┐     ┌─────────────┐
+│   Poisson   │────▶│  Excitatory │◀───┐
+│   Input     │     │   (40 RS)   │────┼───┐
+└─────────────┘     └──────┬──────┘    │   │
+                           │           │   │
+                    E→I    │    E→E    │   │
+                           ▼           │   │
+                    ┌─────────────┐    │   │
+                    │ Inhibitory  │────┘   │
+                    │  (10 FS)    │◀───────┘
+                    └─────────────┘   I→E, I→I
+```
+
+### Populations
+
+| Population | Count | Type | Description |
+|------------|-------|------|-------------|
+| Excitatory | 40 | RS (Regular Spiking) | Pyramidal-like neurons |
+| Inhibitory | 10 | FS (Fast Spiking) | Interneuron-like cells |
+
+### Synaptic Connections
+
+| Connection | Probability | Weight | Time Constant |
+|------------|-------------|--------|---------------|
+| External→E | 10% | +1.0 | 5 ms |
+| E→E | 10% | +0.3 | 5 ms |
+| E→I | 10% | +0.5 | 5 ms |
+| I→E | 10% | -1.5 | 10 ms |
+| I→I | 10% | -0.5 | 10 ms |
+
+### What to Observe
+
+- **E/I Balance**: Inhibition regulates excitatory activity
+- **Population Dynamics**: Correlated activity patterns emerge
+- **Firing Rates**: Compare E vs I population statistics
+- **Membrane Traces**: Sample neurons show voltage dynamics
+
+### Parameters to Explore
+
+Try adjusting:
+- **Steps**: More steps = longer simulation time
+- **dt**: Smaller dt = more accurate but slower
+"""
+
+
 def main() -> None:
     """Launch SimUI with the neuro microcircuit demo."""
     import argparse
@@ -158,9 +245,13 @@ def main() -> None:
     if args.mode == "single":
         print("Mode: Single Neuron (RS with DC current)")
         world = setup_single_neuron_world()
+        description = SINGLE_NEURON_DESCRIPTION
+        title = "Single Neuron Simulation"
     else:
         print("Mode: E/I Microcircuit (40E + 10I with Poisson input)")
         world = setup_microcircuit_world()
+        description = MICROCIRCUIT_DESCRIPTION
+        title = "E/I Microcircuit Simulation"
 
     print(f"Modules: {len(world._biomodule_listeners)}")
     print(f"Connections: {len(world.describe_wiring())}")
@@ -175,7 +266,8 @@ def main() -> None:
         # Create UI interface with neuro-appropriate defaults
         ui = Interface(
             world,
-            title="Neuro Simulation",
+            title=title,
+            description=description,
             controls=[
                 Number("steps", args.steps, label="Steps", minimum=100, maximum=50000, step=100),
                 Number("dt", args.dt, label="dt (s)", minimum=0.00001, maximum=0.01, step=0.00001),

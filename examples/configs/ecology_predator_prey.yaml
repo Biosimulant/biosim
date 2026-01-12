@@ -1,0 +1,103 @@
+# Ecology Pack: Classic Predator-Prey Simulation
+#
+# This config demonstrates a Lotka-Volterra style predator-prey system
+# with rabbits (prey) and foxes (predators) in a variable environment.
+#
+# The parameters are tuned to produce oscillating population dynamics
+# characteristic of predator-prey systems.
+#
+# Run with:
+#   python examples/ecology_simui_demo.py --config examples/configs/ecology_predator_prey.yaml
+
+modules:
+  # Environment broadcasts conditions to all organisms
+  environment:
+    class: bsim.packs.ecology.Environment
+    args:
+      temperature: 20.0
+      water: 80.0
+      food_availability: 1.0
+      sunlight: 1.0
+      seasonal_cycle: false
+
+  # Prey population (rabbits) - fast reproduction, vulnerable to predation
+  rabbits:
+    class: bsim.packs.ecology.OrganismPopulation
+    args:
+      name: "Rabbits"
+      initial_count: 800
+      birth_rate: 0.10
+      death_rate: 0.02
+      optimal_temp: 20.0
+      temp_tolerance: 15.0
+      carrying_capacity: 2000
+      seed: 42
+
+  # Predator population (foxes) - slower reproduction, depends on prey
+  foxes:
+    class: bsim.packs.ecology.OrganismPopulation
+    args:
+      name: "Foxes"
+      initial_count: 100
+      birth_rate: 0.04
+      death_rate: 0.02
+      optimal_temp: 15.0
+      temp_tolerance: 20.0
+      food_efficiency: 0.8
+      carrying_capacity: 300
+      seed: 43
+
+  # Predation interaction - controls predator-prey dynamics
+  predation:
+    class: bsim.packs.ecology.PredatorPreyInteraction
+    args:
+      predation_rate: 0.005
+      conversion_efficiency: 1.0
+      seed: 44
+
+  # Monitors
+  pop_monitor:
+    class: bsim.packs.ecology.PopulationMonitor
+    args:
+      max_points: 10000
+
+  phase_space:
+    class: bsim.packs.ecology.PhaseSpaceMonitor
+    args:
+      x_species: "Rabbits"
+      y_species: "Foxes"
+      max_points: 5000
+
+  metrics:
+    class: bsim.packs.ecology.EcologyMetrics
+
+wiring:
+  # Environment broadcasts to all organisms
+  - from: environment.out.conditions
+    to:
+      - rabbits.in.conditions
+      - foxes.in.conditions
+
+  # Population states feed into predation calculator
+  - from: rabbits.out.population_state
+    to:
+      - predation.in.prey_state
+      - pop_monitor.in.population_state
+      - phase_space.in.population_state
+      - metrics.in.population_state
+
+  - from: foxes.out.population_state
+    to:
+      - predation.in.predator_state
+      - pop_monitor.in.population_state
+      - phase_space.in.population_state
+      - metrics.in.population_state
+
+  # Predation affects prey and feeds predators
+  - from: predation.out.predation
+    to:
+      - rabbits.in.predation
+
+  - from: predation.out.food_gained
+    to:
+      - foxes.in.food_gained

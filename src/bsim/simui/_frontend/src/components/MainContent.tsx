@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo } from 'react'
+import React, { useMemo } from 'react'
 import { useUi, useModuleNames, useVisualsByModule } from '../app/ui'
 import ModuleVisuals from './ModuleVisuals'
+import DescriptionPanel from './DescriptionPanel'
 
 function EmptyState({ message, description }: { message: string; description?: string }) {
   return (
@@ -21,10 +22,12 @@ export default function MainContent() {
     [allModules, state.visibleModules]
   )
   const visualsByModule = useVisualsByModule()
+  const description = state.spec?.description
 
   if (allModules.length === 0) {
     return (
       <div className="main-content">
+        {description && <DescriptionPanel description={description} />}
         <EmptyState message="No modules found" description="The simulation doesn't have any modules to display yet." />
       </div>
     )
@@ -33,6 +36,7 @@ export default function MainContent() {
   if (available.length === 0) {
     return (
       <div className="main-content">
+        {description && <DescriptionPanel description={description} />}
         <EmptyState message="No modules selected" description="Select modules from the sidebar to view their visualizations." />
       </div>
     )
@@ -40,6 +44,7 @@ export default function MainContent() {
 
   return (
     <div className="main-content">
+      {description && <DescriptionPanel description={description} />}
       <div className="modules-grid">
         {available.map((m) => (
           <ModuleVisuals key={m} moduleName={m} visuals={visualsByModule.get(m) || []} />

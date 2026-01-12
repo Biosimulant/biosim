@@ -65,12 +65,14 @@ class Interface:
         world: BioWorld,
         *,
         title: str = "BioSim UI",
+        description: str | None = None,
         controls: Sequence[Any] | None = None,
         outputs: Sequence[Any] | None = None,
         mount_path: str = "/ui",
     ) -> None:
         self._world = world
         self._title = title
+        self._description = description
         # Base controls
         base_controls = [Number("steps", 100), Number("dt", 0.1), Button("Run")]
         self._controls = list(controls or base_controls)
@@ -269,6 +271,7 @@ class Interface:
             return {
                 "version": "2",
                 "title": self._title,
+                "description": self._description,
                 "controls": controls,
                 "outputs": outputs,
                 "modules": modules,

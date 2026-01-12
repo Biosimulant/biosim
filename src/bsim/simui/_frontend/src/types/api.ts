@@ -21,6 +21,7 @@ export type ModuleVisuals = { module: string; visuals: VisualSpec[] }
 export type UiSpec = {
   version: string
   title: string
+  description?: string | null
   controls: Control[]
   outputs: Array<Record<string, unknown>>
   modules: string[]
