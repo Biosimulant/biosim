@@ -73,9 +73,9 @@ def setup_microcircuit_world() -> bsim.BioWorld:
     # Input
     poisson_input = PoissonInput(n=n_exc, rate_hz=15.0, seed=42)
 
-    # Populations
-    exc_pop = IzhikevichPopulation(n=n_exc, preset="RS", sample_indices=[0, 1, 2])
-    inh_pop = IzhikevichPopulation(n=n_inh, preset="FS", sample_indices=[0])
+    # Populations (I_bias provides baseline drive to ensure spiking activity)
+    exc_pop = IzhikevichPopulation(n=n_exc, preset="RS", sample_indices=[0, 1, 2], I_bias=5.0)
+    inh_pop = IzhikevichPopulation(n=n_inh, preset="FS", sample_indices=[0], I_bias=5.0)
 
     # Synapses
     syn_ext_e = ExpSynapseCurrent(n_pre=n_exc, n_post=n_exc, p_connect=0.1, weight=1.0, tau=0.005, seed=42)

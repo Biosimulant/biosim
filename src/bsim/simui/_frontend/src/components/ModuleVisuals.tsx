@@ -6,7 +6,7 @@ import Table from '../renderers/Table'
 import ImageView from '../renderers/ImageView'
 import Graph from '../renderers/Graph'
 
-const RENDERERS: Record<string, React.ComponentType<{ data: any }>> = {
+const RENDERERS: Record<string, React.ComponentType<{ data: any; isFullscreen?: boolean }>> = {
   timeseries: Timeseries,
   bar: Bar,
   table: Table,
@@ -72,7 +72,7 @@ function VisualizationCard({ visual, index }: { visual: VisualSpec; index: numbe
         </div>
       </div>
       <div className="card-content">
-        <Renderer data={visual.data} />
+        <Renderer data={visual.data} isFullscreen={isFullscreen} />
       </div>
     </>
   )
@@ -117,7 +117,9 @@ function ModuleVisuals({ moduleName, visuals }: { moduleName: string; visuals: V
     <div className="module-visuals">
       <ModuleHeader moduleName={moduleName} visualCount={visuals.length} />
       <div className="visualizations-grid">
-        {visuals.map((v, i) => <VisualizationCard key={i} visual={v} index={i} />)}
+        {visuals.map((v, i) => (
+          <VisualizationCard key={`${moduleName}-${v.render}-${i}`} visual={v} index={i} />
+        ))}
       </div>
     </div>
   )
