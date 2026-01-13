@@ -3,10 +3,56 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from importlib import import_module
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, MutableMapping, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, MutableMapping, Optional, Tuple, TYPE_CHECKING
 
 from .modules import BioModule
 from .world import BioWorld
+
+if TYPE_CHECKING:
+    from .adapters.base import SimulatorAdapter, AdapterConfig
+
+
+# Registry of adapter types to their implementation classes
+_ADAPTER_REGISTRY: Dict[str, str] = {
+    "tellurium": "bsim.adapters.tellurium.TelluriumAdapter",
+    "sbml": "bsim.adapters.tellurium.TelluriumAdapter",  # alias
+    "ml": "bsim.adapters.ml.MLAdapter",
+    "onnx": "bsim.adapters.ml.MLAdapter",  # alias
+}
+
+
+def register_adapter(name: str, cls_path: str) -> None:
+    """
+    Register a new adapter type.
+
+    Args:
+        name: Short name for the adapter (e.g., 'tellurium', 'neuroml')
+        cls_path: Dotted path to the adapter class
+    """
+    _ADAPTER_REGISTRY[name.lower()] = cls_path
+
+
+def get_adapter_class(adapter_type: str) -> type:
+    """
+    Get the adapter class for a given type.
+
+    Args:
+        adapter_type: Type name (e.g., 'tellurium', 'ml')
+
+    Returns:
+        The adapter class
+
+    Raises:
+        ValueError: If adapter type is not registered
+    """
+    cls_path = _ADAPTER_REGISTRY.get(adapter_type.lower())
+    if not cls_path:
+        available = sorted(_ADAPTER_REGISTRY.keys())
+        raise ValueError(
+            f"Unknown adapter type '{adapter_type}'. "
+            f"Available: {available}"
+        )
+    return _import_from_string(cls_path)
 
 
 def _parse_ref(ref: str) -> Tuple[str, Optional[str], str]:
@@ -80,12 +126,169 @@ def _import_from_string(path: str) -> Any:
     return getattr(mod, attr)
 
 
+class AdapterModule(BioModule):
+    """
+    Wrapper that makes a SimulatorAdapter behave like a BioModule.
+
+    This allows adapters to be used in the standard wiring system,
+    receiving signals from other modules and emitting signals that
+    can be consumed by other modules.
+
+    Example config:
+        modules:
+          metabolism:
+            adapter: tellurium
+            model: path/to/model.xml
+            expose: [glucose, ATP]
+            parameters:
+              k1: 0.5
+    """
+
+    def __init__(
+        self,
+        name: str,
+        adapter: "SimulatorAdapter",
+        expose: List[str] | None = None,
+        input_map: Dict[str, str] | None = None,
+    ):
+        """
+        Create an adapter wrapper.
+
+        Args:
+            name: Module name for signal emission
+            adapter: The underlying simulator adapter
+            expose: List of outputs to expose as signals
+            input_map: Mapping of signal names to adapter input names
+        """
+        super().__init__()
+        self._name = name
+        self._adapter = adapter
+        self._expose = expose or []
+        self._input_map = input_map or {}
+        self._pending_inputs: Dict[str, Any] = {}
+
+    def inputs(self) -> List[str]:
+        """Return declared input ports."""
+        return list(self._input_map.keys()) if self._input_map else []
+
+    def outputs(self) -> List[str]:
+        """Return declared output ports."""
+        return self._expose
+
+    def on_signal(self, topic: str, payload: Any) -> None:
+        """Receive a signal and queue it for the adapter."""
+        # Map external signal name to internal adapter input name
+        internal_name = self._input_map.get(topic, topic)
+        self._pending_inputs[internal_name] = payload
+
+    def step(self, dt: float) -> None:
+        """
+        Advance the adapter by dt and emit output signals.
+
+        This is called by the world during simulation.
+        """
+        from .adapters.signals import BioSignal
+
+        # Apply pending inputs to adapter
+        if self._pending_inputs:
+            signals = {
+                name: BioSignal(
+                    source=self._name,
+                    name=name,
+                    value=value,
+                    timestamp=self._adapter.current_time,
+                )
+                for name, value in self._pending_inputs.items()
+            }
+            self._adapter.set_inputs(signals)
+            self._pending_inputs.clear()
+
+        # Advance simulation
+        new_time = self._adapter.current_time + dt
+        self._adapter.advance_to(new_time)
+
+        # Emit outputs as signals
+        outputs = self._adapter.get_outputs()
+        for signal_name in self._expose:
+            if signal_name in outputs:
+                signal = outputs[signal_name]
+                self.emit(signal_name, signal.value)
+
+    def reset(self) -> None:
+        """Reset the adapter to initial state."""
+        self._adapter.reset()
+        self._pending_inputs.clear()
+
+
+def _create_adapter_module(name: str, entry: Mapping[str, Any]) -> AdapterModule:
+    """
+    Create an AdapterModule from a config entry.
+
+    Args:
+        name: Module name
+        entry: Config dict with adapter, model, expose, parameters, etc.
+
+    Returns:
+        Configured AdapterModule
+    """
+    adapter_type = entry.get("adapter")
+    if not isinstance(adapter_type, str):
+        raise ValueError(f"Module '{name}' has invalid adapter type")
+
+    # Get adapter class
+    adapter_cls = get_adapter_class(adapter_type)
+
+    # Build adapter config
+    from .adapters.base import AdapterConfig
+
+    config = AdapterConfig(
+        adapter_type=adapter_type,
+        model_path=entry.get("model") or entry.get("sbml") or entry.get("onnx"),
+        expose=entry.get("expose", []),
+        parameters=entry.get("parameters", {}),
+        inputs=entry.get("inputs", {}),
+        outputs=entry.get("outputs", {}),
+        extra=entry.get("extra", {}),
+    )
+
+    # Instantiate and setup adapter
+    adapter = adapter_cls(config)
+    adapter.setup({})
+
+    # Create wrapper module
+    return AdapterModule(
+        name=name,
+        adapter=adapter,
+        expose=config.expose,
+        input_map=config.inputs,
+    )
+
+
 def build_from_spec(world: BioWorld, spec: Mapping[str, Any]) -> WiringBuilder:
     """Build modules and wiring from a spec dict.
 
     Spec format (keys optional):
-    - modules: mapping of name -> dotted path string or {class: dotted, args: {...}}
+    - modules: mapping of name -> one of:
+        - dotted path string (e.g., "bsim.packs.neuro.IzhikevichPopulation")
+        - {class: dotted, args: {...}} for native BioModule classes
+        - {adapter: "tellurium", model: "path/to/model.xml", expose: [...]} for adapters
     - wiring: list of {from: str, to: [str, ...]}
+
+    Example with adapter:
+        modules:
+          metabolism:
+            adapter: tellurium
+            model: models/glycolysis.xml
+            expose: [glucose, ATP, pyruvate]
+            parameters:
+              vmax: 1.5
+
+          predictor:
+            adapter: ml
+            model: models/classifier.onnx
+            expose: [prediction]
+            inputs:
+              substrate_level: glucose
     """
     builder = WiringBuilder(world)
 
@@ -93,17 +296,28 @@ def build_from_spec(world: BioWorld, spec: Mapping[str, Any]) -> WiringBuilder:
     if isinstance(modules_section, Mapping):
         for name, entry in modules_section.items():
             if isinstance(entry, str):
+                # Simple class path string
                 cls = _import_from_string(entry)
                 module = cls()
             elif isinstance(entry, Mapping):
-                cls_path = entry.get("class")
-                if not isinstance(cls_path, str):
-                    raise ValueError(f"Invalid class for module '{name}'")
-                cls = _import_from_string(cls_path)
-                kwargs = entry.get("args") or {}
-                if not isinstance(kwargs, Mapping):
-                    raise ValueError(f"Invalid args for module '{name}'")
-                module = cls(**dict(kwargs))
+                # Check if it's an adapter or native module
+                if "adapter" in entry:
+                    # Create adapter-wrapped module
+                    module = _create_adapter_module(name, entry)
+                elif "class" in entry:
+                    # Native BioModule class
+                    cls_path = entry.get("class")
+                    if not isinstance(cls_path, str):
+                        raise ValueError(f"Invalid class for module '{name}'")
+                    cls = _import_from_string(cls_path)
+                    kwargs = entry.get("args") or {}
+                    if not isinstance(kwargs, Mapping):
+                        raise ValueError(f"Invalid args for module '{name}'")
+                    module = cls(**dict(kwargs))
+                else:
+                    raise ValueError(
+                        f"Module '{name}' must have either 'class' or 'adapter' key"
+                    )
             else:
                 raise ValueError(f"Invalid module entry for '{name}'")
             if not isinstance(module, BioModule):

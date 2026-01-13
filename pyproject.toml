@@ -78,6 +78,24 @@ ui = [
   "fastapi>=0.110,<1",
   "uvicorn>=0.23",
 ]
+# Adapter dependencies - install what you need
+tellurium = [
+  "tellurium>=2.2.0",
+]
+ml = [
+  "onnxruntime>=1.16.0",
+  "numpy>=1.24.0",
+]
+# All adapters
+adapters = [
+  "tellurium>=2.2.0",
+  "onnxruntime>=1.16.0",
+  "numpy>=1.24.0",
+]
+# Everything
+all = [
+  "bsim[dev,ui,adapters]",
+]
 
 [tool.hatch.build]
 include = [
