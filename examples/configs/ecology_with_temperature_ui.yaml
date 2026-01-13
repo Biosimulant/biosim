@@ -1,0 +1,125 @@
+# Ecology Pack: Predator-Prey with Temperature UI Control
+#
+# This config demonstrates using DefaultBioSolver with temperature parameters
+# which enables the temperature slider in SimUI.
+#
+# Run with:
+#   python -m bsim examples/configs/ecology_with_temperature_ui.yaml --simui --open
+
+meta:
+  title: "Predator-Prey with Temperature Control"
+  description: |
+    ## Temperature-Controlled Ecosystem
+
+    This simulation uses **DefaultBioSolver** with temperature parameters,
+    enabling the temperature slider in SimUI.
+
+    ### How Temperature Affects the Simulation
+
+    - **Rabbits**: Optimal at 20°C, ±15°C tolerance
+    - **Foxes**: Optimal at 15°C, ±20°C tolerance
+
+    When temperature deviates from optimal:
+    - Birth rates decrease
+    - Death rates increase
+    - Population dynamics shift
+
+    ### Try These Experiments
+
+    1. **Run at 20°C** (default) - stable oscillations
+    2. **Increase to 40°C** - rabbits struggle, foxes thrive
+    3. **Decrease to 0°C** - both species stressed
+    4. **Extreme: 50°C** - population collapse
+
+  # Solver with temperature UI support (Format 2: built-in with parameters)
+  solver:
+    type: default
+    temperature:
+      initial: 20.0
+      bounds: [0.0, 50.0]
+
+modules:
+  # Environment syncs temperature from solver for UI control
+  environment:
+    class: bsim.packs.ecology.Environment
+    args:
+      temperature: 20.0
+      water: 80.0
+      food_availability: 1.0
+      sync_from_solver: true  # KEY: enables UI temperature control
+
+  rabbits:
+    class: bsim.packs.ecology.OrganismPopulation
+    args:
+      name: "Rabbits"
+      initial_count: 800
+      birth_rate: 0.10
+      death_rate: 0.02
+      optimal_temp: 20.0
+      temp_tolerance: 15.0
+      carrying_capacity: 2000
+      seed: 42
+
+  foxes:
+    class: bsim.packs.ecology.OrganismPopulation
+    args:
+      name: "Foxes"
+      initial_count: 100
+      birth_rate: 0.04
+      death_rate: 0.02
+      optimal_temp: 15.0
+      temp_tolerance: 20.0
+      food_efficiency: 0.8
+      carrying_capacity: 300
+      seed: 43
+
+  predation:
+    class: bsim.packs.ecology.PredatorPreyInteraction
+    args:
+      predation_rate: 0.005
+      conversion_efficiency: 1.0
+      seed: 44
+
+  # Monitors
+  pop_monitor:
+    class: bsim.packs.ecology.PopulationMonitor
+    args:
+      max_points: 10000
+
+  phase_space:
+    class: bsim.packs.ecology.PhaseSpaceMonitor
+    args:
+      x_species: "Rabbits"
+      y_species: "Foxes"
+      max_points: 5000
+
+  metrics:
+    class: bsim.packs.ecology.EcologyMetrics
+
+wiring:
+  - from: environment.out.conditions
+    to:
+      - rabbits.in.conditions
+      - foxes.in.conditions
+
+  - from: rabbits.out.population_state
+    to:
+      - predation.in.prey_state
+      - pop_monitor.in.population_state
+      - phase_space.in.population_state
+      - metrics.in.population_state
+
+  - from: foxes.out.population_state
+    to:
+      - predation.in.predator_state
+      - pop_monitor.in.population_state
+      - phase_space.in.population_state
+      - metrics.in.population_state
+
+  - from: predation.out.predation
+    to:
+      - rabbits.in.predation
+
+  - from: predation.out.food_gained
+    to:
+      - foxes.in.food_gained

@@ -12,18 +12,53 @@ Usage:
     python -m bsim config.yaml --steps 5000 --dt 0.05
 
 YAML config format (extended):
-    # Metadata for SimUI (optional)
     meta:
       title: "My Simulation"
       description: "Markdown description here"
-      solver: default  # "default" or "fixed"
-      temperature: 20.0  # Initial temperature for DefaultBioSolver
 
-    # Modules and wiring (standard)
+      # Solver options (three formats supported):
+
+      # 1. String shorthand
+      solver: fixed           # or "default"
+
+      # 2. Built-in solver with parameters
+      solver:
+        type: default
+        temperature:
+          initial: 20.0
+          bounds: [0.0, 50.0]
+
+      # 3. Custom solver class (from any installed package)
+      solver:
+        class: my_package.MySolver
+        args:
+          custom_param: 42
+
+    # Modules - reference any importable class
     modules:
-      ...
+      my_module:
+        class: some_package.CustomModule
+        args:
+          param: value
+
     wiring:
-      ...
+      - from: module_a.out.signal
+        to: [module_b.in.signal]
+
+Plugin Architecture:
+    Any pip-installable package can provide custom modules and solvers.
+    Reference them by their full dotted import path in YAML configs.
+
+    Example:
+        pip install bsim-neurolab
+
+        # config.yaml
+        meta:
+          solver:
+            class: bsim_neurolab.AdaptiveSolver
+        modules:
+          neuron:
+            class: bsim_neurolab.HodgkinHuxley
 """
 from __future__ import annotations
 
@@ -60,26 +95,93 @@ def load_config(path: Path) -> Dict[str, Any]:
         sys.exit(1)
 
 
+def _import_class(dotted_path: str) -> type:
+    """Import a class from a dotted path like 'package.module.ClassName'."""
+    from importlib import import_module
+
+    module_path, _, class_name = dotted_path.rpartition(".")
+    if not module_path or not class_name:
+        raise ValueError(f"Invalid import path: {dotted_path}")
+    module = import_module(module_path)
+    return getattr(module, class_name)
+
+
+def create_solver(solver_spec: Any, temp_override: Optional[float] = None) -> "Solver":
+    """Create a solver from YAML spec.
+
+    Supports three formats:
+    1. String shorthand: "fixed" or "default"
+    2. Dict with type: {type: "default", temperature: {initial: 20.0, bounds: [0, 50]}}
+    3. Dict with class: {class: "my_package.MySolver", args: {...}}
+    """
+    import bsim
+    from bsim.solver import Solver
+
+    # Format 1: String shorthand
+    if isinstance(solver_spec, str):
+        if solver_spec == "default":
+            from bsim.solver import DefaultBioSolver, TemperatureParams
+
+            initial_temp = temp_override if temp_override is not None else 25.0
+            return DefaultBioSolver(
+                temperature=TemperatureParams(initial=initial_temp, bounds=(0.0, 50.0)),
+            )
+        return bsim.FixedStepSolver()
+
+    # Format 2 & 3: Dict-based configuration
+    if isinstance(solver_spec, dict):
+        # Format 3: Custom class
+        if "class" in solver_spec:
+            try:
+                cls = _import_class(solver_spec["class"])
+            except Exception as e:
+                print(f"Error importing solver class '{solver_spec['class']}': {e}", file=sys.stderr)
+                sys.exit(1)
+
+            args = solver_spec.get("args", {})
+            if not isinstance(args, dict):
+                args = {}
+
+            try:
+                return cls(**args)
+            except Exception as e:
+                print(f"Error instantiating solver '{solver_spec['class']}': {e}", file=sys.stderr)
+                sys.exit(1)
+
+        # Format 2: Built-in with parameters
+        solver_type = solver_spec.get("type", "fixed")
+        if solver_type == "default":
+            from bsim.solver import DefaultBioSolver, TemperatureParams
+
+            temp_spec = solver_spec.get("temperature", {})
+            if isinstance(temp_spec, dict):
+                initial_temp = temp_override if temp_override is not None else temp_spec.get("initial", 25.0)
+                bounds = temp_spec.get("bounds", [0.0, 50.0])
+                if isinstance(bounds, list) and len(bounds) == 2:
+                    bounds = tuple(bounds)
+                else:
+                    bounds = (0.0, 50.0)
+                temp_params = TemperatureParams(initial=initial_temp, bounds=bounds)
+            else:
+                initial_temp = temp_override if temp_override is not None else 25.0
+                temp_params = TemperatureParams(initial=initial_temp, bounds=(0.0, 50.0))
+
+            return DefaultBioSolver(temperature=temp_params)
+
+        return bsim.FixedStepSolver()
+
+    # Fallback: no solver spec or invalid
+    return bsim.FixedStepSolver()
+
+
 def create_world(config: Dict[str, Any], temp_override: Optional[float] = None) -> "BioWorld":
     """Create a BioWorld from config, using appropriate solver."""
     import bsim
 
     meta = config.get("meta", {})
-    solver_type = meta.get("solver", "fixed")
+    solver_spec = meta.get("solver", "fixed")
 
-    if solver_type == "default":
-        from bsim.solver import DefaultBioSolver, TemperatureParams
-
-        # Get temperature from meta or override
-        initial_temp = temp_override if temp_override is not None else meta.get("temperature", 25.0)
-        temp_bounds = meta.get("temperature_bounds", (0.0, 50.0))
-
-        solver = DefaultBioSolver(
-            temperature=TemperatureParams(initial=initial_temp, bounds=tuple(temp_bounds)),
-        )
-    else:
-        solver = bsim.FixedStepSolver()
-
+    solver = create_solver(solver_spec, temp_override=temp_override)
     world = bsim.BioWorld(solver=solver)
     return world
 

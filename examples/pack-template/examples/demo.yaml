@@ -1,0 +1,42 @@
+# Demo: Using my_pack modules and solver
+#
+# Run with:
+#   cd examples/pack-template
+#   pip install -e .
+#   python -m bsim examples/demo.yaml --simui
+
+meta:
+  title: "My Pack Demo"
+  description: |
+    ## Custom Pack Demo
+
+    This demonstrates using custom modules and solvers from `my_pack`.
+
+    ### Modules Used
+    - **Counter**: Counts simulation steps
+    - **SignalLogger**: Logs all signals for debugging
+
+    ### Custom Solver
+    Using `VariableStepSolver` with configurable dt bounds.
+
+  solver:
+    class: my_pack.VariableStepSolver
+    args:
+      min_dt: 0.01
+      max_dt: 0.1
+
+modules:
+  counter:
+    class: my_pack.Counter
+    args:
+      name: "step_counter"
+
+  logger:
+    class: my_pack.SignalLogger
+    args:
+      max_entries: 50
+
+wiring:
+  # Counter emits to logger
+  - from: counter.out.count
+    to: [logger.in.count]
