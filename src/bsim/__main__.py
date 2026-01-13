@@ -214,6 +214,7 @@ def run_simui(
     world: "BioWorld",
     config: Dict[str, Any],
     *,
+    config_path: Path,
     steps: int,
     dt: float,
     port: int,
@@ -250,6 +251,7 @@ def run_simui(
         description=description,
         controls=controls,
         outputs=outputs,
+        config_path=config_path,
     )
 
     print(f"Starting SimUI: http://{host}:{port}/ui/")
@@ -348,6 +350,7 @@ Examples:
         run_simui(
             world,
             config,
+            config_path=args.config.resolve(),
             steps=args.steps,
             dt=args.dt,
             port=args.port,

@@ -16,6 +16,7 @@ from fastapi.staticfiles import StaticFiles
 
 from ..world import BioWorld, BioWorldEvent
 from .runner import SimulationManager
+from .editor_api import build_editor_router
 
 logger = logging.getLogger(__name__)
 
@@ -69,10 +70,12 @@ class Interface:
         controls: Sequence[Any] | None = None,
         outputs: Sequence[Any] | None = None,
         mount_path: str = "/ui",
+        config_path: str | Path | None = None,
     ) -> None:
         self._world = world
         self._title = title
         self._description = description
+        self._config_path: Path | None = Path(config_path) if config_path else None
         # Base controls
         base_controls = [Number("steps", 100), Number("dt", 0.1), Button("Run")]
         self._controls = list(controls or base_controls)
@@ -447,7 +450,58 @@ class Interface:
             self._last_step = None
             return {"ok": True}
 
+        # Include the config editor API router
+        editor_router = build_editor_router(
+            get_config_path=lambda: self._config_path,
+            get_world=lambda: self._world,
+            reload_world=self._reload_world,
+        )
+        router.include_router(editor_router, prefix="/api")
+
         return router
+
+    # ---- Config reload ----------------------------------------------------
+    def _reload_world(self, new_config_path: Path | None = None) -> bool:
+        """Reload the world from config file.
+
+        This clears existing modules and rewires from the config.
+        Returns True on success, False on failure.
+        """
+        import bsim
+
+        config_path = new_config_path or self._config_path
+        if not config_path or not config_path.exists():
+            logger.error("Cannot reload: no config path available")
+            return False
+
+        try:
+            # Stop any running simulation
+            self._runner.reset()
+
+            # Clear existing modules from the world
+            for module in list(self._world._biomodule_listeners.keys()):
+                self._world.remove_biomodule(module)
+
+            # Clear signal routes
+            self._world._signal_routes.clear()
+
+            # Reload wiring from config
+            bsim.load_wiring(self._world, config_path)
+
+            # Update stored config path
+            self._config_path = config_path
+
+            # Clear event buffers
+            with self._events_lock:
+                self._events.clear()
+                self._event_seq = 0
+            self._last_step = None
+
+            logger.info(f"Reloaded world from {config_path}")
+            return True
+        except Exception:
+            logger.exception(f"Failed to reload world from {config_path}")
+            return False
 
     # ---- Helpers ---------------------------------------------------------
     @staticmethod

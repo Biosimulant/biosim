@@ -7,6 +7,86 @@ export type SSESubscription = {
   close: () => void
 }
 
+// Editor types
+export interface ModuleArg {
+  name: string
+  type: string
+  default: unknown
+  required: boolean
+  description?: string
+  options?: unknown[]
+}
+
+export interface ModuleSpec {
+  name: string
+  category: string
+  description?: string
+  inputs: string[]
+  outputs: string[]
+  args: ModuleArg[]
+}
+
+export interface ModuleRegistry {
+  modules: Record<string, ModuleSpec>
+  categories: Record<string, string[]>
+}
+
+export interface GraphNode {
+  id: string
+  type: string
+  position: { x: number; y: number }
+  data: {
+    args: Record<string, unknown>
+    inputs: string[]
+    outputs: string[]
+  }
+}
+
+export interface GraphEdge {
+  id: string
+  source: string
+  sourceHandle: string
+  target: string
+  targetHandle: string
+}
+
+export interface GraphMeta {
+  title?: string
+  description?: string
+  solver?: string
+  solverConfig?: Record<string, unknown>
+}
+
+export interface ConfigGraph {
+  nodes: GraphNode[]
+  edges: GraphEdge[]
+  meta: GraphMeta
+}
+
+export interface ConfigFileInfo {
+  name: string
+  path: string
+  is_dir: boolean
+}
+
+export interface ValidateResponse {
+  valid: boolean
+  errors: string[]
+}
+
+export interface CurrentConfigResponse {
+  available: boolean
+  path: string | null
+  graph: ConfigGraph | null
+  error?: string
+}
+
+export interface ApplyConfigResponse {
+  ok: boolean
+  path: string
+  error?: string
+}
+
 export type Api = ReturnType<typeof makeApi>
 
 export function makeApi(baseUrl: string) {
@@ -23,6 +103,15 @@ export function makeApi(baseUrl: string) {
       body: JSON.stringify(body ?? {})
     })
     if (!res.ok) throw new Error(`POST ${path} failed: ${res.status}`)
+    return res.json() as Promise<T>
+  }
+  async function put<T>(path: string, body: unknown): Promise<T> {
+    const res = await fetch(`${base}${path}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body ?? {})
+    })
+    if (!res.ok) throw new Error(`PUT ${path} failed: ${res.status}`)
     return res.json() as Promise<T>
   }
 
@@ -45,6 +134,7 @@ export function makeApi(baseUrl: string) {
   }
 
   return {
+    // Simulation API
     spec: () => get('/api/spec'),
     status: () => get('/api/status'),
     state: () => get('/api/state'),
@@ -58,6 +148,20 @@ export function makeApi(baseUrl: string) {
     pause: () => post('/api/pause', {}),
     resume: () => post('/api/resume', {}),
     reset: () => post('/api/reset', {}),
-    subscribeSSE
+    subscribeSSE,
+
+    // Editor API
+    editor: {
+      getModules: () => get<ModuleRegistry>('/api/editor/modules'),
+      getConfig: (path: string) => get<ConfigGraph>(`/api/editor/config?path=${encodeURIComponent(path)}`),
+      getCurrent: () => get<CurrentConfigResponse>('/api/editor/current'),
+      saveConfig: (path: string, graph: ConfigGraph) => put<{ ok: boolean; path: string }>('/api/editor/config', { path, graph }),
+      applyConfig: (graph: ConfigGraph, savePath?: string) => post<ApplyConfigResponse>('/api/editor/apply', { graph, save_path: savePath }),
+      validate: (graph: ConfigGraph) => post<ValidateResponse>('/api/editor/validate', graph),
+      layout: (graph: ConfigGraph) => post<ConfigGraph>('/api/editor/layout', graph),
+      toYaml: (graph: ConfigGraph) => post<{ yaml: string }>('/api/editor/to-yaml', graph),
+      fromYaml: (yaml: string) => post<ConfigGraph>('/api/editor/from-yaml', { yaml }),
+      listFiles: (path?: string) => get<ConfigFileInfo[]>(`/api/editor/files${path ? `?path=${encodeURIComponent(path)}` : ''}`),
+    }
   }
 }

@@ -6,8 +6,11 @@ import type { SSEMessage, SSESubscription } from './lib/api'
 import Sidebar from './components/Sidebar'
 import MainContent from './components/MainContent'
 import Footer from './components/Footer'
+import { ConfigEditor } from './components/editor'
 
-function AppCore() {
+type AppMode = 'simulation' | 'editor'
+
+function SimulationView() {
   const api = useApi()
   const { state, actions } = useUi()
   const [connected, setConnected] = useState(false)
@@ -89,21 +92,103 @@ function AppCore() {
   const reset = useCallback(async () => { await api.reset(); actions.setEvents([]) }, [api, actions])
 
   return (
+    <>
+      <header className="app-header">
+        <h1 className="app-title">{state.spec?.title || 'BioSim UI'}</h1>
+        <div className="app-status">{connected && <div className="sse-indicator" title="SSE Connected" />}</div>
+      </header>
+      <aside className="app-sidebar-left">
+        <Sidebar onRun={run} onPause={pause} onResume={resume} onReset={reset} />
+      </aside>
+      <main className="app-main">
+        <MainContent />
+      </main>
+      <aside className="app-sidebar-right">
+        <Footer />
+      </aside>
+    </>
+  )
+}
+
+function EditorView() {
+  const api = useApi()
+  return <ConfigEditor api={api} />
+}
+
+function AppCore() {
+  const [mode, setMode] = useState<AppMode>('simulation')
+
+  // Check URL hash for mode
+  useEffect(() => {
+    const hash = window.location.hash.slice(1)
+    if (hash === 'editor') setMode('editor')
+
+    const handleHashChange = () => {
+      const newHash = window.location.hash.slice(1)
+      setMode(newHash === 'editor' ? 'editor' : 'simulation')
+    }
+    window.addEventListener('hashchange', handleHashChange)
+    return () => window.removeEventListener('hashchange', handleHashChange)
+  }, [])
+
+  const toggleMode = () => {
+    const newMode = mode === 'simulation' ? 'editor' : 'simulation'
+    window.location.hash = newMode === 'editor' ? 'editor' : ''
+    setMode(newMode)
+  }
+
+  if (mode === 'editor') {
+    return (
+      <div className="app" style={{ height: '100vh' }}>
+        <div style={{ position: 'absolute', top: '8px', right: '8px', zIndex: 1001 }}>
+          <button
+            onClick={toggleMode}
+            style={{
+              padding: '6px 12px',
+              background: '#3b82f6',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '13px',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+            }}
+          >
+            Back to Simulation
+          </button>
+        </div>
+        <EditorView />
+      </div>
+    )
+  }
+
+  return (
     <div className="app">
       <div className="app-layout">
-        <header className="app-header">
-          <h1 className="app-title">{state.spec?.title || 'BioSim UI'}</h1>
-          <div className="app-status">{connected && <div className="sse-indicator" title="SSE Connected" />}</div>
-        </header>
-        <aside className="app-sidebar-left">
-          <Sidebar onRun={run} onPause={pause} onResume={resume} onReset={reset} />
-        </aside>
-        <main className="app-main">
-          <MainContent />
-        </main>
-        <aside className="app-sidebar-right">
-          <Footer />
-        </aside>
+        <SimulationView />
+      </div>
+      <div style={{ position: 'fixed', bottom: '16px', right: '16px', zIndex: 1000 }}>
+        <button
+          onClick={toggleMode}
+          title="Open Config Editor"
+          style={{
+            padding: '10px 16px',
+            background: '#3b82f6',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            fontSize: '13px',
+            fontWeight: 500,
+            boxShadow: '0 2px 8px rgba(59, 130, 246, 0.4)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+          }}
+        >
+          <span style={{ fontSize: '16px' }}>&#9881;</span>
+          Config Editor
+        </button>
       </div>
     </div>
   )
