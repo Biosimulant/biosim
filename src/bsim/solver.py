@@ -55,11 +55,11 @@ class FixedStepSolver(Solver):
         return {"time": time, "steps": steps}
 
 
-# --- Extensible Processes and DefaultBioSolver ---
+# --- Extensible Processes and FixedStepBioSolver ---
 
 
 class Process(ABC):
-    """A state update strategy applied by DefaultBioSolver each step.
+    """A state update strategy applied by FixedStepBioSolver each step.
 
     Implementations read from the current state and propose updates for one
     or more named quantities by returning a patch mapping quantity -> new value.
@@ -138,7 +138,7 @@ class ScalarRateProcess(Process):
         return {self.params.name: next_val}
 
 
-class DefaultBioSolver(Solver):
+class FixedStepBioSolver(Solver):
     """Extensible solver with configurable bio-quantities and processes.
 
     Features:
@@ -197,7 +197,7 @@ class DefaultBioSolver(Solver):
         except Exception:
             return self
         new_temp = replace(self._temperature_params, initial=temp_val)
-        return DefaultBioSolver(
+        return FixedStepBioSolver(
             temperature=new_temp,
             water=self._water_params,
             oxygen=self._oxygen_params,

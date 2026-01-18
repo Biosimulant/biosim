@@ -1,9 +1,9 @@
 import pytest
 
 
-def test_default_bio_solver_temperature_only(bsim):
+def test_fixed_step_bio_solver_temperature_only(bsim):
     # Increase temperature by 1.0 per step via delta_per_step
-    solver = bsim.DefaultBioSolver(
+    solver = bsim.FixedStepBioSolver(
         temperature=bsim.TemperatureParams(initial=0.0, delta_per_step=1.0)
     )
     world = bsim.BioWorld(solver=solver)
@@ -26,11 +26,11 @@ def test_default_bio_solver_temperature_only(bsim):
     assert result["temperature"] == pytest.approx(3.0)
 
 
-def test_default_bio_solver_water_and_oxygen_with_bounds(bsim):
+def test_fixed_step_bio_solver_water_and_oxygen_with_bounds(bsim):
     # Water and oxygen decay with clamping to [0, 1]
     water = bsim.ScalarRateParams(name="water", initial=1.0, rate_per_time=-0.6, bounds=(0.0, 1.0))
     oxygen = bsim.ScalarRateParams(name="oxygen", initial=0.3, rate_per_time=-0.2, bounds=(0.0, 1.0))
-    solver = bsim.DefaultBioSolver(water=water, oxygen=oxygen)
+    solver = bsim.FixedStepBioSolver(water=water, oxygen=oxygen)
     world = bsim.BioWorld(solver=solver)
 
     result = world.simulate(steps=2, dt=1.0)

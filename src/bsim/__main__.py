@@ -120,10 +120,10 @@ def create_solver(solver_spec: Any, temp_override: Optional[float] = None) -> "S
     # Format 1: String shorthand
     if isinstance(solver_spec, str):
         if solver_spec == "default":
-            from bsim.solver import DefaultBioSolver, TemperatureParams
+            from bsim.solver import FixedStepBioSolver, TemperatureParams
 
             initial_temp = temp_override if temp_override is not None else 25.0
-            return DefaultBioSolver(
+            return FixedStepBioSolver(
                 temperature=TemperatureParams(initial=initial_temp, bounds=(0.0, 50.0)),
             )
         return bsim.FixedStepSolver()
@@ -151,7 +151,7 @@ def create_solver(solver_spec: Any, temp_override: Optional[float] = None) -> "S
         # Format 2: Built-in with parameters
         solver_type = solver_spec.get("type", "fixed")
         if solver_type == "default":
-            from bsim.solver import DefaultBioSolver, TemperatureParams
+            from bsim.solver import FixedStepBioSolver, TemperatureParams
 
             temp_spec = solver_spec.get("temperature", {})
             if isinstance(temp_spec, dict):
@@ -166,7 +166,7 @@ def create_solver(solver_spec: Any, temp_override: Optional[float] = None) -> "S
                 initial_temp = temp_override if temp_override is not None else 25.0
                 temp_params = TemperatureParams(initial=initial_temp, bounds=(0.0, 50.0))
 
-            return DefaultBioSolver(temperature=temp_params)
+            return FixedStepBioSolver(temperature=temp_params)
 
         return bsim.FixedStepSolver()
 
@@ -317,7 +317,7 @@ Examples:
         "--temperature",
         type=float,
         default=None,
-        help="Override initial temperature (for DefaultBioSolver)",
+        help="Override initial temperature (for FixedStepBioSolver)",
     )
 
     args = parser.parse_args()

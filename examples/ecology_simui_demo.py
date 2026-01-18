@@ -38,10 +38,10 @@ from bsim.packs.ecology import (
 
 def setup_predator_prey_world() -> bsim.BioWorld:
     """Set up a classic predator-prey ecosystem."""
-    # Use DefaultBioSolver with temperature for UI control
-    from bsim.solver import DefaultBioSolver, TemperatureParams
+    # Use FixedStepBioSolver with temperature for UI control
+    from bsim.solver import FixedStepBioSolver, TemperatureParams
 
-    solver = DefaultBioSolver(
+    solver = FixedStepBioSolver(
         temperature=TemperatureParams(initial=20.0, bounds=(0.0, 50.0)),
     )
     world = bsim.BioWorld(solver=solver)
@@ -231,10 +231,10 @@ This simulation models a more complex ecosystem with **wolves** preying on both 
 
 def setup_three_species_world() -> bsim.BioWorld:
     """Set up a three-species food chain: grass -> rabbits -> foxes."""
-    # Use DefaultBioSolver with temperature for UI control
-    from bsim.solver import DefaultBioSolver, TemperatureParams
+    # Use FixedStepBioSolver with temperature for UI control
+    from bsim.solver import FixedStepBioSolver, TemperatureParams
 
-    solver = DefaultBioSolver(
+    solver = FixedStepBioSolver(
         temperature=TemperatureParams(initial=20.0, bounds=(-10.0, 50.0)),
     )
     world = bsim.BioWorld(solver=solver)

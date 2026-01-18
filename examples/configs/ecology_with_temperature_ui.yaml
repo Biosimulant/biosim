@@ -1,6 +1,6 @@
 # Ecology Pack: Predator-Prey with Temperature UI Control
 #
-# This config demonstrates using DefaultBioSolver with temperature parameters
+# This config demonstrates using FixedStepBioSolver with temperature parameters
 # which enables the temperature slider in SimUI.
 #
 # Run with:
@@ -11,7 +11,7 @@ meta:
   description: |
     ## Temperature-Controlled Ecosystem
 
-    This simulation uses **DefaultBioSolver** with temperature parameters,
+    This simulation uses **FixedStepBioSolver** with temperature parameters,
     enabling the temperature slider in SimUI.
 
     ### How Temperature Affects the Simulation

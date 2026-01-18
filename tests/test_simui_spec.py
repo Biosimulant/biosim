@@ -13,7 +13,7 @@ def fastapi_client():
 
 def _make_world(bsim, with_temp=False):
     if with_temp:
-        solver = bsim.DefaultBioSolver(temperature=bsim.TemperatureParams(initial=12.5))
+        solver = bsim.FixedStepBioSolver(temperature=bsim.TemperatureParams(initial=12.5))
     else:
         solver = bsim.FixedStepSolver()
     return bsim.BioWorld(solver=solver)

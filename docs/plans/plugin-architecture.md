@@ -31,7 +31,7 @@ Current:
 ```python
 solver_type = meta.get("solver", "fixed")
 if solver_type == "default":
-    # hardcoded DefaultBioSolver
+    # hardcoded FixedStepBioSolver
 else:
     # hardcoded FixedStepSolver
 ```
@@ -70,7 +70,7 @@ def create_solver(solver_spec: Any) -> Solver:
     # Format 1: String shorthand
     if isinstance(solver_spec, str):
         if solver_spec == "default":
-            return bsim.DefaultBioSolver()
+            return bsim.FixedStepBioSolver()
         return bsim.FixedStepSolver()
 
     # Format 2 & 3: Dict with type or class
@@ -91,8 +91,8 @@ def create_solver(solver_spec: Any) -> Solver:
                     initial=temp_spec.get("initial", 25.0),
                     bounds=tuple(temp_spec.get("bounds", (0.0, 50.0))),
                 )
-                return bsim.DefaultBioSolver(temperature=temp_params)
-            return bsim.DefaultBioSolver()
+                return bsim.FixedStepBioSolver(temperature=temp_params)
+            return bsim.FixedStepBioSolver()
         return bsim.FixedStepSolver()
 
     # Fallback

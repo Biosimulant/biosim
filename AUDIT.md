@@ -9,7 +9,7 @@ This is a point-in-time audit of the current `B-Simulant` repo state, focused on
 
 - Core library lives in `src/bsim/` and provides a small but coherent simulation runtime (`BioWorld`), solver interface + implementations, a module abstraction (`BioModule`), wiring (code + YAML/TOML loaders), and a minimal visualization contract.
 - A lightweight web UI (“SimUI”) exists under `src/bsim/simui/`, backed by FastAPI and a prebuilt frontend bundle shipped as static assets.
-- Tests exist and cover most current public behaviors (events, biosignals, wiring validation, visuals normalization, DefaultBioSolver, SimUI spec endpoints).
+- Tests exist and cover most current public behaviors (events, biosignals, wiring validation, visuals normalization, FixedStepBioSolver, SimUI spec endpoints).
 
 ## Git working state (what’s staged right now)
 
@@ -42,7 +42,7 @@ At the time of writing, `git status` shows a large staged set including (non-exh
   - `simulate(*, steps, dt, emit)` keyword-only contract.
 - `FixedStepSolver` (`src/bsim/solver.py`)
   - Emits a `STEP` event per iteration and returns `{time, steps}`.
-- `DefaultBioSolver` (`src/bsim/solver.py`)
+- `FixedStepBioSolver` (`src/bsim/solver.py`)
   - A “process” concept (`Process.update(state, dt) -> patch`) with built-in processes:
     - temperature (`TemperatureParams`)
     - generic scalar rates (`ScalarRateParams`) used for water/oxygen and arbitrary quantities
@@ -90,7 +90,7 @@ At the time of writing, `git status` shows a large staged set including (non-exh
 ### Docs, examples, tests, CI
 
 - Docs exist in `docs/` (overview, quickstart, wiring, solver, etc.).
-- Examples exist in `examples/` (basic usage, world simulation, visuals demo, wiring builder demo, DefaultBioSolver demo, SimUI demos).
+- Examples exist in `examples/` (basic usage, world simulation, visuals demo, wiring builder demo, FixedStepBioSolver demo, SimUI demos).
 - Tests exist in `tests/` (pytest) and cover the current primitives, including SimUI spec behavior.
 - GitHub Actions CI exists in `.github/workflows/ci.yml` and runs `pip install -e '.[dev,ui]'` then `pytest`, plus a package build job.
 
@@ -106,7 +106,7 @@ Note: `.venv/bin/pytest` fails in this checkout due to a stale shebang (venv cre
 
 The current library covers the Phase 1 “core engine” shape, but many items in the business case remain conceptual/planned:
 
-- Adaptive solver: only fixed-step exists today (`FixedStepSolver` / `DefaultBioSolver`).
+- Adaptive solver: only fixed-step exists today (`FixedStepSolver` / `FixedStepBioSolver`).
 - Richer modeling primitives: no built-in domain modules yet (molecular dynamics, CA, metabolic, neural, population, PK/PD).
 - Plugin SDK: no plugin discovery mechanism (e.g., entry points), versioned plugin contracts, or compatibility tooling.
 - Standards compliance: no SBML/CellML import/export or interoperability layer.

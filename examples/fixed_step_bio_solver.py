@@ -1,12 +1,12 @@
 """
-Examples for bsim.DefaultBioSolver with built-in and custom processes.
+Examples for bsim.FixedStepBioSolver with built-in and custom processes.
 
 Run after installing the project in editable mode:
     pip install -e .
-    python examples/default_bio_solver.py
+    python examples/fixed_step_bio_solver.py
 
 Alternatively, without installing:
-    PYTHONPATH=src python examples/default_bio_solver.py
+    PYTHONPATH=src python examples/fixed_step_bio_solver.py
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ def print_listener(event: bsim.BioWorldEvent, payload: Dict[str, Any]) -> None:
 
 def example_temperature_only() -> None:
     print("\n-- Temperature only (delta_per_step + rate_per_time) --")
-    solver = bsim.DefaultBioSolver(
+    solver = bsim.FixedStepBioSolver(
         temperature=bsim.TemperatureParams(
             initial=300.0,         # Kelvin
             delta_per_step=1.0,    # +1 K each step
@@ -52,7 +52,7 @@ def example_water_oxygen() -> None:
     print("\n-- Water and Oxygen with bounds --")
     water = bsim.ScalarRateParams(name="water", initial=1.0, rate_per_time=-0.6, bounds=(0.0, 1.0))
     oxygen = bsim.ScalarRateParams(name="oxygen", initial=0.3, rate_per_time=-0.2, bounds=(0.0, 1.0))
-    solver = bsim.DefaultBioSolver(water=water, oxygen=oxygen)
+    solver = bsim.FixedStepBioSolver(water=water, oxygen=oxygen)
     world = bsim.BioWorld(solver=solver)
     world.on(print_listener)
     result = world.simulate(steps=3, dt=1.0)
@@ -109,7 +109,7 @@ def example_custom_process() -> None:
     # Oxygen decays; glucose production reduced when oxygen is low
     oxygen = bsim.ScalarRateParams(name="oxygen", initial=0.25, rate_per_time=-0.1, bounds=(0.0, 1.0))
     glucose = GlucoseProcess(initial=2.0, production_per_step=0.5, consumption_rate=0.2)
-    solver = bsim.DefaultBioSolver(oxygen=oxygen, processes=[glucose])
+    solver = bsim.FixedStepBioSolver(oxygen=oxygen, processes=[glucose])
     world = bsim.BioWorld(solver=solver)
     world.on(print_listener)
     result = world.simulate(steps=4, dt=0.5)

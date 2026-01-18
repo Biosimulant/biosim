@@ -12,7 +12,7 @@ from .world import BioWorld, BioWorldEvent
 from .solver import (
     Solver,
     FixedStepSolver,
-    DefaultBioSolver,
+    FixedStepBioSolver,
     Process,
     TemperatureParams,
     ScalarRateParams,
@@ -36,7 +36,7 @@ __all__ = [
     "BioWorldEvent",
     "Solver",
     "FixedStepSolver",
-    "DefaultBioSolver",
+    "FixedStepBioSolver",
     "Process",
     "TemperatureParams",
     "ScalarRateParams",

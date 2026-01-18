@@ -73,7 +73,7 @@ Biosimulant/
 
 ### Core Simulation Engine
 - [ ] Fixed-step and adaptive solvers
-- [ ] DefaultBioSolver with configurable bio-quantities (temperature, water, oxygen, etc.)
+- [ ] FixedStepBioSolver with configurable bio-quantities (temperature, water, oxygen, etc.)
 - [ ] Event-driven architecture with lifecycle hooks
 - [ ] Directed biosignal routing between modules
 - [ ] Connection validation via port declarations
@@ -124,7 +124,7 @@ pip install -e './B-Simulant[ui]'
 import bsim
 
 # Create a solver with bio-quantities
-solver = bsim.DefaultBioSolver(
+solver = bsim.FixedStepBioSolver(
     temperature=bsim.TemperatureParams(
         initial=300.0,          # Kelvin
         delta_per_step=1.0,

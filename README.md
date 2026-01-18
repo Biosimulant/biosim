@@ -41,16 +41,16 @@ pip install -e .
 python examples/basic_usage.py
 ```
 
-### Quick Start: DefaultBioSolver
+### Quick Start: FixedStepBioSolver
 
-`DefaultBioSolver` extends the fixed-step behavior with configurable bio-quantities and processes (temperature, water, oxygen, etc.). It preserves the same event flow via `BioWorld` (`LOADED → BEFORE_SIMULATION → STEP* → AFTER_SIMULATION`).
+`FixedStepBioSolver` extends the fixed-step behavior with configurable bio-quantities and processes (temperature, water, oxygen, etc.). It preserves the same event flow via `BioWorld` (`LOADED → BEFORE_SIMULATION → STEP* → AFTER_SIMULATION`).
 
 Minimal usage:
 
 ```python
 import bsim
 
-solver = bsim.DefaultBioSolver(
+solver = bsim.FixedStepBioSolver(
     temperature=bsim.TemperatureParams(
         initial=300.0,          # Kelvin
         delta_per_step=1.0,     # +1 K per step
@@ -68,7 +68,7 @@ print(result)  # {'time': 3.0, 'steps': 3, 'temperature': ..., 'water': ..., 'ox
 
 See a fuller demonstration (including a custom process) in:
 
-- `examples/default_bio_solver.py`
+- `examples/fixed_step_bio_solver.py`
 
 ### Visuals from Modules
 
@@ -142,7 +142,7 @@ Understanding the core concepts is essential for working with bsim effectively.
 | **BioWorld** | Runtime container that orchestrates simulation steps, publishes lifecycle events, and routes module-to-module messages (biosignals). |
 | **BioModule** | Pluggable unit of behavior with local state. Modules listen to world events, exchange biosignals with peers, and optionally provide visualizations. |
 | **Solver** | Execution strategy that drives time-stepping. Calls `emit(event, payload)` to publish events and returns a summary dict when complete. |
-| **Process** | State-update strategy used by `DefaultBioSolver`. Defines `init_state()` and `update(state, dt)` to evolve quantities over time. |
+| **Process** | State-update strategy used by `FixedStepBioSolver`. Defines `init_state()` and `update(state, dt)` to evolve quantities over time. |
 | **Biosignal** | Directed message from one module to another via a named topic. Unlike global events, biosignals are point-to-point between connected modules. |
 | **Wiring** | Module connection graph. Defined programmatically, via `WiringBuilder`, or loaded from YAML/TOML configs. |
 | **VisualSpec** | JSON structure returned by `module.visualize()` with `render` type and `data` payload. SimUI renders these as charts, tables, images, or graphs. |
@@ -171,12 +171,12 @@ result = world.simulate(steps=100, dt=0.1)
 
 **Use when**: You need basic time-stepping and handle all state in your modules.
 
-### DefaultBioSolver
+### FixedStepBioSolver
 
 Extensible solver with built-in support for biological quantities and custom processes.
 
 ```python
-solver = bsim.DefaultBioSolver(
+solver = bsim.FixedStepBioSolver(
     temperature=bsim.TemperatureParams(initial=300.0, delta_per_step=1.0, rate_per_time=0.5, bounds=(273.15, 315.15)),
     water=bsim.ScalarRateParams(name="water", initial=1.0, rate_per_time=-0.6, bounds=(0.0, 1.0)),
     oxygen=bsim.ScalarRateParams(name="oxygen", initial=0.3, rate_per_time=-0.2, bounds=(0.0, 1.0)),
@@ -201,7 +201,7 @@ class MySolver(bsim.Solver):
 
 ### Custom Process
 
-Extend `DefaultBioSolver` with domain-specific state evolution:
+Extend `FixedStepBioSolver` with domain-specific state evolution:
 
 ```python
 from bsim.solver import Process
@@ -218,7 +218,7 @@ class GlucoseProcess(Process):
         current = state.get("glucose", self.initial)
         return {"glucose": current - self.rate * dt}
 
-solver = bsim.DefaultBioSolver(processes=[GlucoseProcess()])
+solver = bsim.FixedStepBioSolver(processes=[GlucoseProcess()])
 ```
 
 ---

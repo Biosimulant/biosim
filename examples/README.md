@@ -17,7 +17,7 @@ SimUI
 - `neuro_simui_demo.py`: Neuro SimUI demo for the neuro pack.
 
 Domain packs (headless demos)
-- `default_bio_solver.py`: `DefaultBioSolver` built-in processes + custom process example.
+- `fixed_step_bio_solver.py`: `FixedStepBioSolver` built-in processes + custom process example.
 - `neuro_single_neuron_demo.py`: Single-neuron Izhikevich demo + monitors/metrics.
 - `neuro_microcircuit_demo.py`: E/I microcircuit demo + monitors/metrics.
 

@@ -28,7 +28,7 @@ class Environment(BioModule):
         seasonal_cycle: If True, apply sinusoidal seasonal variation.
         season_period: Period of seasonal cycle in simulation time units.
         sync_from_solver: If True, read temperature/water from solver state
-            (enables UI control via DefaultBioSolver).
+            (enables UI control via FixedStepBioSolver).
     """
 
     def __init__(
