@@ -27,9 +27,9 @@ dependencies = [
 ]
 
 [project.urls]
-Documentation = "https://github.com/Demi/bsim#readme"
-Issues = "https://github.com/Demi/bsim/issues"
-Source = "https://github.com/Demi/bsim"
+Documentation = "https://github.com/Biosimulant/bsim#readme"
+Issues = "https://github.com/Biosimulant/bsim/issues"
+Source = "https://github.com/Biosimulant/bsim"
 
 [tool.hatch.version]
 path = "src/bsim/__about__.py"
