@@ -51,7 +51,7 @@ python examples/basic_usage.py
 
 For advanced curated demos (neuro/ecology), wiring configs, and model-pack templates, see the companion repo:
 
-- https://github.com/Biosimulant/biomodels
+- https://github.com/Biosimulant/models
 
 ### Quick Start: BioWorld
 
@@ -181,3 +181,7 @@ STARTED -> TICK (xN) -> FINISHED
 ```
 
 `PAUSED`, `RESUMED`, `STOPPED`, and `ERROR` may also be emitted depending on runtime control flow.
+
+## License
+
+MIT. See `LICENSE.txt`.

@@ -33,15 +33,15 @@ from bsim.packs.neuro import (
 
 ### Running Examples
 
-The heavier end-to-end demos and wiring configs live in the companion repo `biomodels`:
+The heavier end-to-end demos and wiring configs live in the companion repo `models`:
 
-- https://github.com/Biosimulant/biomodels
+- https://github.com/Biosimulant/models
 
 Clone it and run examples from that repo:
 
 ```bash
-git clone https://github.com/Biosimulant/biomodels.git
-cd biomodels
+git clone https://github.com/Biosimulant/models.git
+cd models
 ```
 
 **Single neuron space (local wiring-spec runner):**
@@ -399,7 +399,7 @@ visuals = world.collect_visuals()
 
 Balanced excitation/inhibition with Poisson drive.
 
-See `biomodels/spaces/neuro-microcircuit/space.yaml` for the composed space manifest.
+See `models/spaces/neuro-microcircuit/space.yaml` for the composed space manifest.
 
 Key observations:
 - **Balanced E/I**: Asynchronous irregular (AI) spiking
@@ -410,7 +410,7 @@ Key observations:
 
 The neuro pack supports YAML and TOML wiring configs:
 
-Example wiring specs are kept in `biomodels/spaces/*/wiring.yaml`:
+Example wiring specs are kept in `models/spaces/*/wiring.yaml`:
 
 **neuro_single_neuron.yaml**
 **neuro_single_neuron.toml**

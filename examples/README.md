@@ -19,7 +19,7 @@ Advanced models, spaces, and domain demos
 
 For neuroscience/ecology demos, wiring configs, and model-pack templates, see the companion repo:
 
-- https://github.com/Biosimulant/biomodels
+- https://github.com/Biosimulant/models
 
 How to run
 ----------
