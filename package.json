@@ -1,0 +1,39 @@
+{
+  "name": "@bsim/simui-ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./packages/simui-ui/dist/index.cjs",
+  "module": "./packages/simui-ui/dist/index.js",
+  "types": "./packages/simui-ui/dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./packages/simui-ui/dist/index.d.ts",
+      "import": "./packages/simui-ui/dist/index.js",
+      "require": "./packages/simui-ui/dist/index.cjs"
+    },
+    "./styles.css": "./packages/simui-ui/src/styles/globals.css"
+  },
+  "files": [
+    "packages/simui-ui/dist",
+    "packages/simui-ui/src/styles/globals.css"
+  ],
+  "peerDependencies": {
+    "react": "^18",
+    "react-dom": "^18"
+  },
+  "dependencies": {
+    "@xyflow/react": "^12.3.6",
+    "dagre": "^0.8.5",
+    "react-markdown": "^9.0.1",
+    "remark-gfm": "^4.0.0"
+  },
+  "scripts": {
+    "dev": "npm run dev --prefix packages/simui-ui",
+    "build": "npm run build --prefix packages/simui-ui",
+    "build:static": "npm run build:static --prefix packages/simui-ui",
+    "build:types": "npm run build:types --prefix packages/simui-ui",
+    "test": "npm run test --prefix packages/simui-ui",
+    "clean": "npm run clean --prefix packages/simui-ui"
+  }
+}
