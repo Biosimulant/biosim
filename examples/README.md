@@ -17,13 +17,9 @@ SimUI
 Advanced models, spaces, and domain demos
 -----------------------------------------
 
-The heavier neuroscience/ecology demos, wiring configs, and pack template were moved to the companion public repo:
+For neuroscience/ecology demos, wiring configs, and model-pack templates, see the companion repo:
 
 - https://github.com/Biosimulant/biomodels
-
-Moved content includes:
-- `models/` and `spaces/` (with `model.yaml` / `space.yaml`)
-- `pack-template/` (now `biomodels/templates/model-pack/`)
 
 How to run
 ----------

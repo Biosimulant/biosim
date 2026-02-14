@@ -417,7 +417,7 @@ def build_editor_router(
         """List available config files in a directory.
 
         Args:
-            path: Directory path (relative to cwd or examples/configs)
+            path: Directory path (relative to cwd)
 
         Returns:
             List of file info objects
@@ -426,12 +426,7 @@ def build_editor_router(
             if path:
                 resolved = _resolve_config_path(path)
             else:
-                # Default to examples/configs if it exists
-                examples_path = Path.cwd() / "examples" / "configs"
-                if examples_path.exists():
-                    resolved = examples_path
-                else:
-                    resolved = Path.cwd()
+                resolved = Path.cwd()
 
             if not resolved.is_dir():
                 raise HTTPException(status_code=400, detail=f"Not a directory: {path}")

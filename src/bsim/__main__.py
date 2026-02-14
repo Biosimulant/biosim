@@ -148,7 +148,7 @@ def main() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python -m bsim examples/configs/ecology_predator_prey.yaml --simui
+  python -m bsim wiring.yaml --simui
   python -m bsim config.yaml --duration 10.0
   python -m bsim config.yaml --simui --port 8080 --open
         """,

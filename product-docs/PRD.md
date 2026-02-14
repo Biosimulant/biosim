@@ -123,4 +123,4 @@ This PRD describes the end-to-end product, from core simulation primitives throu
 
 ## 7) Milestones (high-level)
 
-See `product-docs/ROADMAP.md` for a sequenced plan and milestone gates.
+See the internal platform repository for a sequenced plan and milestone gates.

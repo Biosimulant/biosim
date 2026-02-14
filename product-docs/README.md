@@ -4,12 +4,11 @@ This folder contains technical product and engineering documentation for `bio-si
 
 ## Core Documents
 - `PRD.md`: technical requirements and personas for runtime features.
-- `ROADMAP.md`: public technical roadmap only.
+- `TEMPLATE_TASK.md`: task template for engineering work.
 - `epics/`: implementation plans per capability.
 - `contracts/`: API and manifest contracts.
 - `quality/`: quality gates and testing practices.
 
 ## Internal Boundary
 Business and market-planning documents are intentionally not public in this repository.
-Internal planning docs are maintained in:
-- `/Volumes/dem-ssd/imp/projects/Nitoons/Biosimulant/bsim-platform/docs/internal/ip/`
+Internal planning docs are maintained in the `bsim-platform` repository under `docs/internal/ip/`.
