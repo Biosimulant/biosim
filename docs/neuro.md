@@ -25,7 +25,7 @@ The neuro packs provide a minimal but composable set of `BioModule`s for:
 | `neuro-rate-monitor` | `src.rate_monitor:RateMonitor` | Population firing rate computation |
 | `neuro-state-monitor` | `src.state_monitor:StateMonitor` | Neuron state tracking (Vm traces) |
 | `neuro-hodgkin-huxley-state-monitor` | `src.hodgkin_huxley_monitor:HHStateMonitor` | HH-specific state monitor (Vm, gating variables m/h/n) |
-| `neuro-metrics` | `src.neuro_metrics:NeuroMetrics` | Summary statistics (spike count, rate, ISI CV) |
+| `neuro-spike-metrics` | `src.neuro_metrics:NeuroMetrics` | Summary statistics (spike count, rate, ISI CV) |
 
 ## Quick Start
 
