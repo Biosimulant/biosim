@@ -33,7 +33,7 @@ Notes:
 
 Example with local state
 ```python
-class Eye(bsim.BioModule):
+class Eye(biosim.BioModule):
     min_dt = 0.01
 
     def __init__(self):
@@ -48,12 +48,12 @@ class Eye(bsim.BioModule):
     def get_outputs(self):
         source = getattr(self, "_world_name", "eye")
         return {
-            "visual_stream": bsim.BioSignal(
+            "visual_stream": biosim.BioSignal(
                 source=source,
                 name="visual_stream",
                 value={"count": self.photons_seen},
                 time=0.0,
-                metadata=bsim.SignalMetadata(units="1"),
+                metadata=biosim.SignalMetadata(units="1"),
             )
         }
 ```

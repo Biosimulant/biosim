@@ -34,7 +34,7 @@ Option B: Without installing
 
 - Run with the source path on `PYTHONPATH` so Python can find the `src` layout, e.g.:
   - `PYTHONPATH=src python examples/world_simulation.py`
-  - `PYTHONPATH=src python -m bsim <path-to-wiring.yaml>`
+  - `PYTHONPATH=src python -m biosim <path-to-wiring.yaml>`
 
 SimUI notes
 -----------

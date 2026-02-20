@@ -5,7 +5,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 FRONTEND_DIR="$ROOT_DIR/packages/simui-ui"
-STATIC_DIR="$ROOT_DIR/src/bsim/simui/static"
+STATIC_DIR="$ROOT_DIR/src/biosim/simui/static"
 
 if ! command -v npm >/dev/null 2>&1; then
   echo "npm not found. Please install Node.js and npm." >&2

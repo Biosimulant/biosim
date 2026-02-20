@@ -1,4 +1,4 @@
-# bsim
+# biosim
 
 [![PyPI - Version](https://img.shields.io/pypi/v/biosim.svg)](https://pypi.org/project/biosim)
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/biosim.svg)](https://pypi.org/project/biosim)
@@ -31,7 +31,7 @@ Provide a small, stable composition layer for simulations: wire reusable compone
 Preferred (pinned GitHub ref):
 
 ```console
-pip install "bsim @ git+https://github.com/<org>/bsim.git@<ref>"
+pip install "biosim @ git+https://github.com/<org>/biosim.git@<ref>"
 ```
 
 Alternative (package index):
@@ -58,10 +58,10 @@ For advanced curated demos (neuro/ecology), wiring configs, and model-pack templ
 Minimal usage:
 
 ```python
-import bsim
-from bsim import BioSignal, SignalMetadata
+import biosim
+from biosim import BioSignal, SignalMetadata
 
-class Counter(bsim.BioModule):
+class Counter(biosim.BioModule):
     min_dt = 0.1
 
     def __init__(self):
@@ -85,7 +85,7 @@ class Counter(bsim.BioModule):
             )
         }
 
-world = bsim.BioWorld()
+world = biosim.BioWorld()
 world.add_biomodule("counter", Counter())
 world.run(duration=1.0, tick_dt=0.1)
 ```
@@ -95,7 +95,7 @@ world.run(duration=1.0, tick_dt=0.1)
 Modules may optionally expose web-native visuals via `visualize()`, returning a dict or list of dicts with keys `render` and `data`. The world can collect them without any transport layer:
 
 ```python
-class MyModule(bsim.BioModule):
+class MyModule(biosim.BioModule):
     min_dt = 0.1
 
     def advance_to(self, t: float) -> None:
@@ -110,7 +110,7 @@ class MyModule(bsim.BioModule):
             "data": {"series": [{"name": "s", "points": [[0.0, 1.0]]}]},
         }
 
-world = bsim.BioWorld()
+world = biosim.BioWorld()
 world.add_biomodule("module", MyModule())
 world.run(duration=0.1, tick_dt=0.1)
 print(world.collect_visuals())  # [{"module": "module", "visuals": [...]}]
@@ -128,8 +128,8 @@ SimUI lets you build and launch a small web UI entirely from Python (similar to 
   - From your own code:
 
     ```python
-    from bsim.simui import Interface, Number, Button, EventLog, VisualsPanel
-    world = bsim.BioWorld()
+    from biosim.simui import Interface, Number, Button, EventLog, VisualsPanel
+    world = biosim.BioWorld()
     ui = Interface(
         world,
         controls=[Number("duration", 10), Number("tick_dt", 0.1), Button("Run")],
@@ -158,15 +158,15 @@ Per-run resets for clean visuals
 - To avoid overlapping charts across runs, add `reset()` to modules that accumulate history (e.g., time series points).
 
 - Maintainer flow (building the frontend SPA):
-  - Edit the React/Vite app under `src/bsim/simui/_frontend/`.
-  - Build via Python: `python -m bsim.simui.build` (requires Node/npm). This writes `src/bsim/simui/static/app.js`.
+  - Edit the React/Vite app under `src/biosim/simui/_frontend/`.
+  - Build via Python: `python -m biosim.simui.build` (requires Node/npm). This writes `src/biosim/simui/static/app.js`.
   - Alternatively: `bash scripts/build_simui_frontend.sh`.
-  - Packaging includes `src/bsim/simui/static/**`, so end users never need npm.
+  - Packaging includes `src/biosim/simui/static/**`, so end users never need npm.
 
 - CI packaging (recommended): run the frontend build before `python -m build` so wheels/sdists ship the bundled assets.
 
 Troubleshooting:
-- If you see `SimUI static bundle missing at .../static/app.js`, build the frontend with `python -m bsim.simui.build` (requires Node/npm) before launching. End users installing a release wheel won't see this.
+- If you see `SimUI static bundle missing at .../static/app.js`, build the frontend with `python -m biosim.simui.build` (requires Node/npm) before launching. End users installing a release wheel won't see this.
 
 ### SimUI Design Notes
 - Transport: SSE (Server-Sent Events). The SPA connects to `/api/stream` for real-time updates. Polling endpoints (`/api/status`, `/api/visuals`, `/api/events`) remain available for fallback/debugging.
@@ -185,7 +185,7 @@ Troubleshooting:
 
 ## Terminology
 
-Understanding the core concepts is essential for working with bsim effectively.
+Understanding the core concepts is essential for working with biosim effectively.
 
 | Term | Description |
 |------|-------------|

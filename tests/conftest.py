@@ -7,11 +7,11 @@ import pytest
 
 
 @pytest.fixture(scope="session")
-def bsim():
+def biosim():
     try:
-        import bsim as _bsim  # type: ignore
+        import biosim as _bsim  # type: ignore
         return _bsim
     except ModuleNotFoundError:
         sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-        import bsim as _bsim  # type: ignore  # noqa: E402
+        import biosim as _bsim  # type: ignore  # noqa: E402
         return _bsim

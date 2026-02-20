@@ -13,13 +13,13 @@ node_modules/
 .venv/
 dist/
 build/
-src/bsim/simui/_frontend/dist/
+src/biosim/simui/_frontend/dist/
 
 .DS_Store
 
 # SimUI UI build outputs
 packages/simui-ui/dist-static/
 
-# Commit the built library artifacts so npm can install @bsim/simui-ui from a git SHA.
+# Commit the built library artifacts so npm can install @biosim/simui-ui from a git SHA.
 !packages/simui-ui/dist/
 !packages/simui-ui/dist/**

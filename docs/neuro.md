@@ -1,8 +1,8 @@
 # Neuro Pack: Computational Neuroscience Modules
 
-This document describes the neuro model packs in the companion `models` repository, a reference implementation for simulating spiking neural networks with `bsim`.
+This document describes the neuro model packs in the companion `models` repository, a reference implementation for simulating spiking neural networks with `biosim`.
 
-> **Important**: The neuro modules are **not** bundled inside the `bsim` core library. They live as separate model packs in the [`Biosimulant/models`](https://github.com/Biosimulant/models) repo under `models/models/neuro-*`.
+> **Important**: The neuro modules are **not** bundled inside the `biosim` core library. They live as separate model packs in the [`Biosimulant/models`](https://github.com/Biosimulant/models) repo under `models/models/neuro-*`.
 
 ## Overview
 
@@ -31,13 +31,13 @@ The neuro packs provide a minimal but composable set of `BioModule`s for:
 
 ### Installation
 
-Clone the models repository alongside bsim:
+Clone the models repository alongside biosim:
 
 ```bash
 git clone https://github.com/Biosimulant/models.git
 cd models
-pip install -e ../bsim            # Install bsim core
-pip install -e ../bsim'[ui]'      # Optional: for SimUI
+pip install -e ../biosim            # Install biosim core
+pip install -e ../biosim'[ui]'      # Optional: for SimUI
 ```
 
 ### Running Spaces
@@ -46,17 +46,17 @@ Pre-composed simulation spaces are in `models/spaces/`:
 
 **Single neuron space:**
 ```bash
-python -m bsim spaces/neuro-single-neuron/wiring.yaml
+python -m biosim spaces/neuro-single-neuron/wiring.yaml
 ```
 
 **E/I microcircuit space (50 neurons):**
 ```bash
-python -m bsim spaces/neuro-microcircuit/wiring.yaml
+python -m biosim spaces/neuro-microcircuit/wiring.yaml
 ```
 
 **Hodgkin-Huxley single neuron:**
 ```bash
-python -m bsim spaces/neuro-hodgkin-huxley-neuron/wiring.yaml
+python -m biosim spaces/neuro-hodgkin-huxley-neuron/wiring.yaml
 ```
 
 **Local SimUI (optional):**
@@ -68,9 +68,9 @@ python spaces/neuro-microcircuit/simui_local.py
 **Config-driven runs (no code changes):**
 ```bash
 python -c "
-import bsim
-w = bsim.BioWorld()
-bsim.load_wiring(w, 'spaces/neuro-single-neuron/wiring.yaml')
+import biosim
+w = biosim.BioWorld()
+biosim.load_wiring(w, 'spaces/neuro-single-neuron/wiring.yaml')
 w.run(duration=0.5, tick_dt=0.0001)
 print('Simulation complete')
 for v in w.collect_visuals():
@@ -437,15 +437,15 @@ Example wiring specs are in `models/spaces/`:
 
 Load and run:
 ```python
-import bsim
-world = bsim.BioWorld()
-bsim.load_wiring(world, "spaces/neuro-single-neuron/wiring.yaml")
+import biosim
+world = biosim.BioWorld()
+biosim.load_wiring(world, "spaces/neuro-single-neuron/wiring.yaml")
 world.run(duration=0.3, tick_dt=0.0001)
 ```
 
 ## See Also
 
-- [bsim README](../README.md) - VisualSpec types, SimUI API reference
+- [biosim README](../README.md) - VisualSpec types, SimUI API reference
 - [Wiring docs](wiring.md) - WiringBuilder and loader API
 - [Config docs](config.md) - YAML/TOML config file format
 - [models STANDARDS.md](https://github.com/Biosimulant/models/blob/main/STANDARDS.md) - Model contribution guidelines

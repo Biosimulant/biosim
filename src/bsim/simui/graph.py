@@ -25,7 +25,7 @@ class Position:
 class GraphNode:
     """A node in the config graph representing a module instance."""
     id: str  # Module name (e.g., "rabbits")
-    type: str  # Class path (e.g., "bsim.packs.ecology.OrganismPopulation")
+    type: str  # Class path (e.g., "biosim.packs.ecology.OrganismPopulation")
     position: Position = field(default_factory=Position)
     args: Dict[str, Any] = field(default_factory=dict)
     inputs: List[str] = field(default_factory=list)

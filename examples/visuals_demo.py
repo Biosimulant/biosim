@@ -14,16 +14,16 @@ from __future__ import annotations
 import sys
 
 try:
-    import bsim
+    import biosim
 except ModuleNotFoundError:
     sys.stderr.write(
-        "Could not import 'bsim'. Did you run 'pip install -e .'?\n"
+        "Could not import 'biosim'. Did you run 'pip install -e .'?\n"
         "Alternatively, run with 'PYTHONPATH=src'.\n"
     )
     raise
 
 
-class StepSeries(bsim.BioModule):
+class StepSeries(biosim.BioModule):
     def __init__(self) -> None:
         self.min_dt = 0.1
         self._points: list[list[float]] = []
@@ -42,7 +42,7 @@ class StepSeries(bsim.BioModule):
 
 
 def main() -> None:
-    world = bsim.BioWorld()
+    world = biosim.BioWorld()
     world.add_biomodule("step_series", StepSeries())
     world.run(duration=0.5, tick_dt=0.1)
 

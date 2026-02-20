@@ -7,19 +7,19 @@ def fastapi_client():
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
     except Exception:
-        pytest.skip("fastapi not installed (install with bsim[ui])")
+        pytest.skip("fastapi not installed (install with biosim[ui])")
     return FastAPI, TestClient
 
 
-def _make_world(bsim):
-    return bsim.BioWorld()
+def _make_world(biosim):
+    return biosim.BioWorld()
 
 
-def test_spec_version_and_modules(bsim, fastapi_client):
+def test_spec_version_and_modules(biosim, fastapi_client):
     FastAPI, TestClient = fastapi_client
-    world = _make_world(bsim)
+    world = _make_world(biosim)
 
-    class M1(bsim.BioModule):
+    class M1(biosim.BioModule):
         def __init__(self):
             self.min_dt = 0.1
 
@@ -29,7 +29,7 @@ def test_spec_version_and_modules(bsim, fastapi_client):
         def get_outputs(self):
             return {}
 
-    class M2(bsim.BioModule):
+    class M2(biosim.BioModule):
         def __init__(self):
             self.min_dt = 0.1
 
@@ -42,7 +42,7 @@ def test_spec_version_and_modules(bsim, fastapi_client):
     world.add_biomodule("m1", M1())
     world.add_biomodule("m2", M2())
 
-    ui = bsim.simui.Interface(world)
+    ui = biosim.simui.Interface(world)
     app = FastAPI()
     ui.mount(app, "/ui")
     client = TestClient(app)
@@ -53,11 +53,11 @@ def test_spec_version_and_modules(bsim, fastapi_client):
     assert set(data.get("modules", [])) == {"m1", "m2"}
 
 
-def test_run_endpoint_accepts_duration(bsim, fastapi_client):
+def test_run_endpoint_accepts_duration(biosim, fastapi_client):
     FastAPI, TestClient = fastapi_client
-    world = _make_world(bsim)
+    world = _make_world(biosim)
 
-    class M1(bsim.BioModule):
+    class M1(biosim.BioModule):
         def __init__(self):
             self.min_dt = 0.1
 
@@ -69,7 +69,7 @@ def test_run_endpoint_accepts_duration(bsim, fastapi_client):
 
     world.add_biomodule("m1", M1())
 
-    ui = bsim.simui.Interface(world)
+    ui = biosim.simui.Interface(world)
     app = FastAPI()
     ui.mount(app, "/ui")
     client = TestClient(app)

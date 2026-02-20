@@ -162,7 +162,7 @@ def discover_pack_modules(pack_path: str, category: str) -> Dict[str, ModuleSpec
     """Discover all BioModule classes in a pack.
 
     Args:
-        pack_path: Dotted path to the pack module (e.g., "bsim.packs.neuro")
+        pack_path: Dotted path to the pack module (e.g., "biosim.packs.neuro")
         category: Category name for these modules (e.g., "neuro")
 
     Returns:

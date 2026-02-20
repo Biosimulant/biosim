@@ -13,7 +13,7 @@ Validation
 
 Code builder
 ```python
-wb = bsim.WiringBuilder(world)
+wb = biosim.WiringBuilder(world)
 wb.add("eye", Eye()).add("lgn", LGN()).add("sc", SC())
 wb.connect("eye.visual_stream", ["lgn.retina"])  # Eye -> LGN
 wb.connect("lgn.thalamus", ["sc.vision"]).apply()  # LGN -> SC
@@ -48,11 +48,11 @@ to = ["sc.vision"]
 ```
 
 Spec builder
-- `bsim.build_from_spec(world, spec)` builds modules and wiring from a dict spec directly (used internally by the loaders).
+- `biosim.build_from_spec(world, spec)` builds modules and wiring from a dict spec directly (used internally by the loaders).
   - `spec["modules"]`: mapping of name -> dotted class path or `{class, args, min_dt, priority}`.
   - `spec["wiring"]`: list of `{from: str, to: [str, ...]}`.
 
 Loaders
-- `bsim.load_wiring(world, path)` auto-detects YAML/TOML by file extension.
-- `bsim.load_wiring_yaml(world, path)` and `bsim.load_wiring_toml(world, path)` for explicit formats.
+- `biosim.load_wiring(world, path)` auto-detects YAML/TOML by file extension.
+- `biosim.load_wiring_yaml(world, path)` and `biosim.load_wiring_toml(world, path)` for explicit formats.
 - TOML support requires Python 3.11+ or `tomli` installed.

@@ -1,5 +1,5 @@
-def test_exports(bsim):
-    assert hasattr(bsim, "__version__")
-    assert hasattr(bsim, "BioWorld")
-    assert hasattr(bsim, "WorldEvent")
-    assert hasattr(bsim, "BioSignal")
+def test_exports(biosim):
+    assert hasattr(biosim, "__version__")
+    assert hasattr(biosim, "BioWorld")
+    assert hasattr(biosim, "WorldEvent")
+    assert hasattr(biosim, "BioSignal")

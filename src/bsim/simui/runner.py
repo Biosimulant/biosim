@@ -101,7 +101,7 @@ class SimulationManager:
     # Internal -------------------------------------------------------------
     def _worker(self, duration: float, tick_dt: Optional[float]) -> None:
         try:
-            from bsim.world import WorldEvent  # lazy to avoid circulars
+            from biosim.world import WorldEvent  # lazy to avoid circulars
 
             def _counter(ev, payload):
                 if ev == WorldEvent.TICK:

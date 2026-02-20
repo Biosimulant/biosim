@@ -1,12 +1,12 @@
 ---
-title: "bsim Documentation"
-author: "bsim project"
+title: "biosim Documentation"
+author: "biosim project"
 date: "\today"
 ---
 
 # Preface
 
-This document compiles the bsim repository guides into a single reference.
+This document compiles the biosim repository guides into a single reference.
 
 \newpage
 

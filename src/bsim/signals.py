@@ -46,7 +46,7 @@ class SignalMetadata:
 @dataclass
 class BioSignal:
     """
-    A signal passed between modules in a bsim simulation.
+    A signal passed between modules in a biosim simulation.
 
     BioSignals are the standard interchange format for cross-module communication.
     They carry values along with metadata about their source, timing, and semantics.

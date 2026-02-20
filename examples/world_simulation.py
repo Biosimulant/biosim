@@ -11,14 +11,14 @@ Or without installing:
 
 from __future__ import annotations
 
-import bsim
+import biosim
 
 
-def print_listener(event: bsim.WorldEvent, payload: dict) -> None:
+def print_listener(event: biosim.WorldEvent, payload: dict) -> None:
     print(f"EVENT: {event.value} -> {payload}")
 
 
-class StepLoggerModule(bsim.BioModule):
+class StepLoggerModule(biosim.BioModule):
     """Example module that advances on its schedule."""
 
     def __init__(self):
@@ -31,7 +31,7 @@ class StepLoggerModule(bsim.BioModule):
         return {}
 
 
-class Eye(bsim.BioModule):
+class Eye(biosim.BioModule):
     """Publishes a vision signal each step."""
 
     def __init__(self):
@@ -43,14 +43,14 @@ class Eye(bsim.BioModule):
 
     def advance_to(self, t: float) -> None:
         self._outputs = {
-            "vision": bsim.BioSignal(source="eye", name="vision", value={"photon": True}, time=t)
+            "vision": biosim.BioSignal(source="eye", name="vision", value={"photon": True}, time=t)
         }
 
     def get_outputs(self):
         return dict(self._outputs)
 
 
-class LGN(bsim.BioModule):
+class LGN(biosim.BioModule):
     """Receives Eye.vision and relays to thalamus channel."""
 
     def __init__(self):
@@ -66,7 +66,7 @@ class LGN(bsim.BioModule):
     def set_inputs(self, signals):
         if "vision" in signals:
             self._outputs = {
-                "thalamus": bsim.BioSignal(
+                "thalamus": biosim.BioSignal(
                     source="lgn", name="thalamus", value=signals["vision"].value, time=signals["vision"].time
                 )
             }
@@ -78,7 +78,7 @@ class LGN(bsim.BioModule):
         return dict(self._outputs)
 
 
-class SuperiorColliculus(bsim.BioModule):
+class SuperiorColliculus(biosim.BioModule):
     """Receives LGN.thalamus signals."""
 
     def __init__(self):
@@ -99,13 +99,13 @@ class SuperiorColliculus(bsim.BioModule):
 
 
 def main() -> None:
-    world = bsim.BioWorld()
+    world = biosim.BioWorld()
     world.on(print_listener)
     world.add_biomodule("logger", StepLoggerModule())
     world.run(duration=0.3, tick_dt=0.1)
 
     print("--- Signal routing demo ---")
-    bw = bsim.BioWorld()
+    bw = biosim.BioWorld()
     eye = Eye()
     lgn = LGN()
     sc = SuperiorColliculus()

@@ -1,6 +1,6 @@
 # Configuration Files
 
-You can declare modules and connections in TOML or YAML. Load with helpers in `bsim.wiring`.
+You can declare modules and connections in TOML or YAML. Load with helpers in `biosim.wiring`.
 
 Keys
 - `modules`: mapping of name -> class path (or object with `class`, optional `args`, optional `min_dt`, optional `priority`).

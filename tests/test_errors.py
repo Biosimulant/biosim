@@ -1,8 +1,8 @@
 import pytest
 
 
-def test_error_event_and_finished_emitted(bsim):
-    class Boom(bsim.BioModule):
+def test_error_event_and_finished_emitted(biosim):
+    class Boom(biosim.BioModule):
         def __init__(self):
             self.min_dt = 0.1
 
@@ -12,7 +12,7 @@ def test_error_event_and_finished_emitted(bsim):
         def get_outputs(self):
             return {}
 
-    world = bsim.BioWorld()
+    world = biosim.BioWorld()
     world.add_biomodule("boom", Boom())
     seen = []
 
@@ -23,5 +23,5 @@ def test_error_event_and_finished_emitted(bsim):
     with pytest.raises(RuntimeError):
         world.run(duration=0.1, tick_dt=0.1)
 
-    assert bsim.WorldEvent.ERROR in seen
-    assert bsim.WorldEvent.FINISHED in seen
+    assert biosim.WorldEvent.ERROR in seen
+    assert biosim.WorldEvent.FINISHED in seen

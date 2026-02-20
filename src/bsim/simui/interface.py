@@ -452,7 +452,7 @@ class Interface:
         This clears existing modules and rewires from the config.
         Returns True on success, False on failure.
         """
-        import bsim
+        import biosim
 
         config_path = new_config_path or self._config_path
         if not config_path or not config_path.exists():
@@ -471,7 +471,7 @@ class Interface:
             self._world._signal_routes.clear()
 
             # Reload wiring from config
-            bsim.load_wiring(self._world, config_path)
+            biosim.load_wiring(self._world, config_path)
 
             # Update stored config path
             self._config_path = config_path

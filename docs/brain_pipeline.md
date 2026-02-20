@@ -4,11 +4,11 @@ This example shows a simple visual pathway using directed biosignals.
 
 Code
 ```python
-import bsim
+import biosim
 from examples.wiring_builder_demo import Eye, LGN, SC
 
-world = bsim.BioWorld()
-wb = bsim.WiringBuilder(world)
+world = biosim.BioWorld()
+wb = biosim.WiringBuilder(world)
 wb.add("eye", Eye()).add("lgn", LGN()).add("sc", SC())
 wb.connect("eye.visual_stream", ["lgn.retina"])   # Eye -> LGN
 wb.connect("lgn.thalamus", ["sc.vision"]).apply()  # LGN -> SC

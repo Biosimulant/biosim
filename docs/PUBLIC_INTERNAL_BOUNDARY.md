@@ -17,4 +17,4 @@
 ## Enforcement
 - CI blocks commits containing common business-sensitive terms in docs.
 - CI blocks commits containing detected secrets.
-- Internal planning docs are stored in `bsim-platform`.
+- Internal planning docs are stored in `biosim-platform`.

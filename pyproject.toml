@@ -27,31 +27,31 @@ dependencies = [
 ]
 
 [project.urls]
-Documentation = "https://github.com/Biosimulant/bsim#readme"
-Issues = "https://github.com/Biosimulant/bsim/issues"
-Source = "https://github.com/Biosimulant/bsim"
+Documentation = "https://github.com/Biosimulant/biosim#readme"
+Issues = "https://github.com/Biosimulant/biosim/issues"
+Source = "https://github.com/Biosimulant/biosim"
 
 [tool.hatch.version]
-path = "src/bsim/__about__.py"
+path = "src/biosim/__about__.py"
 
 [tool.hatch.envs.types]
 extra-dependencies = [
   "mypy>=1.0.0",
 ]
 [tool.hatch.envs.types.scripts]
-check = "mypy --install-types --non-interactive {args:src/bsim tests}"
+check = "mypy --install-types --non-interactive {args:src/biosim tests}"
 
 [tool.coverage.run]
-source_pkgs = ["bsim", "tests"]
+source_pkgs = ["biosim", "tests"]
 branch = true
 parallel = true
 omit = [
-  "src/bsim/__about__.py",
+  "src/biosim/__about__.py",
 ]
 
 [tool.coverage.paths]
-bsim = ["src/bsim", "*/bsim/src/bsim"]
-tests = ["tests", "*/bsim/tests"]
+biosim = ["src/biosim", "*/biosim/src/biosim"]
+tests = ["tests", "*/biosim/tests"]
 
 [tool.coverage.report]
 exclude_lines = [
@@ -82,23 +82,23 @@ ui = [
 ]
 # Everything
 all = [
-  "bsim[dev,ui]",
+  "biosim[dev,ui]",
 ]
 
 [tool.hatch.build]
 include = [
-  "src/bsim/simui/static/**",
+  "src/biosim/simui/static/**",
 ]
 exclude = [
-  "src/bsim/simui/_frontend/**",
+  "src/biosim/simui/_frontend/**",
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/bsim"]
+packages = ["src/biosim"]
 
 [tool.hatch.build.targets.sdist]
 include = [
-  "src/bsim/**",
+  "src/biosim/**",
   "tests/**",
   "docs/**",
   "examples/**",

@@ -27,7 +27,7 @@ Key methods
 
 Example
 ```python
-world = bsim.BioWorld()
+world = biosim.BioWorld()
 world.on(lambda ev, p: print(ev.value, p))
 
 eye, lgn = Eye(), LGN()

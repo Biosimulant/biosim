@@ -42,7 +42,7 @@ __all__ = [
 
 
 def __getattr__(name: str) -> ModuleType:
-    # Lazily import optional namespaces so `import bsim` does not require extras.
+    # Lazily import optional namespaces so `import biosim` does not require extras.
     if name == "simui":
         return importlib.import_module(".simui", __name__)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

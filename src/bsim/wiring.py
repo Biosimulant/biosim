@@ -78,7 +78,7 @@ def build_from_spec(world: BioWorld, spec: Mapping[str, Any]) -> WiringBuilder:
 
     Spec format (keys optional):
     - modules: mapping of name -> one of:
-        - dotted path string (e.g., "bsim.packs.neuro.IzhikevichPopulation")
+        - dotted path string (e.g., "biosim.packs.neuro.IzhikevichPopulation")
         - {class: dotted, args: {...}, min_dt: float, priority: int}
     - wiring: list of {from: str, to: [str, ...]}
     """

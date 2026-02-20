@@ -1,6 +1,6 @@
 # Overview
 
-bsim is a modular biological simulation library. It centers around four ideas:
+biosim is a modular biological simulation library. It centers around four ideas:
 
 - **BioWorld**: the runtime container that orchestrates multi-rate biomodules, routes signals, and publishes lifecycle events. Supports cooperative pause/resume/stop.
 - **BioModule**: a unit of behavior with local state that implements a runnable contract (`setup/reset/advance_to/get_outputs/visualize/...`).

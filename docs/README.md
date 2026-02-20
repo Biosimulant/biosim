@@ -1,6 +1,6 @@
-# bsim Documentation
+# biosim Documentation
 
-Welcome to the bsim documentation. This guide explains the core concepts, APIs, and practical wiring patterns for building modular biological simulations.
+Welcome to the biosim documentation. This guide explains the core concepts, APIs, and practical wiring patterns for building modular biological simulations.
 
 ## Contents
 
@@ -19,7 +19,7 @@ See the files in this folder for a textbook-style walkthrough with code and conc
 
 ## SimUI
 
-The bsim core includes a lightweight web UI (SimUI) for running and visualizing simulations. See the [README](../README.md#simui-python-declared-ui) for:
+The biosim core includes a lightweight web UI (SimUI) for running and visualizing simulations. See the [README](../README.md#simui-python-declared-ui) for:
 - Python-declared interface API
 - Full REST + SSE endpoint reference
 - Config editor sub-API for visual wiring editing

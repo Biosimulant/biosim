@@ -1,14 +1,14 @@
 # SPDX-FileCopyrightText: 2025-present Demi <bjaiye1@gmail.com>
 #
 # SPDX-License-Identifier: MIT
-"""Generic CLI runner for bsim simulations.
+"""Generic CLI runner for biosim simulations.
 
 Run any YAML/TOML config directly without needing a separate demo script.
 
 Usage:
-    python -m bsim config.yaml                    # Run headless
-    python -m bsim config.yaml --simui            # Launch SimUI dashboard
-    python -m bsim config.yaml --duration 10.0
+    python -m biosim config.yaml                    # Run headless
+    python -m biosim config.yaml --simui            # Launch SimUI dashboard
+    python -m biosim config.yaml --duration 10.0
 
 YAML config format (simplified):
     meta:
@@ -64,9 +64,9 @@ def load_config(path: Path) -> Dict[str, Any]:
 
 
 def create_world() -> "BioWorld":
-    import bsim
+    import biosim
 
-    return bsim.BioWorld()
+    return biosim.BioWorld()
 
 
 def run_headless(world: "BioWorld", duration: float, tick_dt: float | None) -> None:
@@ -105,10 +105,10 @@ def run_simui(
 ) -> None:
     """Launch SimUI with the configured world."""
     try:
-        from bsim.simui import Interface, Number, Button, EventLog, VisualsPanel
+        from biosim.simui import Interface, Number, Button, EventLog, VisualsPanel
     except ImportError as e:
         print(f"Error: SimUI requires additional dependencies: {e}", file=sys.stderr)
-        print("Install with: pip install 'bsim[ui]' or pip install fastapi uvicorn", file=sys.stderr)
+        print("Install with: pip install 'biosim[ui]' or pip install fastapi uvicorn", file=sys.stderr)
         sys.exit(1)
 
     meta = config.get("meta", {})
@@ -143,14 +143,14 @@ def run_simui(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        prog="python -m bsim",
-        description="Run bsim simulations from YAML/TOML config files.",
+        prog="python -m biosim",
+        description="Run biosim simulations from YAML/TOML config files.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python -m bsim wiring.yaml --simui
-  python -m bsim config.yaml --duration 10.0
-  python -m bsim config.yaml --simui --port 8080 --open
+  python -m biosim wiring.yaml --simui
+  python -m biosim config.yaml --duration 10.0
+  python -m biosim config.yaml --simui --port 8080 --open
         """,
     )
 
@@ -205,8 +205,8 @@ Examples:
 
     world = create_world()
 
-    import bsim
-    bsim.load_wiring(world, args.config)
+    import biosim
+    biosim.load_wiring(world, args.config)
 
     try:
         module_count = len(world.module_names)

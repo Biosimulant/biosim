@@ -11,14 +11,14 @@ Run an example
 - Declarative wiring (files):
   - Load a YAML/TOML wiring spec and run (bring your own file, or use one from `models`):
     - https://github.com/Biosimulant/models/tree/main/spaces
-    - `python -c "import bsim; w=bsim.BioWorld(); bsim.load_wiring(w, '<path-to-wiring.yaml>'); w.run(duration=0.5, tick_dt=0.1)"`
+    - `python -c "import biosim; w=biosim.BioWorld(); biosim.load_wiring(w, '<path-to-wiring.yaml>'); w.run(duration=0.5, tick_dt=0.1)"`
 
 Minimal code
 ```python
-import bsim
-from bsim import BioSignal, SignalMetadata
+import biosim
+from biosim import BioSignal, SignalMetadata
 
-class Eye(bsim.BioModule):
+class Eye(biosim.BioModule):
     min_dt = 0.1
 
     def __init__(self):
@@ -39,7 +39,7 @@ class Eye(bsim.BioModule):
             )
         }
 
-class LGN(bsim.BioModule):
+class LGN(biosim.BioModule):
     min_dt = 0.1
 
     def __init__(self):
@@ -56,8 +56,8 @@ class LGN(bsim.BioModule):
             return {}
         return {"thalamus": self._inputs["retina"]}
 
-world = bsim.BioWorld()
-wb = bsim.WiringBuilder(world)
+world = biosim.BioWorld()
+wb = biosim.WiringBuilder(world)
 wb.add("eye", Eye()).add("lgn", LGN())
 wb.connect("eye.visual_stream", ["lgn.retina"]).apply()
 world.run(duration=0.2, tick_dt=0.1)
@@ -74,7 +74,7 @@ When using the SimUI, each new Run starts with a clean slate:
 Example:
 
 ```python
-class SineWave(bsim.BioModule):
+class SineWave(biosim.BioModule):
     min_dt = 0.1
 
     def __init__(self):

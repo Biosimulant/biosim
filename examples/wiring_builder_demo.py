@@ -8,10 +8,10 @@ Run:
 
 from __future__ import annotations
 
-import bsim
+import biosim
 
 
-class Eye(bsim.BioModule):
+class Eye(biosim.BioModule):
     def __init__(self):
         self.min_dt = 0.1
         self._outputs = {}
@@ -21,14 +21,14 @@ class Eye(bsim.BioModule):
 
     def advance_to(self, t: float) -> None:
         self._outputs = {
-            "visual_stream": bsim.BioSignal(source="eye", name="visual_stream", value=t, time=t)
+            "visual_stream": biosim.BioSignal(source="eye", name="visual_stream", value=t, time=t)
         }
 
     def get_outputs(self):
         return dict(self._outputs)
 
 
-class LGN(bsim.BioModule):
+class LGN(biosim.BioModule):
     def __init__(self):
         self.min_dt = 0.1
         self._outputs = {}
@@ -43,7 +43,7 @@ class LGN(bsim.BioModule):
         if "retina" in signals:
             sig = signals["retina"]
             self._outputs = {
-                "thalamus": bsim.BioSignal(source="lgn", name="thalamus", value=sig.value, time=sig.time)
+                "thalamus": biosim.BioSignal(source="lgn", name="thalamus", value=sig.value, time=sig.time)
             }
 
     def advance_to(self, t: float) -> None:
@@ -53,7 +53,7 @@ class LGN(bsim.BioModule):
         return dict(self._outputs)
 
 
-class SC(bsim.BioModule):
+class SC(biosim.BioModule):
     def __init__(self):
         self.min_dt = 0.1
 
@@ -72,10 +72,10 @@ class SC(bsim.BioModule):
 
 
 def main() -> None:
-    world = bsim.BioWorld()
+    world = biosim.BioWorld()
     eye, lgn, sc = Eye(), LGN(), SC()
 
-    wb = bsim.WiringBuilder(world)
+    wb = biosim.WiringBuilder(world)
     wb.add("eye", eye, priority=2).add("lgn", lgn, priority=1).add("sc", sc)
     wb.connect("eye.visual_stream", ["lgn.retina", "sc.vision"]).apply()
 

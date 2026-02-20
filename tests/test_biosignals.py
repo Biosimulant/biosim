@@ -1,23 +1,23 @@
 import pytest
 
 
-def test_biosignal_routing_eye_to_lgn_to_sc(bsim):
+def test_biosignal_routing_eye_to_lgn_to_sc(biosim):
     calls = {"lgn": 0, "sc": 0}
 
-    class Eye(bsim.BioModule):
+    class Eye(biosim.BioModule):
         def __init__(self):
             self.min_dt = 0.1
             self._outputs = {}
 
         def advance_to(self, t: float) -> None:
             self._outputs = {
-                "vision": bsim.BioSignal(source="eye", name="vision", value=t, time=t)
+                "vision": biosim.BioSignal(source="eye", name="vision", value=t, time=t)
             }
 
         def get_outputs(self):
             return dict(self._outputs)
 
-    class LGN(bsim.BioModule):
+    class LGN(biosim.BioModule):
         def __init__(self):
             self.min_dt = 0.1
             self._outputs = {}
@@ -26,7 +26,7 @@ def test_biosignal_routing_eye_to_lgn_to_sc(bsim):
             if "vision" in signals:
                 calls["lgn"] += 1
                 self._outputs = {
-                    "thalamus": bsim.BioSignal(
+                    "thalamus": biosim.BioSignal(
                         source="lgn", name="thalamus", value=signals["vision"].value, time=signals["vision"].time
                     )
                 }
@@ -37,7 +37,7 @@ def test_biosignal_routing_eye_to_lgn_to_sc(bsim):
         def get_outputs(self):
             return dict(self._outputs)
 
-    class SC(bsim.BioModule):
+    class SC(biosim.BioModule):
         def __init__(self):
             self.min_dt = 0.1
 
@@ -51,7 +51,7 @@ def test_biosignal_routing_eye_to_lgn_to_sc(bsim):
         def get_outputs(self):
             return {}
 
-    world = bsim.BioWorld()
+    world = biosim.BioWorld()
     world.add_biomodule("eye", Eye(), priority=2)
     world.add_biomodule("lgn", LGN(), priority=1)
     world.add_biomodule("sc", SC(), priority=0)
@@ -64,21 +64,21 @@ def test_biosignal_routing_eye_to_lgn_to_sc(bsim):
     assert calls["sc"] >= 1
 
 
-def test_biosignal_is_not_broadcast_without_connection(bsim):
+def test_biosignal_is_not_broadcast_without_connection(biosim):
     received = {"b": 0, "c": 0}
 
-    class A(bsim.BioModule):
+    class A(biosim.BioModule):
         def __init__(self):
             self.min_dt = 0.1
             self._outputs = {}
 
         def advance_to(self, t: float) -> None:
-            self._outputs = {"sig": bsim.BioSignal(source="a", name="sig", value=t, time=t)}
+            self._outputs = {"sig": biosim.BioSignal(source="a", name="sig", value=t, time=t)}
 
         def get_outputs(self):
             return dict(self._outputs)
 
-    class B(bsim.BioModule):
+    class B(biosim.BioModule):
         def __init__(self):
             self.min_dt = 0.1
 
@@ -91,7 +91,7 @@ def test_biosignal_is_not_broadcast_without_connection(bsim):
         def get_outputs(self):
             return {}
 
-    class C(bsim.BioModule):
+    class C(biosim.BioModule):
         def __init__(self):
             self.min_dt = 0.1
 
@@ -104,7 +104,7 @@ def test_biosignal_is_not_broadcast_without_connection(bsim):
         def get_outputs(self):
             return {}
 
-    world = bsim.BioWorld()
+    world = biosim.BioWorld()
     world.add_biomodule("a", A(), priority=1)
     world.add_biomodule("b", B(), priority=0)
     world.add_biomodule("c", C(), priority=0)

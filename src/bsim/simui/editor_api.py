@@ -127,10 +127,10 @@ def _resolve_config_path(path: str) -> Path:
         except ValueError:
             continue
 
-    # Check if it's in the bsim package examples
+    # Check if it's in the biosim package examples
     try:
-        import bsim
-        bsim_path = Path(bsim.__file__).parent.parent
+        import biosim
+        bsim_path = Path(biosim.__file__).parent.parent
         resolved.relative_to(bsim_path.resolve())
         return resolved
     except (ImportError, ValueError):

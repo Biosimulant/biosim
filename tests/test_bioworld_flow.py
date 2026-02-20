@@ -4,10 +4,10 @@ import time
 import pytest
 
 
-def test_run_emits_ticks(bsim):
+def test_run_emits_ticks(biosim):
     events = []
 
-    class Ticker(bsim.BioModule):
+    class Ticker(biosim.BioModule):
         def __init__(self):
             self.min_dt = 0.1
             self._t = 0.0
@@ -16,7 +16,7 @@ def test_run_emits_ticks(bsim):
         def advance_to(self, t: float) -> None:
             self._t = t
             self._outputs = {
-                "out": bsim.BioSignal(
+                "out": biosim.BioSignal(
                     source="ticker",
                     name="out",
                     value=t,
@@ -27,7 +27,7 @@ def test_run_emits_ticks(bsim):
         def get_outputs(self):
             return dict(self._outputs)
 
-    world = bsim.BioWorld()
+    world = biosim.BioWorld()
     world.add_biomodule("ticker", Ticker())
 
     def listener(ev, payload):
@@ -36,60 +36,60 @@ def test_run_emits_ticks(bsim):
     world.on(listener)
     world.run(duration=0.3, tick_dt=0.1)
 
-    assert events[0][0] == bsim.WorldEvent.STARTED
-    tick_events = [e for e in events if e[0] == bsim.WorldEvent.TICK]
+    assert events[0][0] == biosim.WorldEvent.STARTED
+    tick_events = [e for e in events if e[0] == biosim.WorldEvent.TICK]
     assert [round(p["t"], 2) for _, p in tick_events] == [0.1, 0.2, 0.3]
-    assert events[-1][0] == bsim.WorldEvent.FINISHED
+    assert events[-1][0] == biosim.WorldEvent.FINISHED
 
 
-def test_request_stop_emits_stopped(bsim):
+def test_request_stop_emits_stopped(biosim):
     seen = []
 
-    class Ticker(bsim.BioModule):
+    class Ticker(biosim.BioModule):
         def __init__(self):
             self.min_dt = 0.1
             self._outputs = {}
 
         def advance_to(self, t: float) -> None:
-            self._outputs = {"out": bsim.BioSignal(source="ticker", name="out", value=t, time=t)}
+            self._outputs = {"out": biosim.BioSignal(source="ticker", name="out", value=t, time=t)}
 
         def get_outputs(self):
             return dict(self._outputs)
 
-    world = bsim.BioWorld()
+    world = biosim.BioWorld()
     world.add_biomodule("ticker", Ticker())
 
     def listener(ev, payload):
         seen.append(ev)
-        if ev == bsim.WorldEvent.TICK:
+        if ev == biosim.WorldEvent.TICK:
             world.request_stop()
 
     world.on(listener)
     world.run(duration=10.0, tick_dt=0.1)
 
-    assert bsim.WorldEvent.STOPPED in seen
+    assert biosim.WorldEvent.STOPPED in seen
 
 
-def test_request_pause_blocks_until_resume(bsim):
+def test_request_pause_blocks_until_resume(biosim):
     about_to_tick = threading.Event()
     done = threading.Event()
 
-    class Ticker(bsim.BioModule):
+    class Ticker(biosim.BioModule):
         def __init__(self):
             self.min_dt = 0.1
             self._outputs = {}
 
         def advance_to(self, t: float) -> None:
-            self._outputs = {"out": bsim.BioSignal(source="ticker", name="out", value=t, time=t)}
+            self._outputs = {"out": biosim.BioSignal(source="ticker", name="out", value=t, time=t)}
 
         def get_outputs(self):
             return dict(self._outputs)
 
-    world = bsim.BioWorld()
+    world = biosim.BioWorld()
     world.add_biomodule("ticker", Ticker())
 
     def listener(ev, payload):
-        if ev == bsim.WorldEvent.TICK and not about_to_tick.is_set():
+        if ev == biosim.WorldEvent.TICK and not about_to_tick.is_set():
             about_to_tick.set()
             world.request_pause()
 

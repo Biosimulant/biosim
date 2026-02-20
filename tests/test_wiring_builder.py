@@ -1,10 +1,10 @@
 import pytest
 
 
-def test_wiring_builder_connects_by_names_and_topics(bsim):
+def test_wiring_builder_connects_by_names_and_topics(biosim):
     calls = {"lgn": 0, "sc": 0}
 
-    class Eye(bsim.BioModule):
+    class Eye(biosim.BioModule):
         def __init__(self):
             self.min_dt = 0.1
             self._outputs = {}
@@ -13,12 +13,12 @@ def test_wiring_builder_connects_by_names_and_topics(bsim):
             return {"visual_stream"}
 
         def advance_to(self, t: float) -> None:
-            self._outputs = {"visual_stream": bsim.BioSignal(source="eye", name="visual_stream", value=t, time=t)}
+            self._outputs = {"visual_stream": biosim.BioSignal(source="eye", name="visual_stream", value=t, time=t)}
 
         def get_outputs(self):
             return dict(self._outputs)
 
-    class LGN(bsim.BioModule):
+    class LGN(biosim.BioModule):
         def __init__(self):
             self.min_dt = 0.1
             self._outputs = {}
@@ -33,7 +33,7 @@ def test_wiring_builder_connects_by_names_and_topics(bsim):
             if "retina" in signals:
                 calls["lgn"] += 1
                 sig = signals["retina"]
-                self._outputs = {"thalamus": bsim.BioSignal(source="lgn", name="thalamus", value=sig.value, time=sig.time)}
+                self._outputs = {"thalamus": biosim.BioSignal(source="lgn", name="thalamus", value=sig.value, time=sig.time)}
 
         def advance_to(self, t: float) -> None:
             return
@@ -41,7 +41,7 @@ def test_wiring_builder_connects_by_names_and_topics(bsim):
         def get_outputs(self):
             return dict(self._outputs)
 
-    class SC(bsim.BioModule):
+    class SC(biosim.BioModule):
         def __init__(self):
             self.min_dt = 0.1
 
@@ -58,8 +58,8 @@ def test_wiring_builder_connects_by_names_and_topics(bsim):
         def get_outputs(self):
             return {}
 
-    world = bsim.BioWorld()
-    wb = bsim.WiringBuilder(world)
+    world = biosim.BioWorld()
+    wb = biosim.WiringBuilder(world)
     wb.add("eye", Eye(), priority=2).add("lgn", LGN(), priority=1).add("sc", SC(), priority=0)
     wb.connect("eye.visual_stream", ["lgn.retina"])  # Eye -> LGN
     wb.connect("lgn.thalamus", ["sc.vision"]).apply()  # LGN -> SC

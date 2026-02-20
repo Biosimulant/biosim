@@ -5,7 +5,7 @@ except ModuleNotFoundError as exc:  # pragma: no cover - optional dependency pat
     missing = getattr(exc, "name", None)
     if missing in {"fastapi", "starlette", "uvicorn"}:
         raise ImportError(
-            "SimUI requires optional UI dependencies. Install with `pip install 'bsim[ui]'`."
+            "SimUI requires optional UI dependencies. Install with `pip install 'biosim[ui]'`."
         ) from exc
     raise
 

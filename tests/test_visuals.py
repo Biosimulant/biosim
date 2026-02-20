@@ -1,8 +1,8 @@
 
-def test_collect_visuals_empty(bsim):
-    world = bsim.BioWorld()
+def test_collect_visuals_empty(biosim):
+    world = biosim.BioWorld()
 
-    class Silent(bsim.BioModule):
+    class Silent(biosim.BioModule):
         def __init__(self):
             self.min_dt = 0.1
 
@@ -18,10 +18,10 @@ def test_collect_visuals_empty(bsim):
     assert collected == []
 
 
-def test_collect_visuals_with_modules(bsim):
-    world = bsim.BioWorld()
+def test_collect_visuals_with_modules(biosim):
+    world = biosim.BioWorld()
 
-    class TS(bsim.BioModule):
+    class TS(biosim.BioModule):
         def __init__(self):
             self.min_dt = 0.1
             self._points = []
@@ -38,7 +38,7 @@ def test_collect_visuals_with_modules(bsim):
                 "data": {"series": [{"name": "i", "points": self._points}]},
             }
 
-    class GraphMod(bsim.BioModule):
+    class GraphMod(biosim.BioModule):
         def __init__(self):
             self.min_dt = 0.1
 
@@ -71,10 +71,10 @@ def test_collect_visuals_with_modules(bsim):
     assert g_vis["render"] == "graph"
 
 
-def test_visuals_invalid_shapes_are_filtered(bsim):
-    world = bsim.BioWorld()
+def test_visuals_invalid_shapes_are_filtered(biosim):
+    world = biosim.BioWorld()
 
-    class Bad1(bsim.BioModule):
+    class Bad1(biosim.BioModule):
         def __init__(self):
             self.min_dt = 0.1
 
@@ -87,7 +87,7 @@ def test_visuals_invalid_shapes_are_filtered(bsim):
         def visualize(self):
             return {"data": {"x": 1}}  # missing 'render'
 
-    class Bad2(bsim.BioModule):
+    class Bad2(biosim.BioModule):
         def __init__(self):
             self.min_dt = 0.1
 
@@ -100,7 +100,7 @@ def test_visuals_invalid_shapes_are_filtered(bsim):
         def visualize(self):
             return {"render": "timeseries", "data": set([1, 2, 3])}  # not JSON-serializable
 
-    class Good(bsim.BioModule):
+    class Good(biosim.BioModule):
         def __init__(self):
             self.min_dt = 0.1
 
@@ -124,10 +124,10 @@ def test_visuals_invalid_shapes_are_filtered(bsim):
     assert collected[0]["visuals"][0]["render"] == "bar"
 
 
-def test_visuals_description_is_preserved(bsim):
-    world = bsim.BioWorld()
+def test_visuals_description_is_preserved(biosim):
+    world = biosim.BioWorld()
 
-    class WithDescription(bsim.BioModule):
+    class WithDescription(biosim.BioModule):
         def __init__(self):
             self.min_dt = 0.1
 

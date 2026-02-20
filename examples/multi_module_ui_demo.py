@@ -8,10 +8,10 @@ from __future__ import annotations
 import math
 import random
 
-import bsim
+import biosim
 
 
-class SineWave(bsim.BioModule):
+class SineWave(biosim.BioModule):
     def __init__(self):
         self.min_dt = 0.1
         self.points = []
@@ -65,7 +65,7 @@ class SineWave(bsim.BioModule):
         return {"render": "timeseries", "data": {"series": [{"name": "sin(t)", "points": pts}]}}
 
 
-class BarCounts(bsim.BioModule):
+class BarCounts(biosim.BioModule):
     def __init__(self):
         self.min_dt = 0.1
         self.values = {"A": 1, "B": 2, "C": 3}
@@ -88,7 +88,7 @@ class BarCounts(bsim.BioModule):
         return {"render": "bar", "data": {"items": items}}
 
 
-class TableSnapshot(bsim.BioModule):
+class TableSnapshot(biosim.BioModule):
     def __init__(self, bar_mod: BarCounts):
         self.min_dt = 0.1
         self.bar_mod = bar_mod
@@ -114,7 +114,7 @@ class TableSnapshot(bsim.BioModule):
         return {"render": "table", "data": {"items": items}}
 
 
-class SmallGraph(bsim.BioModule):
+class SmallGraph(biosim.BioModule):
     def __init__(self):
         self.min_dt = 0.5
 
@@ -138,20 +138,20 @@ class SmallGraph(bsim.BioModule):
 
 
 def main():
-    world = bsim.BioWorld()
+    world = biosim.BioWorld()
     bar = BarCounts()
     world.add_biomodule("sine", SineWave())
     world.add_biomodule("bar", bar)
     world.add_biomodule("table", TableSnapshot(bar))
     world.add_biomodule("graph", SmallGraph())
 
-    ui = bsim.simui.Interface(
+    ui = biosim.simui.Interface(
         world,
         title="Multi-Module Demo",
         controls=[
-            bsim.simui.Number("duration", 10.0),
-            bsim.simui.Number("tick_dt", 0.1),
-            bsim.simui.Button("Run"),
+            biosim.simui.Number("duration", 10.0),
+            biosim.simui.Number("tick_dt", 0.1),
+            biosim.simui.Button("Run"),
         ],
     )
     ui.launch(open_browser=True)

@@ -1,5 +1,5 @@
-def test_world_load_wiring_yaml(tmp_path, bsim):
-    world = bsim.BioWorld()
+def test_world_load_wiring_yaml(tmp_path, biosim):
+    world = biosim.BioWorld()
     path = tmp_path / "wiring.yaml"
     path.write_text(
         "\n".join(
@@ -15,5 +15,5 @@ def test_world_load_wiring_yaml(tmp_path, bsim):
         ),
         encoding="utf-8",
     )
-    bsim.load_wiring(world, path)
+    biosim.load_wiring(world, path)
     world.run(duration=0.1, tick_dt=0.1)

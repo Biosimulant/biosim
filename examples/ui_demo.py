@@ -11,13 +11,13 @@ Or:
 
 from __future__ import annotations
 
-import bsim
+import biosim
 
 
 def main() -> None:
-    world = bsim.BioWorld()
+    world = biosim.BioWorld()
 
-    class TS(bsim.BioModule):
+    class TS(biosim.BioModule):
         def __init__(self):
             self.min_dt = 0.1
             self._points = []
@@ -36,7 +36,7 @@ def main() -> None:
 
     world.add_biomodule("ts", TS())
 
-    from bsim.simui import Interface, Number, Button, EventLog, VisualsPanel
+    from biosim.simui import Interface, Number, Button, EventLog, VisualsPanel
 
     ui = Interface(
         world,

@@ -14,14 +14,14 @@ except Exception:  # pragma: no cover
         _HAS_TOML = False
 
 
-def _common_modules(bsim):
+def _common_modules(biosim):
     from examples.wiring_builder_demo import Eye, LGN, SC
     return Eye, LGN, SC
 
 
 @pytest.mark.skipif(not _HAS_TOML, reason="TOML support not available")
-def test_load_wiring_toml(tmp_path: Path, bsim):
-    Eye, LGN, SC = _common_modules(bsim)
+def test_load_wiring_toml(tmp_path: Path, biosim):
+    Eye, LGN, SC = _common_modules(biosim)
     content = f"""
 [modules.eye]
 class = "{Eye.__module__}.{Eye.__name__}"
@@ -42,14 +42,14 @@ to = ["lgn.retina", "sc.vision"]
     path = tmp_path / "wiring.toml"
     path.write_text(content)
 
-    world = bsim.BioWorld()
-    bsim.load_wiring_toml(world, path)
+    world = biosim.BioWorld()
+    biosim.load_wiring_toml(world, path)
     world.run(duration=0.1, tick_dt=0.1)
 
 
-def test_build_from_spec_with_preadded_modules(bsim):
-    Eye, LGN, SC = _common_modules(bsim)
-    world = bsim.BioWorld()
+def test_build_from_spec_with_preadded_modules(biosim):
+    Eye, LGN, SC = _common_modules(biosim)
+    world = biosim.BioWorld()
     spec = {
         "modules": {
             "eye": {"class": f"{Eye.__module__}.{Eye.__name__}", "min_dt": 0.1},
@@ -61,5 +61,5 @@ def test_build_from_spec_with_preadded_modules(bsim):
             {"from": "lgn.thalamus", "to": ["sc.vision"]},
         ],
     }
-    bsim.build_from_spec(world, spec)
+    biosim.build_from_spec(world, spec)
     world.run(duration=0.1, tick_dt=0.1)

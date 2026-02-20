@@ -1,6 +1,6 @@
 # Plugin Development Guide
 
-This guide explains how to create custom biomodules for bsim that can be:
+This guide explains how to create custom biomodules for biosim that can be:
 1. Used in your own projects
 2. Published as pip-installable packages
 3. Referenced in YAML configs by other users
@@ -8,11 +8,11 @@ This guide explains how to create custom biomodules for bsim that can be:
 ## Quick Start
 
 ```bash
-# Install bsim
-pip install bsim
+# Install biosim
+pip install biosim
 
 # Create your package
-mkdir my-bsim-pack && cd my-bsim-pack
+mkdir my-biosim-pack && cd my-biosim-pack
 # ... implement modules ...
 
 # Use in YAML
@@ -32,7 +32,7 @@ All modules implement the runnable contract. A minimal interface looks like:
 
 ```python
 from typing import Any, Dict, List, Optional, Set
-from bsim import BioModule, BioSignal, SignalMetadata
+from biosim import BioModule, BioSignal, SignalMetadata
 
 class BioModule:
     min_dt: float  # required positive value
@@ -54,7 +54,7 @@ class BioModule:
 ```python
 # my_pack/modules.py
 from typing import Dict, Set
-from bsim import BioModule, BioSignal, SignalMetadata
+from biosim import BioModule, BioSignal, SignalMetadata
 
 class Counter(BioModule):
     """Counts ticks and emits a count signal."""
@@ -130,7 +130,7 @@ class Accumulator(BioModule):
 ### Package layout
 
 ```
-my-bsim-pack/
+my-biosim-pack/
 ├── pyproject.toml
 ├── src/
 │   └── my_pack/
