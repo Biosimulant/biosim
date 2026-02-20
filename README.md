@@ -40,6 +40,37 @@ Alternative (package index):
 pip install biosim
 ```
 
+## Publishing to PyPI
+
+This repository publishes to PyPI using GitHub Trusted Publishing.
+
+Release workflow:
+
+1. Update `src/biosim/__about__.py` with a new version (example: `0.0.2`).
+2. Commit and push the version bump to `main`.
+3. Create and push a matching tag (`v0.0.2`).
+4. Verify GitHub Actions `Publish to PyPI` finishes successfully.
+
+Manual commands:
+
+```bash
+git add src/biosim/__about__.py
+git commit -m "Bump version to 0.0.2"
+git push origin main
+git tag v0.0.2
+git push origin v0.0.2
+```
+
+Automation script:
+
+```bash
+bash scripts/release_pypi.sh
+```
+
+- This reads the version from `src/biosim/__about__.py`, requires a clean git tree, pushes `main`, then creates and pushes `v<version>`.
+- You can also pass an explicit version: `bash scripts/release_pypi.sh 0.0.2`.
+- Use `--no-push` to only create the local tag: `bash scripts/release_pypi.sh --no-push`.
+
 ## Examples
 
 - See `examples/` for quick-start scripts. Try:
