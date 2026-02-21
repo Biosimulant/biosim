@@ -17,9 +17,6 @@ src/biosim/simui/_frontend/dist/
 
 .DS_Store
 
-# SimUI UI build outputs
+# SimUI UI build outputs (built automatically via prepare script)
+packages/simui-ui/dist/
 packages/simui-ui/dist-static/
-
-# Commit the built library artifacts so npm can install @biosim/simui-ui from a git SHA.
-!packages/simui-ui/dist/
-!packages/simui-ui/dist/**

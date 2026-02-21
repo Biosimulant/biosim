@@ -34,6 +34,7 @@
     "build:static": "npm run build:static --prefix packages/simui-ui",
     "build:types": "npm run build:types --prefix packages/simui-ui",
     "test": "npm run test --prefix packages/simui-ui",
-    "clean": "npm run clean --prefix packages/simui-ui"
+    "clean": "npm run clean --prefix packages/simui-ui",
+    "prepare": "npm install --prefix packages/simui-ui && npm run build"
   }
 }
