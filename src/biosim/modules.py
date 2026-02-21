@@ -26,7 +26,7 @@ class BioModule(ABC):
     @abstractmethod
     def advance_to(self, t: float) -> None:
         """Advance the module's internal state to time t."""
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover - abstract
 
     def set_inputs(self, signals: Dict[str, BioSignal]) -> None:
         """Receive input signals for the next advance step."""
@@ -35,7 +35,7 @@ class BioModule(ABC):
     @abstractmethod
     def get_outputs(self) -> Dict[str, BioSignal]:
         """Return current output signals."""
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover - abstract
 
     def get_state(self) -> Dict[str, Any]:
         """Return serializable state for checkpointing."""
