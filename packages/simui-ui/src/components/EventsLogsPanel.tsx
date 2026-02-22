@@ -199,8 +199,22 @@ export default function EventsLogsPanel() {
           <div className="footer-actions">
             {activeTab === 'events' && events.length > 0 && (
               <>
-                <button className="btn btn-small btn-primary" onClick={handleDownloadEvents}>
-                  Download
+                <button
+                  className="btn btn-small btn-primary footer-icon-button"
+                  onClick={handleDownloadEvents}
+                  title="Download events"
+                  aria-label="Download events"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      d="M12 3v11m0 0 4-4m-4 4-4-4M5 19h14"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
                 </button>
                 <button className="btn btn-small btn-outline" onClick={() => actions.setEvents([])}>
                   Clear
