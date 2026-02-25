@@ -269,7 +269,7 @@ function SimulationView({
         />
       </aside>
       <main className="app-main">
-        <MainContent chatAdapter={chatAdapter} />
+        <MainContent />
       </main>
       <aside className={`app-sidebar-right ${rightDrawerOpen ? 'open' : ''}`}>
         <EventsLogsPanel />
