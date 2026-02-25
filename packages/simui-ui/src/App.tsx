@@ -17,6 +17,8 @@ export interface SimuiAppProps {
   style?: React.CSSProperties;
   height?: string;
   initialMode?: AppMode;
+  hideHeader?: boolean;
+  onConnectionChange?: (connected: boolean) => void;
   headerLeft?: React.ReactNode;
   headerRight?: React.ReactNode;
   chatAdapter?: ChatAdapter;
@@ -24,11 +26,15 @@ export interface SimuiAppProps {
 }
 
 function SimulationView({
+  hideHeader,
+  onConnectionChange,
   headerLeft,
   headerRight,
   chatAdapter,
   sidebarAction,
 }: {
+  hideHeader?: boolean;
+  onConnectionChange?: (connected: boolean) => void;
   headerLeft?: React.ReactNode;
   headerRight?: React.ReactNode;
   chatAdapter?: ChatAdapter;
@@ -149,9 +155,11 @@ function SimulationView({
         (err) => {
           console.error("SSE error:", err);
           setConnected(false);
+          onConnectionChange?.(false);
         },
       );
       setConnected(true);
+      onConnectionChange?.(true);
     };
 
     setup();
@@ -162,6 +170,7 @@ function SimulationView({
         sseRef.current = null;
       }
       setConnected(false);
+      onConnectionChange?.(false);
     };
   }, [api, handleSSEMessage, initialize]);
 
@@ -222,42 +231,44 @@ function SimulationView({
 
   return (
     <>
-      <header className="app-header">
-        <div className="app-header-left">
-          {/* Mobile menu button for left sidebar */}
-          <button
-            className="btn btn-small lg:hidden"
-            style={{ display: window.innerWidth >= 1024 ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px' }}
-            onClick={() => setLeftDrawerOpen(!leftDrawerOpen)}
-            title="Toggle controls"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="3" y1="12" x2="21" y2="12"></line>
-              <line x1="3" y1="6" x2="21" y2="6"></line>
-              <line x1="3" y1="18" x2="21" y2="18"></line>
-            </svg>
-          </button>
-          {headerLeft}
-          <h1 className="app-title">{state.spec?.title || "BioSim UI"}</h1>
-        </div>
-        <div className="app-header-right">
-          {headerRight}
-          <div className="app-status">{connected && <div className="sse-indicator" title="Stream Connected" />}</div>
-          {/* Mobile menu button for right sidebar */}
-          <button
-            className="btn btn-small lg:hidden"
-            style={{ display: window.innerWidth >= 1024 ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px' }}
-            onClick={() => setRightDrawerOpen(!rightDrawerOpen)}
-            title="Toggle events"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="12" y1="16" x2="12" y2="12"></line>
-              <line x1="12" y1="8" x2="12.01" y2="8"></line>
-            </svg>
-          </button>
-        </div>
-      </header>
+      {!hideHeader && (
+        <header className="app-header">
+          <div className="app-header-left">
+            {/* Mobile menu button for left sidebar */}
+            <button
+              className="btn btn-small lg:hidden"
+              style={{ display: window.innerWidth >= 1024 ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px' }}
+              onClick={() => setLeftDrawerOpen(!leftDrawerOpen)}
+              title="Toggle controls"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+              </svg>
+            </button>
+            {headerLeft}
+            <h1 className="app-title">{state.spec?.title || "BioSim UI"}</h1>
+          </div>
+          <div className="app-header-right">
+            {headerRight}
+            <div className="app-status">{connected && <div className="sse-indicator" title="Stream Connected" />}</div>
+            {/* Mobile menu button for right sidebar */}
+            <button
+              className="btn btn-small lg:hidden"
+              style={{ display: window.innerWidth >= 1024 ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px' }}
+              onClick={() => setRightDrawerOpen(!rightDrawerOpen)}
+              title="Toggle events"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="16" x2="12" y2="12"></line>
+                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+              </svg>
+            </button>
+          </div>
+        </header>
+      )}
       <aside className={`app-sidebar-left ${leftDrawerOpen ? 'open' : ''}`}>
         <Sidebar
           onRun={run}
@@ -300,6 +311,8 @@ function EditorView() {
 function AppCore({
   initialMode,
   editorEnabled,
+  hideHeader,
+  onConnectionChange,
   headerLeft,
   headerRight,
   chatAdapter,
@@ -307,6 +320,8 @@ function AppCore({
 }: {
   initialMode?: AppMode;
   editorEnabled: boolean;
+  hideHeader?: boolean;
+  onConnectionChange?: (connected: boolean) => void;
   headerLeft?: React.ReactNode;
   headerRight?: React.ReactNode;
   chatAdapter?: ChatAdapter;
@@ -366,8 +381,10 @@ function AppCore({
 
   return (
     <div className="app">
-      <div className="app-layout">
+      <div className="app-layout" style={hideHeader ? { gridTemplateRows: '0px 1fr' } : undefined}>
         <SimulationView
+          hideHeader={hideHeader}
+          onConnectionChange={onConnectionChange}
           headerLeft={headerLeft}
           headerRight={headerRight}
           chatAdapter={chatAdapter}
@@ -405,12 +422,16 @@ function AppCore({
 
 function AppShell({
   initialMode,
+  hideHeader,
+  onConnectionChange,
   headerLeft,
   headerRight,
   chatAdapter,
   sidebarAction,
 }: {
   initialMode?: AppMode;
+  hideHeader?: boolean;
+  onConnectionChange?: (connected: boolean) => void;
   headerLeft?: React.ReactNode;
   headerRight?: React.ReactNode;
   chatAdapter?: ChatAdapter;
@@ -422,6 +443,8 @@ function AppShell({
     <AppCore
       initialMode={initialMode}
       editorEnabled={editorEnabled}
+      hideHeader={hideHeader}
+      onConnectionChange={onConnectionChange}
       headerLeft={headerLeft}
       headerRight={headerRight}
       chatAdapter={chatAdapter}
@@ -436,6 +459,8 @@ export const SimuiApp: React.FC<SimuiAppProps> = ({
   style,
   height = "100vh",
   initialMode,
+  hideHeader,
+  onConnectionChange,
   headerLeft,
   headerRight,
   chatAdapter,
@@ -448,6 +473,8 @@ export const SimuiApp: React.FC<SimuiAppProps> = ({
         <UiProvider>
           <AppShell
             initialMode={initialMode}
+            hideHeader={hideHeader}
+            onConnectionChange={onConnectionChange}
             headerLeft={headerLeft}
             headerRight={headerRight}
             chatAdapter={chatAdapter}
