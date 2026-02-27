@@ -38,7 +38,7 @@ export default function Graph({ data, isFullscreen }: { data: { nodes?: Node[]; 
           if (!p) return null
           return (
             <g key={n.id}>
-              <circle cx={p.x} cy={p.y} r={14} fill="#22d3ee" />
+              <circle cx={p.x} cy={p.y} r={14} fill="#b0b0b0" />
               <text x={p.x} y={p.y + 4} fontSize={10} textAnchor="middle" fill="#0f172a">{n.id}</text>
             </g>
           )

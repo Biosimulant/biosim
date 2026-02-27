@@ -11,11 +11,11 @@ const ModulePalette: React.FC<ModulePaletteProps> = ({ registry, onDragStart }) 
   const [search, setSearch] = useState('')
 
   // Dark theme colors
-  const bg = '#0f1628'
-  const surface = '#11182b'
-  const text = '#e6eaf2'
-  const muted = '#9aa6c1'
-  const border = '#1e2a44'
+  const bg = '#0f0f0f'
+  const surface = '#181818'
+  const text = '#e0e0e0'
+  const muted = '#888888'
+  const border = '#2a2a2a'
 
   if (!registry) {
     return (
