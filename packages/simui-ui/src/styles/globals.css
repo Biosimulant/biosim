@@ -2,19 +2,19 @@
 
 /* Tokens */
 .simui-root {
-  --bg: #0f0f0f;
-  --surface: #181818;
-  --surface-2: #141414;
-  --text: #e0e0e0;
-  --muted: #888888;
-  --border: #2a2a2a;
-  --accent: #b0b0b0;
-  --primary: #d4d4d4;
-  --primary-dark: #a0a0a0;
-  --primary-muted: #c0c0c0;
-  --primary-bg: #1e1e1e;
-  --primary-text: #e8e8e8;
-  --secondary: #b8b8b8;
+  --bg: #071414;
+  --surface: #0a1a1a;
+  --surface-2: #0d1f1f;
+  --text: #d4e8e5;
+  --muted: #7a9a95;
+  --border: #1a3333;
+  --accent: #22d3ee;
+  --primary: #14b8a6;
+  --primary-dark: #0d9488;
+  --primary-muted: #5eead4;
+  --primary-bg: #0f2a2a;
+  --primary-text: #ccfbf1;
+  --secondary: #2dd4bf;
   --success: #22c55e;
   --warning: #eab308;
   --danger: #ef4444;
@@ -66,7 +66,7 @@
 .simui-run-status { display: inline-flex; align-items: center; padding: 4px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: capitalize; }
 .simui-run-status--pending { background: rgba(148,163,184,0.2); color: #cbd5e1; }
 .simui-run-status--queued { background: rgba(234,179,8,0.2); color: #facc15; }
-.simui-run-status--running { background: rgba(176,176,176,0.2); color: #e0e0e0; }
+.simui-run-status--running { background: rgba(20,184,166,0.2); color: #99f6e4; }
 .simui-run-status--completed { background: rgba(34,197,94,0.2); color: #86efac; }
 .simui-run-status--failed { background: rgba(239,68,68,0.2); color: #fca5a5; }
 .simui-run-status--cancelled { background: rgba(148,163,184,0.2); color: #e2e8f0; }
@@ -104,7 +104,7 @@
 .sidebar-panel-header:hover { background: rgba(255,255,255,0.04); }
 .sidebar-panel-header:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(176,176,176,.25);
+  box-shadow: 0 0 0 3px rgba(34,211,238,.25);
 }
 .sidebar-panel-title {
   font-size: 12px;
@@ -137,7 +137,7 @@
 /* Status */
 .status-display { padding: var(--gap-3); border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); display: flex; flex-direction: column; gap: var(--gap-2); }
 .status-badge { display: inline-flex; align-items: center; gap: 8px; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; letter-spacing: .04em; }
-.status-idle{ background:#64748b;color:#fff } .status-running{ background:var(--success);color:#0f0f0f } .status-paused{ background:var(--warning);color:#111 } .status-error{ background:var(--danger);color:#fff } .status-unknown{ background:#475569;color:#fff }
+.status-idle{ background:#64748b;color:#fff } .status-running{ background:var(--success);color:#0b1020 } .status-paused{ background:var(--warning);color:#111 } .status-error{ background:var(--danger);color:#fff } .status-unknown{ background:#475569;color:#fff }
 .status-info { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); font-size: 12px; }
 .status-message.error { color: var(--danger); font-size: 12px; }
 
@@ -147,7 +147,7 @@
 .control-field { display: flex; flex-direction: column; gap: 6px; }
 .control-label { color: var(--muted); font-size: 12px; }
 .control-input { padding: 10px 12px; border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 8px; }
-.control-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(176,176,176,.2); }
+.control-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(34,211,238,.2); }
 .control-actions { display: flex; flex-direction: column; gap: 8px; }
 .control-group {
   border: 1px solid var(--border);
@@ -170,7 +170,7 @@
 .control-group-header:hover { background: rgba(255,255,255,0.04); }
 .control-group-header:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(176,176,176,.25);
+  box-shadow: 0 0 0 3px rgba(34,211,238,.25);
 }
 .control-group-title {
   font-size: 12px;
@@ -261,8 +261,8 @@
 }
 .main-tab:hover { border-color: var(--accent); color: var(--text); }
 .main-tab.active {
-  background: rgba(176,176,176,0.12);
-  border-color: rgba(176,176,176,0.45);
+  background: rgba(34,211,238,0.12);
+  border-color: rgba(34,211,238,0.45);
   color: var(--text);
 }
 
@@ -284,8 +284,8 @@
 .chat-loading {
   padding: 10px 12px;
   border-radius: 8px;
-  background: rgba(176,176,176,0.15);
-  color: #e0e0e0;
+  background: rgba(20,184,166,0.15);
+  color: #99f6e4;
   font-size: 12px;
 }
 .chat-error {
@@ -334,8 +334,8 @@
   border: 1px solid var(--border);
 }
 .chat-message.user .chat-bubble {
-  background: rgba(176,176,176,0.2);
-  border-color: rgba(176,176,176,0.35);
+  background: rgba(34,211,238,0.2);
+  border-color: rgba(34,211,238,0.35);
 }
 .chat-meta {
   color: var(--muted);
@@ -359,7 +359,7 @@
 .chat-textarea:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(176,176,176,0.2);
+  box-shadow: 0 0 0 3px rgba(34,211,238,0.2);
 }
 
 /* Module visuals */
@@ -492,7 +492,7 @@
 .wiring-palette { border: 1px solid var(--border); background: var(--surface); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; }
 .wiring-palette-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; }
 .wiring-palette-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.04); background: rgba(255,255,255,0.02); font-size: 12px; }
-.wiring-palette-item:hover { border-color: rgba(176,176,176,0.35); }
+.wiring-palette-item:hover { border-color: rgba(34,211,238,0.35); }
 .wiring-palette-item input { width: 16px; height: 16px; }
 .wiring-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.65); display: flex; align-items: center; justify-content: center; z-index: 2000; }
 .wiring-modal { width: 520px; max-width: calc(100vw - 24px); background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 14px 50px rgba(0,0,0,0.55); padding: 14px; }

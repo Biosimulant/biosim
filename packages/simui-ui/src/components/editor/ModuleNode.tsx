@@ -23,7 +23,7 @@ const ModuleNode: React.FC<NodeProps> = ({ data, selected }) => {
 
   // Dark theme colors matching globals.css
   const categoryColors: Record<string, { bg: string; border: string; header: string; text: string }> = {
-    neuro: { bg: '#1e1e1e', border: '#d4d4d4', header: '#a0a0a0', text: '#e8e8e8' },
+    neuro: { bg: 'var(--primary-bg)', border: 'var(--primary)', header: 'var(--primary-dark)', text: 'var(--primary-text)' },
     ecology: { bg: '#14352a', border: '#22c55e', header: '#16a34a', text: '#dcfce7' },
     custom: { bg: '#2e1a47', border: '#a855f7', header: '#9333ea', text: '#f3e8ff' },
   }
@@ -92,7 +92,7 @@ const ModuleNode: React.FC<NodeProps> = ({ data, selected }) => {
             </div>
           ))}
           {inputs.length === 0 && (
-            <div style={{ paddingLeft: '14px', fontSize: '12px', color: '#888888', fontStyle: 'italic' }}>
+            <div style={{ paddingLeft: '14px', fontSize: '12px', color: '#9aa6c1', fontStyle: 'italic' }}>
               no inputs
             </div>
           )}
@@ -118,7 +118,7 @@ const ModuleNode: React.FC<NodeProps> = ({ data, selected }) => {
             </div>
           ))}
           {outputs.length === 0 && (
-            <div style={{ paddingRight: '14px', fontSize: '12px', color: '#888888', fontStyle: 'italic' }}>
+            <div style={{ paddingRight: '14px', fontSize: '12px', color: '#9aa6c1', fontStyle: 'italic' }}>
               no outputs
             </div>
           )}
