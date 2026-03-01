@@ -4,9 +4,10 @@ import { UiProvider, useUi, isJsonControl, isNumberControl } from "./app/ui";
 import type { EventRecord, RunStatus, Snapshot, TickData, UiSpec } from "./types/api";
 import type { SSEMessage, SSESubscription, SimulationApi } from "./lib/api";
 import type { ChatAdapter } from "./types/chat";
-import Sidebar from "./components/Sidebar";
-import MainContent from "./components/MainContent";
-import EventsLogsPanel from "./components/EventsLogsPanel";
+import Toolbar from "./components/Toolbar";
+import ContentTabs, { type ContentTab } from "./components/ContentTabs";
+import ControlsDrawer from "./components/ControlsDrawer";
+import BottomPanel from "./components/BottomPanel";
 import { ConfigEditor } from "./components/editor";
 
 type AppMode = "simulation" | "editor";
@@ -32,6 +33,7 @@ function SimulationView({
   headerRight,
   chatAdapter,
   sidebarAction,
+  onToggleEditor,
 }: {
   hideHeader?: boolean;
   onConnectionChange?: (connected: boolean) => void;
@@ -39,12 +41,13 @@ function SimulationView({
   headerRight?: React.ReactNode;
   chatAdapter?: ChatAdapter;
   sidebarAction?: React.ReactNode;
+  onToggleEditor?: () => void;
 }) {
   const api = useApi();
   const { state, actions } = useUi();
   const [connected, setConnected] = useState(false);
-  const [leftDrawerOpen, setLeftDrawerOpen] = useState(false);
-  const [rightDrawerOpen, setRightDrawerOpen] = useState(false);
+  const [controlsOpen, setControlsOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<ContentTab>("visuals");
   const sseRef = useRef<SSESubscription | null>(null);
   const storageKeyRef = useRef<string | null>(null);
 
@@ -230,73 +233,32 @@ function SimulationView({
   }, [api, actions]);
 
   return (
-    <>
+    <div className={`app-v2${hideHeader ? ' app-v2--no-toolbar' : ''}`}>
       {!hideHeader && (
-        <header className="app-header">
-          <div className="app-header-left">
-            {/* Mobile menu button for left sidebar */}
-            <button
-              className="btn btn-small lg:hidden"
-              style={{ display: window.innerWidth >= 1024 ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px' }}
-              onClick={() => setLeftDrawerOpen(!leftDrawerOpen)}
-              title="Toggle controls"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="3" y1="12" x2="21" y2="12"></line>
-                <line x1="3" y1="6" x2="21" y2="6"></line>
-                <line x1="3" y1="18" x2="21" y2="18"></line>
-              </svg>
-            </button>
-            {headerLeft}
-            <h1 className="app-title">{state.spec?.title || "BioSim UI"}</h1>
-          </div>
-          <div className="app-header-right">
-            {headerRight}
-            <div className="app-status">{connected && <div className="sse-indicator" title="Stream Connected" />}</div>
-            {/* Mobile menu button for right sidebar */}
-            <button
-              className="btn btn-small lg:hidden"
-              style={{ display: window.innerWidth >= 1024 ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px' }}
-              onClick={() => setRightDrawerOpen(!rightDrawerOpen)}
-              title="Toggle events"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="12" y1="16" x2="12" y2="12"></line>
-                <line x1="12" y1="8" x2="12.01" y2="8"></line>
-              </svg>
-            </button>
-          </div>
-        </header>
-      )}
-      <aside className={`app-sidebar-left ${leftDrawerOpen ? 'open' : ''}`}>
-        <Sidebar
+        <Toolbar
+          connected={connected}
+          runPending={runPending}
           onRun={run}
           onPause={pause}
           onResume={resume}
           onReset={reset}
-          runPending={runPending}
-          sidebarAction={sidebarAction}
-        />
-      </aside>
-      <main className="app-main">
-        <MainContent />
-      </main>
-      <aside className={`app-sidebar-right ${rightDrawerOpen ? 'open' : ''}`}>
-        <EventsLogsPanel />
-      </aside>
-
-      {/* Backdrop for mobile */}
-      {(leftDrawerOpen || rightDrawerOpen) && (
-        <div
-          className="drawer-backdrop"
-          onClick={() => {
-            setLeftDrawerOpen(false);
-            setRightDrawerOpen(false);
-          }}
+          onToggleControls={() => setControlsOpen((p) => !p)}
+          onToggleEditor={onToggleEditor}
+          headerLeft={headerLeft}
+          headerRight={headerRight}
         />
       )}
-    </>
+
+      <ContentTabs activeTab={activeTab} onTabChange={setActiveTab} />
+
+      <BottomPanel chatAdapter={chatAdapter} />
+
+      <ControlsDrawer
+        open={controlsOpen}
+        onClose={() => setControlsOpen(false)}
+        sidebarAction={sidebarAction}
+      />
+    </div>
   );
 }
 
@@ -347,12 +309,12 @@ function AppCore({
     return () => window.removeEventListener("hashchange", handleHashChange);
   }, [editorEnabled]);
 
-  const toggleMode = () => {
+  const toggleMode = useCallback(() => {
     if (!editorEnabled) return;
     const newMode = mode === "simulation" ? "editor" : "simulation";
     window.location.hash = newMode === "editor" ? "editor" : "";
     setMode(newMode);
-  };
+  }, [editorEnabled, mode]);
 
   if (mode === "editor" && editorEnabled) {
     return (
@@ -380,43 +342,15 @@ function AppCore({
   }
 
   return (
-    <div className="app">
-      <div className="app-layout" style={hideHeader ? { gridTemplateRows: '0px 1fr' } : undefined}>
-        <SimulationView
-          hideHeader={hideHeader}
-          onConnectionChange={onConnectionChange}
-          headerLeft={headerLeft}
-          headerRight={headerRight}
-          chatAdapter={chatAdapter}
-          sidebarAction={sidebarAction}
-        />
-      </div>
-      {editorEnabled && (
-        <div style={{ position: "fixed", bottom: "16px", right: "16px", zIndex: 1000 }}>
-          <button
-            onClick={toggleMode}
-            title="Open Config Editor"
-            style={{
-              padding: "10px 16px",
-              background: "var(--primary)",
-              color: "#fff",
-              border: "none",
-              borderRadius: "8px",
-              cursor: "pointer",
-              fontSize: "13px",
-              fontWeight: 500,
-              boxShadow: "0 2px 8px rgba(20, 184, 166, 0.4)",
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-            }}
-          >
-            <span style={{ fontSize: "16px" }}>&#9881;</span>
-            Config Editor
-          </button>
-        </div>
-      )}
-    </div>
+    <SimulationView
+      hideHeader={hideHeader}
+      onConnectionChange={onConnectionChange}
+      headerLeft={headerLeft}
+      headerRight={headerRight}
+      chatAdapter={chatAdapter}
+      sidebarAction={sidebarAction}
+      onToggleEditor={editorEnabled ? toggleMode : undefined}
+    />
   );
 }
 
