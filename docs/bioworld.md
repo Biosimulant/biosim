@@ -12,6 +12,8 @@ Lifecycle
 - Emits: `STARTED`, `TICK`, `FINISHED`.
 - May also emit: `PAUSED`, `RESUMED`, `STOPPED`, `ERROR`.
 - Exceptions in listeners are logged and do not stop the world.
+- Event payloads now include additive progress fields during active runs:
+  `start`, `end`, `duration`, `progress`, `progress_pct`, `remaining`.
 
 Key methods
 - `on(listener)` / `off(listener)`

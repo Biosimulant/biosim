@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useUi, useModuleNames, isJsonControl, isNumberControl } from '../app/ui'
 import { formatDuration } from '../lib/time'
+import { resolveRunProgress } from '../lib/progress'
 
 type Props = {
   onRun: () => void;
@@ -12,6 +13,12 @@ type Props = {
 }
 
 type PanelId = 'controls' | 'status' | 'modules'
+
+function toFiniteNumber(value: unknown): number {
+  if (value === '' || value === null || value === undefined) return Number.NaN
+  const n = typeof value === 'number' ? value : Number(String(value))
+  return Number.isFinite(n) ? n : Number.NaN
+}
 
 function SidebarPanel({
   id,
@@ -50,17 +57,40 @@ function SidebarPanel({
 function StatusDisplay() {
   const { state } = useUi()
   const st = state.status
+  const numberControls = (state.spec?.controls || []).filter(isNumberControl)
+  const controlDefault = (name: string): number | undefined => numberControls.find((c) => c.name === name)?.default
+  const duration = toFiniteNumber(state.controls.duration ?? controlDefault('duration'))
+  const tickDt = toFiniteNumber(state.controls.tick_dt ?? controlDefault('tick_dt'))
+  const progress = resolveRunProgress({ status: st, duration, tickDt })
+  const progressDisplay = progress.progressPct !== null && (
+    <div className="sim-progress-row" title={progress.estimated ? 'Estimated from ticks' : 'Simulation-time progress'}>
+      <span className="sim-progress-label">{progress.progressLabel}</span>
+      <div className="sim-progress-track" aria-hidden="true">
+        <div className="sim-progress-fill" style={{ width: `${progress.progressPct}%` }} />
+      </div>
+    </div>
+  )
+
   if (!st) return <div className="status-display"><div className="status-badge status-unknown">Unknown</div></div>
   if (st.error) return (
     <div className="status-display">
       <div className="status-badge status-error">Error</div>
       <div className="status-message error">{st.error.message}</div>
+      {progressDisplay}
     </div>
   )
   if (st.running) return (
     <div className="status-display">
       <div className={`status-badge ${st.paused ? 'status-paused' : 'status-running'}`}>{st.paused ? 'Paused' : 'Running'}</div>
       <div className="status-info">Ticks: {st.tick_count?.toLocaleString() || 0}</div>
+      {progressDisplay}
+    </div>
+  )
+  if (progressDisplay) return (
+    <div className="status-display">
+      <div className="status-badge status-idle">Idle</div>
+      <div className="status-info">Last run</div>
+      {progressDisplay}
     </div>
   )
   return <div className="status-display"><div className="status-badge status-idle">Idle</div></div>
@@ -80,15 +110,10 @@ function Controls() {
   const jsonControls = (state.spec?.controls || []).filter(isJsonControl).filter((c) => !hiddenJson.has(c.name))
   const updateControl = useCallback((name: string, value: string) => actions.setControls({ [name]: value }), [actions])
 
-  const toFiniteNumber = (value: unknown): number => {
-    if (value === '' || value === null || value === undefined) return Number.NaN
-    const n = typeof value === 'number' ? value : Number(String(value))
-    return Number.isFinite(n) ? n : Number.NaN
-  }
   const controlDefault = (name: string): number | undefined => numberControls.find((c) => c.name === name)?.default
   const duration = toFiniteNumber(state.controls.duration ?? controlDefault('duration'))
   const tickDt = toFiniteNumber(state.controls.tick_dt ?? controlDefault('tick_dt'))
-  const simTime = toFiniteNumber(st?.tick_count) * tickDt
+  const progress = resolveRunProgress({ status: st, duration, tickDt })
 
   const runtimeNames = new Set(['duration', 'tick_dt'])
   const runtimeControls = numberControls.filter((c) => runtimeNames.has(c.name))
@@ -219,10 +244,10 @@ function Controls() {
         </div>
       )}
       <div className="control-derived">
-        {st?.running && Number.isFinite(simTime) && (
+        {st?.running && progress.simTime !== null && (
           <div className="control-derived-row">
             <span className="control-derived-label">Sim time</span>
-            <span className="control-derived-value">{formatDuration(simTime)}</span>
+            <span className="control-derived-value">{formatDuration(progress.simTime)}</span>
           </div>
         )}
       </div>
@@ -283,10 +308,20 @@ export default function Sidebar(props: Props) {
   const statusSummary = useMemo(() => {
     const st = state.status
     if (!st) return 'Unknown'
-    if (st.error) return 'Error'
-    if (st.running) return `${st.paused ? 'Paused' : 'Running'} · Ticks: ${st.tick_count?.toLocaleString() || 0}`
+    const numberControls = (state.spec?.controls || []).filter(isNumberControl)
+    const controlDefault = (name: string): number | undefined => numberControls.find((c) => c.name === name)?.default
+    const duration = toFiniteNumber(state.controls.duration ?? controlDefault('duration'))
+    const tickDt = toFiniteNumber(state.controls.tick_dt ?? controlDefault('tick_dt'))
+    const progress = resolveRunProgress({ status: st, duration, tickDt })
+    if (st.error) return progress.progressPct !== null ? `Error · ${progress.progressLabel}` : 'Error'
+    if (st.running) {
+      return progress.progressPct !== null
+        ? `${st.paused ? 'Paused' : 'Running'} · ${progress.progressLabel}`
+        : `${st.paused ? 'Paused' : 'Running'} · Ticks: ${st.tick_count?.toLocaleString() || 0}`
+    }
+    if (progress.progressPct !== null) return `Idle · Last run: ${progress.progressLabel}`
     return 'Idle'
-  }, [state.status])
+  }, [state.controls.duration, state.controls.tick_dt, state.spec?.controls, state.status])
 
   const controlsSummary = useMemo(() => {
     const controls = Array.isArray(state.spec?.controls) ? state.spec!.controls! : []

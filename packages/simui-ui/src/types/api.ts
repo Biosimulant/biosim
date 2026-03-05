@@ -52,6 +52,12 @@ export type RunStatus = {
   running: boolean
   paused: boolean
   tick_count?: number
+  sim_time?: number
+  sim_start?: number
+  sim_end?: number
+  sim_remaining?: number
+  progress?: number
+  progress_pct?: number
   phase?: string
   phase_message?: string
   error?: { message: string }

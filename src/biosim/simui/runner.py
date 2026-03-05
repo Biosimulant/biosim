@@ -14,6 +14,12 @@ class RunStatus:
     tick_count: int = 0
     error: Optional[str] = None
     paused: bool = False
+    sim_time: Optional[float] = None
+    sim_start: Optional[float] = None
+    sim_end: Optional[float] = None
+    sim_remaining: Optional[float] = None
+    progress: Optional[float] = None
+    progress_pct: Optional[float] = None
 
 
 class SimulationManager:
@@ -48,7 +54,7 @@ class SimulationManager:
 
     def status(self) -> Dict[str, Any]:
         st = self._status
-        return {
+        data: Dict[str, Any] = {
             "running": st.running,
             "paused": st.paused,
             "started_at": _ts(st.started_at),
@@ -56,6 +62,19 @@ class SimulationManager:
             "tick_count": st.tick_count,
             "error": {"message": st.error} if st.error else None,
         }
+        if st.sim_time is not None:
+            data["sim_time"] = st.sim_time
+        if st.sim_start is not None:
+            data["sim_start"] = st.sim_start
+        if st.sim_end is not None:
+            data["sim_end"] = st.sim_end
+        if st.sim_remaining is not None:
+            data["sim_remaining"] = st.sim_remaining
+        if st.progress is not None:
+            data["progress"] = st.progress
+        if st.progress_pct is not None:
+            data["progress_pct"] = st.progress_pct
+        return data
 
     def join(self, timeout: Optional[float] = None) -> None:
         t = self._thread
@@ -104,8 +123,14 @@ class SimulationManager:
             from biosim.world import WorldEvent  # lazy to avoid circulars
 
             def _counter(ev, payload):
-                if ev == WorldEvent.TICK:
-                    self._status.tick_count += 1
+                with self._lock:
+                    if ev == WorldEvent.TICK:
+                        self._status.tick_count += 1
+                    if ev == WorldEvent.PAUSED:
+                        self._status.paused = True
+                    elif ev == WorldEvent.RESUMED:
+                        self._status.paused = False
+                    _update_progress(self._status, payload)
 
             self._world.on(_counter)
             try:
@@ -122,6 +147,38 @@ class SimulationManager:
             self._status.running = False
             self._status.finished_at = time.time()
 
+
+def _coerce_float(value: Any) -> Optional[float]:
+    try:
+        out = float(value)
+    except Exception:
+        return None
+    if out != out:  # NaN
+        return None
+    return out
+
+
+def _update_progress(status: RunStatus, payload: Any) -> None:
+    if not isinstance(payload, dict):
+        return
+    sim_time = _coerce_float(payload.get("t"))
+    sim_start = _coerce_float(payload.get("start"))
+    sim_end = _coerce_float(payload.get("end"))
+    sim_remaining = _coerce_float(payload.get("remaining"))
+    progress = _coerce_float(payload.get("progress"))
+    progress_pct = _coerce_float(payload.get("progress_pct"))
+    if sim_time is not None:
+        status.sim_time = sim_time
+    if sim_start is not None:
+        status.sim_start = sim_start
+    if sim_end is not None:
+        status.sim_end = sim_end
+    if sim_remaining is not None:
+        status.sim_remaining = sim_remaining
+    if progress is not None:
+        status.progress = progress
+    if progress_pct is not None:
+        status.progress_pct = progress_pct
 
 
 def _ts(t: Optional[float]) -> Optional[str]:

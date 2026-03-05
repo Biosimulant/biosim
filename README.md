@@ -145,7 +145,7 @@ SimUI lets you build and launch a small web UI entirely from Python (similar to 
   - The UI provides endpoints under `/ui/api/...`:
     - `GET /api/spec` – UI layout (controls, outputs, modules)
     - `POST /api/run` – Start a simulation run
-    - `GET /api/status` – Runner status (running/paused/error)
+    - `GET /api/status` – Runner status (running/paused/error + optional progress fields)
     - `GET /api/state` – Full state (status + last step + modules)
     - `GET /api/events` – Buffered world events (`?since_id=&limit=`)
     - `GET /api/visuals` – Collected module visuals
@@ -174,6 +174,8 @@ Troubleshooting:
 
 ### SimUI Design Notes
 - Transport: SSE (Server-Sent Events). The SPA connects to `/api/stream` for real-time updates. Polling endpoints (`/api/status`, `/api/visuals`, `/api/events`) remain available for fallback/debugging.
+- Objective progress fields are based on simulation-time progress (`(sim_time - sim_start) / duration`), not wall-clock time.
+- `/api/status` may include: `sim_time`, `sim_start`, `sim_end`, `sim_remaining`, `progress`, `progress_pct` (all optional/additive).
 - Events API: `/api/events?since_id=<int>&limit=<int>` returns `{ events, next_since_id }` where `events` are appended world events and `next_since_id` is the cursor for subsequent calls.
 - VisualSpec types supported now:
   - `timeseries`: `data = { "series": [{ "name": str, "points": [[x, y], ...] }, ...] }`

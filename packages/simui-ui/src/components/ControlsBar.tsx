@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo } from "react";
 import { useUi, useModuleNames, isNumberControl, isJsonControl } from "../app/ui";
 import { formatDuration } from "../lib/time";
+import { resolveRunProgress } from "../lib/progress";
 
 export interface ControlsBarProps {
   onRun: () => void;
@@ -56,7 +57,7 @@ export default function ControlsBar({
 
   const duration = toFiniteNumber(state.controls.duration ?? controlDefault("duration"));
   const tickDt = toFiniteNumber(state.controls.tick_dt ?? controlDefault("tick_dt"));
-  const simTime = toFiniteNumber(st?.tick_count) * tickDt;
+  const progress = resolveRunProgress({ status: st, duration, tickDt });
 
   const statusLabel = useMemo(() => {
     if (!st) return "Unknown";
@@ -99,8 +100,16 @@ export default function ControlsBar({
       {/* Status */}
       <div className="controls-bar-status">
         <span className={`status-badge ${statusClass}`}>{statusLabel}</span>
-        {st?.running && Number.isFinite(simTime) && (
-          <span className="controls-bar-simtime">{formatDuration(simTime)}</span>
+        {st?.running && progress.simTime !== null && (
+          <span className="controls-bar-simtime">{formatDuration(progress.simTime)}</span>
+        )}
+        {st?.running && progress.progressPct !== null && (
+          <div className="controls-bar-progress" title={progress.estimated ? "Estimated from ticks" : "Simulation-time progress"}>
+            <span className="controls-bar-progress-label">{progress.progressLabel}</span>
+            <div className="sim-progress-track controls-bar-progress-track" aria-hidden="true">
+              <div className="sim-progress-fill" style={{ width: `${progress.progressPct}%` }} />
+            </div>
+          </div>
         )}
       </div>
 

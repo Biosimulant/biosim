@@ -3,7 +3,7 @@ import time
 from unittest.mock import patch
 import pytest
 from biosim.world import BioWorld
-from biosim.simui.runner import SimulationManager, RunStatus, _ts
+from biosim.simui.runner import SimulationManager, RunStatus, _coerce_float, _ts, _update_progress
 
 
 def _make_world_with_module(slow=False):
@@ -35,6 +35,12 @@ class TestRunStatus:
         assert s.tick_count == 0
         assert s.error is None
         assert s.paused is False
+        assert s.sim_time is None
+        assert s.sim_start is None
+        assert s.sim_end is None
+        assert s.sim_remaining is None
+        assert s.progress is None
+        assert s.progress_pct is None
 
 
 class TestTimestamp:
@@ -58,6 +64,12 @@ class TestSimulationManager:
         assert st["running"] is False
         assert st["finished_at"] is not None
         assert st["tick_count"] > 0
+        assert st["sim_start"] == pytest.approx(0.0)
+        assert st["sim_end"] == pytest.approx(0.1)
+        assert st["sim_time"] == pytest.approx(0.1)
+        assert st["sim_remaining"] == pytest.approx(0.0)
+        assert st["progress"] == pytest.approx(1.0)
+        assert st["progress_pct"] == pytest.approx(100.0)
 
     def test_double_start_returns_false(self):
         world = _make_world_with_module(slow=True)
@@ -83,6 +95,7 @@ class TestSimulationManager:
         assert st["running"] is False
         assert st["paused"] is False
         assert st["error"] is None
+        assert "progress_pct" not in st
 
     def test_request_stop(self):
         world = _make_world_with_module(slow=True)
@@ -91,7 +104,9 @@ class TestSimulationManager:
         time.sleep(0.1)
         mgr.request_stop()
         mgr.join(timeout=5.0)
-        assert mgr.status()["running"] is False
+        status = mgr.status()
+        assert status["running"] is False
+        assert status["progress_pct"] < 100.0
 
     def test_pause_resume(self):
         world = _make_world_with_module(slow=True)
@@ -121,6 +136,7 @@ class TestSimulationManager:
         st = mgr.status()
         assert st["running"] is False
         assert st["tick_count"] == 0
+        assert "progress_pct" not in st
 
     def test_reset_while_running(self):
         world = _make_world_with_module()
@@ -179,3 +195,34 @@ class TestSimulationManager:
         time.sleep(0.1)
         mgr.reset()
         assert mgr.status()["running"] is False
+
+
+class TestProgressHelpers:
+    def test_coerce_float(self):
+        assert _coerce_float(1) == 1.0
+        assert _coerce_float("2.5") == 2.5
+        assert _coerce_float("bad") is None
+        assert _coerce_float(float("nan")) is None
+
+    def test_update_progress(self):
+        status = RunStatus()
+        _update_progress(status, "bad payload")
+        assert status.progress is None
+
+        _update_progress(
+            status,
+            {
+                "t": 0.3,
+                "start": 0.0,
+                "end": 1.0,
+                "remaining": 0.7,
+                "progress": 0.3,
+                "progress_pct": 30.0,
+            },
+        )
+        assert status.sim_time == pytest.approx(0.3)
+        assert status.sim_start == pytest.approx(0.0)
+        assert status.sim_end == pytest.approx(1.0)
+        assert status.sim_remaining == pytest.approx(0.7)
+        assert status.progress == pytest.approx(0.3)
+        assert status.progress_pct == pytest.approx(30.0)

@@ -37,13 +37,31 @@ def test_run_emits_ticks(biosim):
     world.run(duration=0.3, tick_dt=0.1)
 
     assert events[0][0] == biosim.WorldEvent.STARTED
+    started_payload = events[0][1]
+    assert started_payload["start"] == 0.0
+    assert started_payload["end"] == pytest.approx(0.3)
+    assert started_payload["duration"] == pytest.approx(0.3)
+    assert started_payload["progress"] == 0.0
+    assert started_payload["progress_pct"] == 0.0
+    assert started_payload["remaining"] == pytest.approx(0.3)
+
     tick_events = [e for e in events if e[0] == biosim.WorldEvent.TICK]
     assert [round(p["t"], 2) for _, p in tick_events] == [0.1, 0.2, 0.3]
+    tick_progress = [p["progress_pct"] for _, p in tick_events]
+    assert tick_progress == sorted(tick_progress)
+    assert all(0.0 <= value <= 100.0 for value in tick_progress)
+    assert tick_progress[-1] == pytest.approx(100.0)
+
+    finished_payload = events[-1][1]
     assert events[-1][0] == biosim.WorldEvent.FINISHED
+    assert finished_payload["progress"] == pytest.approx(1.0)
+    assert finished_payload["progress_pct"] == pytest.approx(100.0)
+    assert finished_payload["remaining"] == pytest.approx(0.0)
 
 
 def test_request_stop_emits_stopped(biosim):
     seen = []
+    stopped_payloads = []
 
     class Ticker(biosim.BioModule):
         def __init__(self):
@@ -61,6 +79,8 @@ def test_request_stop_emits_stopped(biosim):
 
     def listener(ev, payload):
         seen.append(ev)
+        if ev == biosim.WorldEvent.STOPPED:
+            stopped_payloads.append(payload)
         if ev == biosim.WorldEvent.TICK:
             world.request_stop()
 
@@ -68,6 +88,8 @@ def test_request_stop_emits_stopped(biosim):
     world.run(duration=10.0, tick_dt=0.1)
 
     assert biosim.WorldEvent.STOPPED in seen
+    assert len(stopped_payloads) == 1
+    assert stopped_payloads[0]["progress_pct"] < 100.0
 
 
 def test_request_pause_blocks_until_resume(biosim):

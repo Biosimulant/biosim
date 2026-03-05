@@ -64,6 +64,8 @@ class BioWorld:
         self._current_time: float = 0.0
         self._is_setup: bool = False
         self._listeners: List[Listener] = []
+        self._active_run_start: Optional[float] = None
+        self._active_run_end: Optional[float] = None
 
         self._stop_requested: bool = False
         self._run_event = threading.Event()
@@ -88,6 +90,27 @@ class BioWorld:
                 listener(event, data)
             except Exception:
                 logger.exception("world listener raised during %s", event)
+
+    def _progress_payload(self, now: Optional[float] = None) -> Dict[str, float]:
+        start = self._active_run_start
+        end = self._active_run_end
+        if start is None or end is None:
+            return {}
+        sim_time = self._current_time if now is None else now
+        duration = max(0.0, end - start)
+        if duration <= 0.0:
+            progress = 1.0 if sim_time >= end else 0.0
+        else:
+            progress = (sim_time - start) / duration
+        progress = max(0.0, min(1.0, progress))
+        return {
+            "start": start,
+            "end": end,
+            "duration": duration,
+            "progress": progress,
+            "progress_pct": progress * 100.0,
+            "remaining": max(0.0, end - sim_time),
+        }
 
     # --- Module registration -----------------------------------------
     def add_biomodule(self, name: str, module: BioModule, *, min_dt: Optional[float] = None, priority: int = 0) -> None:
@@ -194,10 +217,12 @@ class BioWorld:
 
         end_time = self._current_time + duration
         next_tick_time = self._current_time if tick_dt is None else self._current_time + tick_dt
+        self._active_run_start = self._current_time
+        self._active_run_end = end_time
 
         self._stop_requested = False
         self._run_event.set()
-        self._emit(WorldEvent.STARTED, {"t": self._current_time, "end": end_time})
+        self._emit(WorldEvent.STARTED, {"t": self._current_time, **self._progress_payload(self._current_time)})
 
         try:
             while self._queue:
@@ -238,19 +263,21 @@ class BioWorld:
                 self._schedule(name, next_time)
 
                 if tick_dt is None:
-                    self._emit(WorldEvent.TICK, {"t": self._current_time, "module": name})
+                    self._emit(WorldEvent.TICK, {"t": self._current_time, "module": name, **self._progress_payload(self._current_time)})
                 else:
                     while next_tick_time <= self._current_time + eps:
-                        self._emit(WorldEvent.TICK, {"t": next_tick_time})
+                        self._emit(WorldEvent.TICK, {"t": next_tick_time, **self._progress_payload(next_tick_time)})
                         next_tick_time += tick_dt
 
         except SimulationStop:
-            self._emit(WorldEvent.STOPPED, {"t": self._current_time})
+            self._emit(WorldEvent.STOPPED, {"t": self._current_time, **self._progress_payload(self._current_time)})
         except Exception as exc:
-            self._emit(WorldEvent.ERROR, {"t": self._current_time, "error": exc})
+            self._emit(WorldEvent.ERROR, {"t": self._current_time, "error": exc, **self._progress_payload(self._current_time)})
             raise
         finally:
-            self._emit(WorldEvent.FINISHED, {"t": self._current_time})
+            self._emit(WorldEvent.FINISHED, {"t": self._current_time, **self._progress_payload(self._current_time)})
+            self._active_run_start = None
+            self._active_run_end = None
 
     # --- Cooperative controls -----------------------------------------
     def request_stop(self) -> None:
@@ -259,11 +286,11 @@ class BioWorld:
 
     def request_pause(self) -> None:
         self._run_event.clear()
-        self._emit(WorldEvent.PAUSED, {"t": self._current_time})
+        self._emit(WorldEvent.PAUSED, {"t": self._current_time, **self._progress_payload(self._current_time)})
 
     def request_resume(self) -> None:
         self._run_event.set()
-        self._emit(WorldEvent.RESUMED, {"t": self._current_time})
+        self._emit(WorldEvent.RESUMED, {"t": self._current_time, **self._progress_payload(self._current_time)})
 
     # --- Introspection -------------------------------------------------
     @property

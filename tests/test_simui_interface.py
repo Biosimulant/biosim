@@ -232,6 +232,23 @@ class TestStatusEndpoints:
         assert "visuals" in data
         assert "events" in data
 
+    def test_status_includes_progress_after_run(self):
+        app, ui = _make_app()
+        client = TestClient(app)
+        run_response = client.post("/ui/api/run", json={"duration": 0.05, "tick_dt": 0.01})
+        assert run_response.status_code == 202
+        ui._runner.join(timeout=5.0)
+
+        r = client.get("/ui/api/status")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["progress"] == pytest.approx(1.0)
+        assert data["progress_pct"] == pytest.approx(100.0)
+        assert data["sim_time"] == pytest.approx(0.05)
+        assert data["sim_start"] == pytest.approx(0.0)
+        assert data["sim_end"] == pytest.approx(0.05)
+        assert data["sim_remaining"] == pytest.approx(0.0)
+
 
 class TestPauseResumeEndpoints:
     def test_pause_not_running(self):
@@ -388,6 +405,22 @@ class TestListenerAndSSE:
         ui._broadcast_sse({"type": "test"})
         msg = q.get_nowait()
         assert msg["type"] == "test"
+        ui._unsubscribe_sse(q)
+
+    def test_tick_sse_includes_progress(self):
+        world = _make_world()
+        ui = Interface(world)
+        q = ui._subscribe_sse()
+        with patch.object(
+            ui._runner,
+            "status",
+            return_value={"running": True, "paused": False, "progress": 0.1, "progress_pct": 10.0},
+        ):
+            ui._listener(WorldEvent.TICK, {"t": 0.1, "progress": 0.1, "progress_pct": 10.0})
+        msg = q.get_nowait()
+        assert msg["type"] == "tick"
+        assert msg["data"]["status"]["progress_pct"] == pytest.approx(10.0)
+        assert msg["data"]["event"]["payload"]["progress_pct"] == pytest.approx(10.0)
         ui._unsubscribe_sse(q)
 
     def test_collect_visuals_safe_error(self):

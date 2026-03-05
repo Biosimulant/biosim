@@ -81,4 +81,32 @@ describe("Sidebar ActionsBar", () => {
 
     expect(html).not.toContain("Run Simulation");
   });
+
+  it("shows running progress in status summary", () => {
+    mockState.status = { running: true, paused: false, progress_pct: 42, tick_count: 42 };
+    mockState.spec.controls = [
+      { type: "number", name: "duration", default: 10 },
+      { type: "number", name: "tick_dt", default: 0.1 },
+    ];
+
+    const html = renderToStaticMarkup(
+      <Sidebar onRun={() => {}} onPause={() => {}} onResume={() => {}} onReset={() => {}} />,
+    );
+
+    expect(html).toContain("Running · 42.0%");
+  });
+
+  it("keeps last run progress in idle status summary", () => {
+    mockState.status = { running: false, paused: false, progress_pct: 68.5, tick_count: 10 };
+    mockState.spec.controls = [
+      { type: "number", name: "duration", default: 10 },
+      { type: "number", name: "tick_dt", default: 0.1 },
+    ];
+
+    const html = renderToStaticMarkup(
+      <Sidebar onRun={() => {}} onPause={() => {}} onResume={() => {}} onReset={() => {}} />,
+    );
+
+    expect(html).toContain("Idle · Last run: 68.5%");
+  });
 });
