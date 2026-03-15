@@ -12,6 +12,12 @@ def test_getattr_simui_lazy_import(biosim):
         pass
 
 
+def test_getattr_onnx_module_lazy_import(biosim):
+    cls = biosim.__getattr__("OnnxClassifierModule")
+    assert cls is not None
+    assert cls.__name__ == "OnnxClassifierModule"
+
+
 def test_getattr_unknown_raises():
     """__getattr__ should raise AttributeError for unknown names."""
     import biosim
@@ -24,10 +30,12 @@ def test_getattr_unknown_raises():
 
 
 def test_dir_includes_simui():
-    """__dir__ should include 'simui' in its output."""
+    """__dir__ should include lazy namespaces and exported helpers."""
     import biosim
 
     names = biosim.__dir__()
     assert "simui" in names
+    assert "onnx" in names
+    assert "OnnxClassifierModule" in names
     assert "__version__" in names
     assert names == sorted(names)

@@ -40,6 +40,12 @@ Alternative (package index):
 pip install biosim
 ```
 
+For the shared ONNX biomodule helpers:
+
+```console
+pip install "biosim[ml]"
+```
+
 ## Publishing to PyPI
 
 See the release guide: [`docs/releasing.md`](docs/releasing.md).
@@ -121,6 +127,42 @@ print(world.collect_visuals())  # [{"module": "module", "visuals": [...]}]
 ```
 
 See `examples/visuals_demo.py` for a minimal end-to-end example.
+
+### ONNX Modules
+
+`biosim` can host ONNX-backed modules without changing the core runtime. Install
+the ML extras and wrap the ONNX model behind the standard `BioModule`
+interface:
+
+```python
+from biosim import BioSignal, OnnxClassifierModule
+
+classifier = OnnxClassifierModule(
+    model_path="artifacts/model.onnx",
+    class_labels=["quiescent", "subthreshold", "spiking"],
+    input_port="state_vector",
+    probabilities_port="state_probabilities",
+    predicted_port="predicted_state",
+    input_vector_length=4,
+)
+
+classifier.set_inputs(
+    {
+        "state_vector": BioSignal(
+            source="adapter",
+            name="state_vector",
+            value=[-64.0, 0.1, 0.6, 0.3],
+            time=0.0,
+        )
+    }
+)
+classifier.advance_to(0.001)
+print(classifier.get_outputs()["predicted_state"].value)
+```
+
+Model packs can subclass `OnnxClassifierModule` to set repo-relative
+`model_path`, port names, and label sets while keeping the inference logic in
+the shared library.
 
 ## SimUI (Python-Declared UI)
 

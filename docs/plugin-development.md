@@ -123,6 +123,37 @@ class Accumulator(BioModule):
         }
 ```
 
+### Wrapping ONNX in a BioModule
+
+You do not need a new runtime abstraction for ONNX. Use the shared
+`biosim.OnnxClassifierModule` helper or wrap the model in a normal `BioModule`,
+accept `BioSignal` inputs, and emit `BioSignal` outputs.
+
+Typical pattern:
+
+```python
+from pathlib import Path
+
+from biosim import OnnxClassifierModule
+
+
+class OnnxClassifier(OnnxClassifierModule):
+    def __init__(self, model_path: str = "artifacts/model.onnx"):
+        super().__init__(
+            model_path=model_path,
+            class_labels=["quiescent", "subthreshold", "spiking"],
+            input_port="state_vector",
+            probabilities_port="state_probabilities",
+            predicted_port="predicted_state",
+            input_vector_length=4,
+            base_dir=str(Path(__file__).resolve().parent),
+        )
+```
+
+Install `biosim[ml]` in environments that actually execute ONNX inference. The
+key point is that ONNX stays inside the module boundary. The rest of the world
+still sees plain `BioSignal`s and ordinary wiring.
+
 ---
 
 ## Part 2: Packaging and Distribution

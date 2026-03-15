@@ -38,6 +38,7 @@ __all__ = [
     "load_wiring",
     "load_wiring_toml",
     "load_wiring_yaml",
+    "OnnxClassifierModule",
 ]
 
 
@@ -45,8 +46,12 @@ def __getattr__(name: str) -> ModuleType:
     # Lazily import optional namespaces so `import biosim` does not require extras.
     if name == "simui":
         return importlib.import_module(".simui", __name__)
+    if name == "onnx":
+        return importlib.import_module(".onnx", __name__)
+    if name == "OnnxClassifierModule":
+        return getattr(importlib.import_module(".onnx", __name__), name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def __dir__() -> list[str]:
-    return sorted([*__all__, "simui"])
+    return sorted([*__all__, "onnx", "simui"])
