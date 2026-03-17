@@ -1,64 +1,71 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiProvider, useApi } from './app/providers'
 import { UiProvider, useUi, isNumberControl } from './app/ui'
+import { ComposeProvider, useCompose } from './app/compose'
 import type { EventRecord, RunStatus, Snapshot, TickData, UiSpec } from './types/api'
 import type { SSEMessage, SSESubscription } from './lib/api'
 import Sidebar from './components/Sidebar'
-import MainContent from './components/MainContent'
-import Footer from './components/Footer'
-import { ConfigEditor } from './components/editor'
+import ComposeCanvas from './components/ComposeCanvas'
+import ComposeToolbar from './components/ComposeToolbar'
+import RightPanel from './components/RightPanel'
+import { FileListModal, YamlPreviewModal } from './components/ComposeModals'
 
-type AppMode = 'simulation' | 'editor'
-
-function SimulationView() {
+function UnifiedView() {
   const api = useApi()
-  const { state, actions } = useUi()
+  const { state: uiState, actions: uiActions } = useUi()
+  const { state: composeState, actions: composeActions } = useCompose()
   const [connected, setConnected] = useState(false)
+  const [rightPanelOpen, setRightPanelOpen] = useState(false)
   const sseRef = useRef<SSESubscription | null>(null)
 
+  // Initialize simulation UI spec
   const initialize = useCallback(async () => {
     const spec = await api.spec() as UiSpec
-    actions.setSpec(spec)
-    // Prime controls defaults
+    uiActions.setSpec(spec)
     const defaults: Record<string, number | string> = {}
     for (const c of spec.controls || []) if (isNumberControl(c)) defaults[c.name] = c.default
-    actions.setControls(defaults)
-  }, [api, actions])
+    uiActions.setControls(defaults)
+  }, [api, uiActions])
 
+  // SSE message handler
   const handleSSEMessage = useCallback((msg: SSEMessage) => {
     switch (msg.type) {
       case 'snapshot': {
         const snap = msg.data as Snapshot
-        if (snap?.status) actions.setStatus(snap.status)
-        if (Array.isArray(snap?.visuals)) actions.setVisuals(snap.visuals)
-        if (Array.isArray(snap?.events)) actions.setEvents(snap.events)
+        if (snap?.status) uiActions.setStatus(snap.status)
+        if (Array.isArray(snap?.visuals)) uiActions.setVisuals(snap.visuals)
+        if (Array.isArray(snap?.events)) uiActions.setEvents(snap.events)
         break
       }
       case 'tick': {
         const tick = msg.data as TickData
-        if (tick?.status) actions.setStatus(tick.status)
-        if (Array.isArray(tick?.visuals)) actions.setVisuals(tick.visuals)
-        if (tick?.event) actions.appendEvent(tick.event)
+        if (tick?.status) uiActions.setStatus(tick.status)
+        if (Array.isArray(tick?.visuals)) uiActions.setVisuals(tick.visuals)
+        if (tick?.event) uiActions.appendEvent(tick.event)
+        // Auto-open right panel on first results
+        if (!rightPanelOpen && Array.isArray(tick?.visuals) && tick.visuals.length > 0) {
+          setRightPanelOpen(true)
+        }
         break
       }
       case 'event': {
         const event = msg.data as EventRecord
-        actions.appendEvent(event)
+        uiActions.appendEvent(event)
         break
       }
       case 'status':
       case 'heartbeat': {
         const status = msg.data as RunStatus
-        actions.setStatus(status)
+        uiActions.setStatus(status)
         break
       }
     }
-  }, [actions])
+  }, [uiActions, rightPanelOpen])
 
+  // Connect SSE on mount
   useEffect(() => {
     const setup = async () => {
       await initialize()
-      // Connect to SSE stream
       sseRef.current = api.subscribeSSE(
         handleSSEMessage,
         (err) => {
@@ -78,126 +85,83 @@ function SimulationView() {
     }
   }, [])
 
+  // Simulation actions
   const run = useCallback(async () => {
     const payload: Record<string, number> = {}
-    for (const c of state.spec?.controls || []) {
+    for (const c of uiState.spec?.controls || []) {
       if (!isNumberControl(c)) continue
-      const raw = state.controls[c.name] ?? c.default
+      const raw = uiState.controls[c.name] ?? c.default
       const value = typeof raw === 'number' ? raw : Number(String(raw))
       if (Number.isFinite(value)) payload[c.name] = value
     }
     const duration = Number(payload.duration)
     const tickDt = payload.tick_dt
-    // Clear existing visuals before starting a new run
-    actions.setVisuals([])
-    // Clear existing events so the new run log starts fresh
-    actions.setEvents([])
+    uiActions.setVisuals([])
+    uiActions.setEvents([])
+    setRightPanelOpen(true)
     await api.run(duration, tickDt, payload)
-  }, [api, state.controls, state.spec, actions])
+  }, [api, uiState.controls, uiState.spec, uiActions])
+
   const pause = useCallback(async () => { await api.pause() }, [api])
   const resume = useCallback(async () => { await api.resume() }, [api])
-  const reset = useCallback(async () => { await api.reset(); actions.setEvents([]) }, [api, actions])
+  const reset = useCallback(async () => { await api.reset(); uiActions.setEvents([]) }, [api, uiActions])
 
   return (
     <>
+      {/* Header */}
       <header className="app-header">
-        <h1 className="app-title">{state.spec?.title || 'BioSim UI'}</h1>
-        <div className="app-status">{connected && <div className="sse-indicator" title="SSE Connected" />}</div>
+        <h1 className="app-title">{uiState.spec?.title || 'BioSim UI'}</h1>
+        <div className="app-status">
+          {connected && <div className="sse-indicator" title="SSE Connected" />}
+        </div>
       </header>
-      <aside className="app-sidebar-left">
-        <Sidebar onRun={run} onPause={pause} onResume={resume} onReset={reset} />
-      </aside>
-      <main className="app-main">
-        <MainContent />
-      </main>
-      <aside className="app-sidebar-right">
-        <Footer />
-      </aside>
+
+      {/* Toolbar */}
+      <div className="app-toolbar">
+        <ComposeToolbar />
+        {composeState.error && (
+          <div className={`toolbar-message ${composeState.error.includes('success') ? 'toolbar-message--success' : 'toolbar-message--error'}`}>
+            {composeState.error}
+            <button className="toolbar-message-close" onClick={() => composeActions.setError(null)}>{'\u2715'}</button>
+          </div>
+        )}
+      </div>
+
+      {/* Main body: sidebar | center | right panel */}
+      <div className="app-body">
+        <aside className="app-sidebar-left">
+          <Sidebar onRun={run} onPause={pause} onResume={resume} onReset={reset} />
+        </aside>
+
+        <main className="app-center">
+          {composeState.centerView === 'canvas' ? (
+            <ComposeCanvas />
+          ) : (
+            <div className="yaml-view">
+              <pre className="yaml-content">{composeState.yamlPreview || 'Click "YAML" in the toolbar to generate a preview.'}</pre>
+            </div>
+          )}
+        </main>
+
+        <RightPanel isOpen={rightPanelOpen} onToggle={() => setRightPanelOpen(!rightPanelOpen)} />
+      </div>
+
+      {/* Modals */}
+      <FileListModal />
+      <YamlPreviewModal />
     </>
   )
 }
 
-function EditorView() {
-  const api = useApi()
-  return <ConfigEditor api={api} />
-}
-
 function AppCore() {
-  const [mode, setMode] = useState<AppMode>('simulation')
-
-  // Check URL hash for mode
-  useEffect(() => {
-    const hash = window.location.hash.slice(1)
-    if (hash === 'editor') setMode('editor')
-
-    const handleHashChange = () => {
-      const newHash = window.location.hash.slice(1)
-      setMode(newHash === 'editor' ? 'editor' : 'simulation')
-    }
-    window.addEventListener('hashchange', handleHashChange)
-    return () => window.removeEventListener('hashchange', handleHashChange)
-  }, [])
-
-  const toggleMode = () => {
-    const newMode = mode === 'simulation' ? 'editor' : 'simulation'
-    window.location.hash = newMode === 'editor' ? 'editor' : ''
-    setMode(newMode)
-  }
-
-  if (mode === 'editor') {
-    return (
-      <div className="app" style={{ height: '100vh' }}>
-        <div style={{ position: 'absolute', top: '8px', right: '8px', zIndex: 1001 }}>
-          <button
-            onClick={toggleMode}
-            style={{
-              padding: '6px 12px',
-              background: 'var(--primary)',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '13px',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-            }}
-          >
-            Back to Simulation
-          </button>
-        </div>
-        <EditorView />
-      </div>
-    )
-  }
+  const api = useApi()
 
   return (
-    <div className="app">
-      <div className="app-layout">
-        <SimulationView />
+    <ComposeProvider api={api}>
+      <div className="app">
+        <UnifiedView />
       </div>
-      <div style={{ position: 'fixed', bottom: '16px', right: '16px', zIndex: 1000 }}>
-        <button
-          onClick={toggleMode}
-          title="Open Config Editor"
-          style={{
-            padding: '10px 16px',
-            background: 'var(--primary)',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontSize: '13px',
-            fontWeight: 500,
-            boxShadow: '0 2px 8px rgba(20, 184, 166, 0.4)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-          }}
-        >
-          <span style={{ fontSize: '16px' }}>&#9881;</span>
-          Config Editor
-        </button>
-      </div>
-    </div>
+    </ComposeProvider>
   )
 }
 

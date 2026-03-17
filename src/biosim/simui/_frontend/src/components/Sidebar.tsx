@@ -1,8 +1,10 @@
-import React, { useCallback, useEffect } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { useUi, useModuleNames, isNumberControl } from '../app/ui'
+import { useCompose } from '../app/compose'
 import { formatDuration } from '../lib/time'
+import type { ModuleSpec } from '../lib/api'
 
-type Props = { onRun: () => void; onPause: () => void; onResume: () => void; onReset: () => void }
+type SimProps = { onRun: () => void; onPause: () => void; onResume: () => void; onReset: () => void }
 
 function StatusDisplay() {
   const { state } = useUi()
@@ -23,7 +25,7 @@ function StatusDisplay() {
   return <div className="status-display"><div className="status-badge status-idle">Idle</div></div>
 }
 
-function Controls({ onRun, onPause, onResume, onReset }: Props) {
+function Controls({ onRun, onPause, onResume, onReset }: SimProps) {
   const { state, actions } = useUi()
   const st = state.status
   const numberControls = (state.spec?.controls || []).filter(isNumberControl)
@@ -54,7 +56,7 @@ function Controls({ onRun, onPause, onResume, onReset }: Props) {
       <div className="control-derived">
         <div className="control-derived-row">
           <span className="control-derived-label">Duration</span>
-          <span className="control-derived-value">{Number.isFinite(duration) ? formatDuration(duration) : '—'}</span>
+          <span className="control-derived-value">{Number.isFinite(duration) ? formatDuration(duration) : '\u2014'}</span>
         </div>
         {st?.running && Number.isFinite(simTime) && (
           <div className="control-derived-row">
@@ -87,7 +89,7 @@ function ModuleManager() {
   }, [state.visibleModules, actions])
   const showAll = useCallback(() => actions.setVisibleModules(new Set(moduleNames)), [moduleNames, actions])
   const hideAll = useCallback(() => actions.setVisibleModules(new Set()), [actions])
-  if (moduleNames.length === 0) return <div className="modules"><div className="empty-state"><p>No modules available</p></div></div>
+  if (moduleNames.length === 0) return null
   return (
     <div className="modules">
       <div className="module-list">
@@ -106,7 +108,100 @@ function ModuleManager() {
   )
 }
 
-export default function Sidebar(props: Props) {
+function PaletteSection() {
+  const { state, actions } = useCompose()
+  const [expanded, setExpanded] = useState(true)
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['neuro', 'ecology']))
+  const [search, setSearch] = useState('')
+
+  const registry = state.registry
+
+  const categoryColors: Record<string, string> = {
+    neuro: 'var(--primary)',
+    ecology: '#22c55e',
+    custom: '#a855f7',
+  }
+
+  const toggleCategory = (category: string) => {
+    const newExpanded = new Set(expandedCategories)
+    newExpanded.has(category) ? newExpanded.delete(category) : newExpanded.add(category)
+    setExpandedCategories(newExpanded)
+  }
+
+  const filteredCategories = registry
+    ? Object.entries(registry.categories).map(([category, paths]) => {
+        const modules = paths
+          .map(path => ({ path, spec: registry.modules[path] }))
+          .filter(({ spec }) => {
+            if (!spec) return false
+            if (!search) return true
+            const s = search.toLowerCase()
+            return spec.name.toLowerCase().includes(s) || spec.description?.toLowerCase().includes(s) || category.toLowerCase().includes(s)
+          })
+        return { category, modules }
+      }).filter(({ modules }) => modules.length > 0)
+    : []
+
+  const handleDragStart = (event: React.DragEvent, moduleType: string, spec: ModuleSpec) => {
+    actions.onPaletteDragStart(event, moduleType, spec)
+  }
+
+  return (
+    <div className="sidebar-section">
+      <h2 className="section-title section-title--collapsible" onClick={() => setExpanded(!expanded)}>
+        <span>{expanded ? '\u25BC' : '\u25B6'}</span> Module Palette
+      </h2>
+      {expanded && (
+        <div className="palette-content">
+          <input
+            type="text"
+            placeholder="Search modules..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="control-input palette-search"
+          />
+          {!registry && <div className="empty-state"><p>Loading modules...</p></div>}
+          {filteredCategories.map(({ category, modules }) => (
+            <div key={category} className="palette-category">
+              <button className="palette-category-header" onClick={() => toggleCategory(category)}>
+                <span className="palette-chevron" style={{ transform: expandedCategories.has(category) ? 'rotate(90deg)' : 'none' }}>{'\u25B6'}</span>
+                <span className="palette-dot" style={{ background: categoryColors[category] || '#666' }} />
+                {category.charAt(0).toUpperCase() + category.slice(1)}
+                <span className="palette-count">{modules.length}</span>
+              </button>
+              {expandedCategories.has(category) && (
+                <div className="palette-modules">
+                  {modules.map(({ path, spec }) => (
+                    <div
+                      key={path}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, path, spec)}
+                      className="palette-module"
+                      title={spec.description || path}
+                    >
+                      <div className="palette-module-name">{spec.name}</div>
+                      <div className="palette-module-ports">
+                        {spec.inputs.length > 0 && <span>in: {spec.inputs.join(', ')}</span>}
+                        {spec.inputs.length > 0 && spec.outputs.length > 0 && ' | '}
+                        {spec.outputs.length > 0 && <span>out: {spec.outputs.join(', ')}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+          {registry && filteredCategories.length === 0 && (
+            <div className="empty-state"><p>No modules found</p></div>
+          )}
+          <div className="palette-hint">Drag modules to canvas</div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default function Sidebar(props: SimProps) {
   return (
     <div className="sidebar">
       <div className="sidebar-content">
@@ -122,6 +217,7 @@ export default function Sidebar(props: Props) {
           <h2 className="section-title">Modules</h2>
           <ModuleManager />
         </section>
+        <PaletteSection />
       </div>
     </div>
   )

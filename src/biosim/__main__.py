@@ -33,6 +33,15 @@ import sys
 from pathlib import Path
 from typing import Any, Dict
 
+from .pack import (
+    PackageError,
+    build_package,
+    export_space_package,
+    fetch_package,
+    run_package,
+    validate_package,
+)
+
 
 def load_config(path: Path) -> Dict[str, Any]:
     """Load YAML or TOML config file."""
@@ -142,6 +151,10 @@ def run_simui(
 
 
 def main() -> None:
+    if len(sys.argv) > 1 and sys.argv[1] == "pack":
+        _main_pack(sys.argv[2:])
+        return
+
     parser = argparse.ArgumentParser(
         prog="python -m biosim",
         description="Run biosim simulations from YAML/TOML config files.",
@@ -231,6 +244,228 @@ Examples:
         )
     else:
         run_headless(world, duration=args.duration, tick_dt=tick_dt)
+
+
+def _main_pack(argv: list[str]) -> None:
+    parser = argparse.ArgumentParser(
+        prog="python -m biosim pack",
+        description="Build, validate, fetch, and run BioSim package files.",
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="Print machine-readable JSON output instead of human-readable summaries",
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    build_parser = subparsers.add_parser("build", help="Build a .bsimpkg from a model or space directory")
+    build_parser.add_argument("source", type=Path)
+    build_parser.add_argument("--out", type=Path, default=None)
+    build_parser.add_argument("--package", dest="package_name", type=str, default=None)
+    build_parser.add_argument("--version", type=str, default="0.1.0")
+    build_parser.add_argument("--visibility", type=str, default="private")
+
+    export_parser = subparsers.add_parser("export-space", help="Export a bundled space package")
+    export_parser.add_argument("source", type=Path)
+    export_parser.add_argument("--out", type=Path, default=None)
+    export_parser.add_argument("--package", dest="package_name", type=str, default=None)
+    export_parser.add_argument("--version", type=str, default="0.1.0")
+    export_parser.add_argument("--visibility", type=str, default="private")
+
+    validate_parser = subparsers.add_parser("validate", help="Validate a .bsimpkg")
+    validate_parser.add_argument("package_file", type=Path)
+
+    fetch_parser = subparsers.add_parser("fetch", help="Fetch a package into the local cache")
+    fetch_parser.add_argument("reference", type=str, help="Reference in package@version form")
+
+    run_parser = subparsers.add_parser("run", help="Run a model or space package")
+    run_parser.add_argument("package_file", type=Path)
+    run_parser.add_argument("--no-install-deps", action="store_true")
+
+    args = parser.parse_args(argv)
+
+    try:
+        if args.command == "build":
+            target = build_package(
+                args.source,
+                output_path=args.out,
+                package_name=args.package_name,
+                version=args.version,
+                visibility=args.visibility,
+            )
+            validation = validate_package(target)
+            _print_pack_result(
+                args.json_output,
+                {
+                    "command": "build",
+                    "package_file": str(target),
+                    "valid": validation.valid,
+                    "package": validation.metadata.get("package") if validation.metadata else None,
+                    "version": validation.metadata.get("version") if validation.metadata else None,
+                    "package_type": validation.metadata.get("package_type") if validation.metadata else None,
+                    "warnings": validation.warnings,
+                },
+            )
+            return
+        if args.command == "export-space":
+            target = export_space_package(
+                args.source,
+                output_path=args.out,
+                package_name=args.package_name,
+                version=args.version,
+                visibility=args.visibility,
+            )
+            validation = validate_package(target)
+            _print_pack_result(
+                args.json_output,
+                {
+                    "command": "export-space",
+                    "package_file": str(target),
+                    "valid": validation.valid,
+                    "package": validation.metadata.get("package") if validation.metadata else None,
+                    "version": validation.metadata.get("version") if validation.metadata else None,
+                    "package_type": validation.metadata.get("package_type") if validation.metadata else None,
+                    "bundle_mode": validation.metadata.get("bundle_mode") if validation.metadata else None,
+                    "warnings": validation.warnings,
+                },
+            )
+            return
+        if args.command == "validate":
+            result = validate_package(args.package_file)
+            if not result.valid:
+                _print_validation_failure(args.package_file, result, json_output=args.json_output)
+                raise SystemExit(1)
+            _print_validation_success(args.package_file, result, json_output=args.json_output)
+            return
+        if args.command == "fetch":
+            package_name, version = _parse_package_reference(args.reference)
+            target = fetch_package(package_name, version)
+            _print_pack_result(
+                args.json_output,
+                {
+                    "command": "fetch",
+                    "package": package_name,
+                    "version": version,
+                    "package_file": str(target),
+                },
+            )
+            return
+        if args.command == "run":
+            result = run_package(args.package_file, install_deps=not args.no_install_deps)
+            _print_run_result(args.package_file, result, json_output=args.json_output)
+            return
+    except PackageError as exc:
+        _print_pack_error(exc, json_output=args.json_output)
+        raise SystemExit(1) from exc
+
+
+def _parse_package_reference(value: str) -> tuple[str, str]:
+    package_name, sep, version = value.rpartition("@")
+    if not sep or not package_name.strip() or not version.strip():
+        raise PackageError("Package reference must be in package@version form")
+    return package_name.strip(), version.strip()
+
+
+def json_dumps(value: Any) -> str:
+    import json
+
+    return json.dumps(value, sort_keys=True)
+
+
+def _print_pack_result(json_output: bool, payload: dict[str, Any]) -> None:
+    if json_output:
+        print(json_dumps(payload))
+        return
+    command = payload.get("command", "pack")
+    print(f"BioSim package {command} succeeded.")
+    if payload.get("package"):
+        print(f"Package: {payload['package']}@{payload.get('version')}")
+    if payload.get("package_type"):
+        print(f"Type: {payload['package_type']}")
+    if payload.get("bundle_mode"):
+        print(f"Bundle mode: {payload['bundle_mode']}")
+    if payload.get("package_file"):
+        print(f"File: {payload['package_file']}")
+    warnings = payload.get("warnings") or []
+    for warning in warnings:
+        print(f"Warning: {warning}")
+
+
+def _print_validation_success(package_file: Path, result: Any, *, json_output: bool) -> None:
+    payload = {
+        "command": "validate",
+        "package_file": str(package_file),
+        "valid": True,
+        "package": result.metadata.get("package") if result.metadata else None,
+        "version": result.metadata.get("version") if result.metadata else None,
+        "package_type": result.metadata.get("package_type") if result.metadata else None,
+        "bundle_mode": result.metadata.get("bundle_mode") if result.metadata else None,
+        "warnings": result.warnings,
+        "metadata": result.metadata,
+    }
+    if json_output:
+        print(json_dumps(payload))
+        return
+    print("BioSim package validation passed.")
+    print(f"File: {package_file}")
+    if result.metadata:
+        print(f"Package: {result.metadata.get('package')}@{result.metadata.get('version')}")
+        print(f"Type: {result.metadata.get('package_type')}")
+        if result.metadata.get("bundle_mode"):
+            print(f"Bundle mode: {result.metadata.get('bundle_mode')}")
+    if result.warnings:
+        for warning in result.warnings:
+            print(f"Warning: {warning}")
+
+
+def _print_validation_failure(package_file: Path, result: Any, *, json_output: bool) -> None:
+    payload = {
+        "command": "validate",
+        "package_file": str(package_file),
+        "valid": False,
+        "errors": list(result.errors),
+        "warnings": list(result.warnings),
+    }
+    if json_output:
+        print(json_dumps(payload), file=sys.stderr)
+        return
+    print("BioSim package validation failed.", file=sys.stderr)
+    print(f"File: {package_file}", file=sys.stderr)
+    for error in result.errors:
+        print(f"Error: {error}", file=sys.stderr)
+    for warning in result.warnings:
+        print(f"Warning: {warning}", file=sys.stderr)
+
+
+def _print_run_result(package_file: Path, result: dict[str, Any], *, json_output: bool) -> None:
+    if json_output:
+        print(json_dumps(result))
+        return
+    print("BioSim package run completed.")
+    print(f"File: {package_file}")
+    if result.get("package"):
+        print(f"Package: {result['package']}@{result.get('version')}")
+    if "outputs" in result:
+        outputs = ", ".join(result.get("outputs") or [])
+        print(f"Outputs: {outputs or '(none)'}")
+    if "modules" in result:
+        modules = ", ".join(
+            f"{item.get('alias')}={item.get('package')}@{item.get('version')}"
+            for item in result.get("modules", [])
+        )
+        print(f"Resolved models: {modules or '(none)'}")
+    if "duration" in result:
+        print(f"Duration: {result['duration']}")
+
+
+def _print_pack_error(exc: Exception, *, json_output: bool) -> None:
+    payload = {"error": str(exc)}
+    if json_output:
+        print(json_dumps(payload), file=sys.stderr)
+        return
+    print("BioSim package command failed.", file=sys.stderr)
+    print(f"Error: {exc}", file=sys.stderr)
 
 
 if __name__ == "__main__":

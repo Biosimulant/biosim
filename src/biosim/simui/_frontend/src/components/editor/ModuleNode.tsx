@@ -2,6 +2,7 @@ import React, { memo } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 
 export interface ModuleNodeData {
+  [key: string]: unknown
   label: string
   moduleType: string
   args: Record<string, unknown>

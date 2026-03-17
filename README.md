@@ -50,6 +50,31 @@ pip install "biosim[ml]"
 
 See the release guide: [`docs/releasing.md`](docs/releasing.md).
 
+## Packaging Models And Spaces
+
+`biosim` can package one model or one space into a single `.bsimpkg` file for portability, upload, caching, and validation.
+
+Common commands:
+
+```bash
+# Build a package from a directory that contains model.yaml or space.yaml
+python -m biosim pack build path/to/model-or-space
+
+# Validate an existing package file
+python -m biosim pack validate dist/local__counter-1.0.0.bsimpkg
+
+# Export a self-contained space package with referenced model packages bundled in
+python -m biosim pack export-space path/to/space
+```
+
+Notes:
+- `build` prefers `package:` and `version:` from `model.yaml` or `space.yaml` when present.
+- model dependencies in manifests must use exact `==` pins.
+- reference-based spaces should use `models[].package` and `models[].version`.
+- `validate` prints human-readable success or failure output by default; add `--json` for machine-readable output.
+
+See [`docs/packaging.md`](docs/packaging.md) for the full package layout, recommended authoring flow, and CLI examples.
+
 ## Examples
 
 - See `examples/` for quick-start scripts. Try:

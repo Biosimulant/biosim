@@ -255,3 +255,109 @@ modules:
         with patch("sys.argv", ["biosim", str(cfg), "--duration", "0.1"]):
             with patch("biosim.world.BioWorld.module_names", new_callable=lambda: property(lambda self: (_ for _ in ()).throw(RuntimeError("test")))):
                 main()
+
+    def test_pack_validate_success_human_output(self, tmp_path, capsys):
+        from biosim.pack import build_package
+
+        pkg_dir = tmp_path / "pkg"
+        pkg_dir.mkdir()
+        (pkg_dir / "model.yaml").write_text(
+            """
+schema_version: "2.0"
+title: "Counter"
+description: "Counter model"
+standard: other
+tags: [test]
+authors: ["Tests"]
+biosim:
+  entrypoint: "src.counter:Counter"
+""".strip()
+            + "\n",
+            encoding="utf-8",
+        )
+        src_dir = pkg_dir / "src"
+        src_dir.mkdir()
+        (src_dir / "counter.py").write_text(
+            """
+from biosim import BioModule
+
+
+class Counter(BioModule):
+    def advance_to(self, t): return
+    def get_outputs(self): return {}
+""".strip()
+            + "\n",
+            encoding="utf-8",
+        )
+        package_path = build_package(pkg_dir, package_name="local/counter", version="1.0.0")
+
+        with patch("sys.argv", ["biosim", "pack", "validate", str(package_path)]):
+            main()
+
+        captured = capsys.readouterr()
+        assert "BioSim package validation passed." in captured.out
+        assert "local/counter@1.0.0" in captured.out
+
+    def test_pack_validate_failure_human_output(self, tmp_path, capsys):
+        package_path = tmp_path / "bad.bsimpkg"
+        package_path.write_bytes(b"not a zip")
+
+        with patch("sys.argv", ["biosim", "pack", "validate", str(package_path)]):
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+
+        assert exc_info.value.code == 1
+        captured = capsys.readouterr()
+        assert "BioSim package validation failed." in captured.err
+        assert "not a zip" in captured.err.lower() or "file is not a zip file" in captured.err.lower()
+
+    def test_pack_build_human_output(self, tmp_path, capsys):
+        pkg_dir = tmp_path / "pkg"
+        pkg_dir.mkdir()
+        (pkg_dir / "model.yaml").write_text(
+            """
+schema_version: "2.0"
+title: "Counter"
+description: "Counter model"
+standard: other
+tags: [test]
+authors: ["Tests"]
+package: declared/counter
+version: 9.9.9
+biosim:
+  entrypoint: "src.counter:Counter"
+""".strip()
+            + "\n",
+            encoding="utf-8",
+        )
+        src_dir = pkg_dir / "src"
+        src_dir.mkdir()
+        (src_dir / "counter.py").write_text(
+            """
+from biosim import BioModule
+
+
+class Counter(BioModule):
+    def advance_to(self, t): return
+    def get_outputs(self): return {}
+""".strip()
+            + "\n",
+            encoding="utf-8",
+        )
+
+        with patch("sys.argv", ["biosim", "pack", "build", str(pkg_dir)]):
+            main()
+
+        captured = capsys.readouterr()
+        assert "BioSim package build succeeded." in captured.out
+        assert "declared/counter@9.9.9" in captured.out
+
+    def test_pack_command_error_output(self, capsys):
+        with patch("sys.argv", ["biosim", "pack", "fetch", "badref"]):
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+
+        assert exc_info.value.code == 1
+        captured = capsys.readouterr()
+        assert "BioSim package command failed." in captured.err
+        assert "package@version" in captured.err
