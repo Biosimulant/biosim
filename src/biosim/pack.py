@@ -19,6 +19,8 @@ from .wiring import WiringBuilder
 from .world import BioWorld
 
 PACKAGE_EXTENSION = ".bsimpkg"
+PACKAGE_EXTENSIONS = (".bsimpkg", ".bsimodel", ".bsispace")
+_TYPE_EXTENSION = {"model": ".bsimodel", "space": ".bsispace"}
 PACKAGE_SCHEMA_VERSION = "1.0"
 DEFAULT_PACKAGE_VERSION = "0.1.0"
 DEFAULT_PACKAGE_NAMESPACE = "local"
@@ -351,7 +353,8 @@ def build_package(
     entries["integrity/sha256sums.txt"] = _checksums_text(entries).encode("utf-8")
 
     if output_path is None:
-        file_name = f"{_package_slug(package_name)}-{version}{PACKAGE_EXTENSION}"
+        ext = _TYPE_EXTENSION.get(package_type, PACKAGE_EXTENSION)
+        file_name = f"{_package_slug(package_name)}-{version}{ext}"
         output_path = source_path / "dist" / file_name
     target = Path(output_path).expanduser().resolve()
     _write_zip(target, entries)
@@ -374,7 +377,7 @@ def export_space_package(
 
     for ref in refs:
         bundled_path = fetch_package(ref["package"], ref["version"])
-        bundled_name = f"{_package_slug(ref['package'])}-{ref['version']}{PACKAGE_EXTENSION}"
+        bundled_name = f"{_package_slug(ref['package'])}-{ref['version']}.bsimodel"
         entries[f"bundled-models/{bundled_name}"] = bundled_path.read_bytes()
     package_name = package_name or _manifest_declared_package(manifest) or _default_package_name(source_path)
     version = _validate_version(_manifest_declared_version(manifest) or version)
@@ -395,7 +398,7 @@ def export_space_package(
     entries["integrity/sha256sums.txt"] = _checksums_text(entries).encode("utf-8")
 
     if output_path is None:
-        file_name = f"{_package_slug(package_name)}-{version}{PACKAGE_EXTENSION}"
+        file_name = f"{_package_slug(package_name)}-{version}.bsispace"
         output_path = source_path / "dist" / file_name
     target = Path(output_path).expanduser().resolve()
     _write_zip(target, entries)
@@ -411,8 +414,8 @@ def _validate_paths(names: Iterable[str]) -> None:
 def validate_package(path: str | Path) -> PackageValidationResult:
     package_path = Path(path).expanduser().resolve()
     result = PackageValidationResult(valid=False)
-    if package_path.suffix != PACKAGE_EXTENSION:
-        result.errors.append(f"Package file must use {PACKAGE_EXTENSION}")
+    if package_path.suffix not in PACKAGE_EXTENSIONS:
+        result.errors.append(f"Package file must use one of {', '.join(PACKAGE_EXTENSIONS)}")
         return result
     if not package_path.exists():
         result.errors.append(f"Package file not found: {package_path}")
@@ -479,8 +482,8 @@ def _validate_bundled_model_refs(entries: Mapping[str, bytes], package_yaml: Map
         version = ref.get("version")
         if not isinstance(package_name, str) or not isinstance(version, str):
             raise PackageError("Bundled model_refs entries require package and version")
-        bundled_name = f"bundled-models/{_package_slug(package_name)}-{version}{PACKAGE_EXTENSION}"
-        if bundled_name not in entries:
+        bundled_base = f"bundled-models/{_package_slug(package_name)}-{version}"
+        if not any(f"{bundled_base}{ext}" in entries for ext in (".bsimodel", PACKAGE_EXTENSION)):
             raise PackageError(f"Missing bundled model package for {package_name}@{version}")
 
 
@@ -693,9 +696,10 @@ def _run_space_loaded_package(loaded: _LoadedPackage, *, install_deps: bool = Tr
 
 def _resolve_model_package_file(package_name: str, version: str, *, bundled_dir: Path | None) -> Path:
     if bundled_dir is not None:
-        candidate = bundled_dir / f"{_package_slug(package_name)}-{version}{PACKAGE_EXTENSION}"
-        if candidate.exists():
-            return candidate
+        for ext in (".bsimodel", PACKAGE_EXTENSION):
+            candidate = bundled_dir / f"{_package_slug(package_name)}-{version}{ext}"
+            if candidate.exists():
+                return candidate
     return fetch_package(package_name, version)
 
 
@@ -768,6 +772,7 @@ def _validate_space_manifest(manifest: Mapping[str, Any]) -> None:
 
 __all__ = [
     "PACKAGE_EXTENSION",
+    "PACKAGE_EXTENSIONS",
     "PackageError",
     "PackageValidationResult",
     "build_package",
