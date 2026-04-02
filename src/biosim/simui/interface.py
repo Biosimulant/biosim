@@ -1,6 +1,7 @@
 from __future__ import annotations
 import asyncio
 import json
+import mimetypes
 import threading
 import time
 from collections import deque
@@ -11,7 +12,7 @@ from typing import Any, Deque, Dict, List, Optional, Sequence, Set
 import logging
 
 from fastapi import APIRouter, FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from ..__about__ import __version__
@@ -107,6 +108,12 @@ class Interface:
         self._sse_subscribers: Set[Queue[Dict[str, Any]]] = set()
         self._sse_lock = threading.Lock()
 
+        # Structure artifacts intentionally exposed by visuals. These are keyed by
+        # a module-supplied artifact id and served through a constrained endpoint
+        # so browser clients never fetch raw filesystem paths directly.
+        self._artifact_paths: Dict[str, Path] = {}
+        self._artifact_lock = threading.Lock()
+
         # Routing / app (must be inside __init__)
         self._router = self._build_router()
 
@@ -183,23 +190,76 @@ class Interface:
     def _collect_visuals_safe(self) -> List[Dict[str, Any]]:
         """Collect visuals with error handling."""
         try:
-            collected = self._world.collect_visuals()
-            return [
-                {
-                    "module": entry.get("module"),
-                    "visuals": [
-                        {
-                            "render": v["render"],
-                            "data": v["data"],
-                            **({"description": v["description"]} if "description" in v else {}),
-                        }
-                        for v in entry.get("visuals", [])
-                    ],
-                }
-                for entry in collected
-            ]
+            return self._collect_transport_visuals()
         except Exception:
             return []
+
+    def _collect_transport_visuals(self) -> List[Dict[str, Any]]:
+        """Collect visuals and sanitize them for browser transport."""
+        collected = self._world.collect_visuals()
+        out: List[Dict[str, Any]] = []
+        next_artifacts: Dict[str, Path] = {}
+
+        for entry in collected:
+            visuals = entry.get("visuals", [])
+            if not isinstance(visuals, list):
+                continue
+
+            next_visuals: List[Dict[str, Any]] = []
+            for visual in visuals:
+                if not isinstance(visual, dict):
+                    continue
+                sanitized = self._sanitize_visual_for_transport(visual, next_artifacts)
+                if sanitized is not None:
+                    next_visuals.append(sanitized)
+
+            if next_visuals:
+                out.append({"module": entry.get("module"), "visuals": next_visuals})
+
+        with self._artifact_lock:
+            self._artifact_paths = next_artifacts
+
+        return out
+
+    def _sanitize_visual_for_transport(
+        self,
+        visual: Dict[str, Any],
+        next_artifacts: Dict[str, Path],
+    ) -> Optional[Dict[str, Any]]:
+        render = visual.get("render")
+        data = visual.get("data")
+        if not isinstance(render, str) or not isinstance(data, dict):
+            return None
+
+        next_visual: Dict[str, Any] = {"render": render, "data": dict(data)}
+        description = visual.get("description")
+        if isinstance(description, str):
+            next_visual["description"] = description
+
+        if render != "structure3d":
+            return next_visual
+
+        source = next_visual["data"].get("source")
+        if not isinstance(source, dict):
+            return next_visual
+
+        next_source = dict(source)
+        artifact_id = next_source.get("artifact_id")
+        artifact_path = next_source.pop("path", None)
+
+        if (
+            next_source.get("kind") == "artifact"
+            and isinstance(artifact_id, str)
+            and artifact_id
+            and isinstance(artifact_path, str)
+            and artifact_path
+        ):
+            resolved = Path(artifact_path).expanduser().resolve()
+            if resolved.exists() and resolved.is_file():
+                next_artifacts[artifact_id] = resolved
+
+        next_visual["data"]["source"] = next_source
+        return next_visual
 
     def _events_since(self, since_id: Optional[int], limit: int) -> Dict[str, Any]:
         with self._events_lock:
@@ -341,22 +401,25 @@ class Interface:
 
         @router.get("/api/visuals")
         def visuals() -> List[Dict[str, Any]]:
-            collected = self._world.collect_visuals()
-            # ensure visuals are normalized JSON-friendly
-            out: List[Dict[str, Any]] = []
-            for entry in collected:
-                out.append({
-                    "module": entry.get("module"),
-                    "visuals": [
-                        {
-                            "render": v["render"],
-                            "data": v["data"],
-                            **({"description": v["description"]} if "description" in v else {}),
-                        }
-                        for v in entry.get("visuals", [])
-                    ],
-                })
-            return out
+            return self._collect_transport_visuals()
+
+        @router.get("/api/artifacts/{artifact_id}")
+        def artifact(artifact_id: str) -> FileResponse:
+            with self._artifact_lock:
+                path = self._artifact_paths.get(artifact_id)
+            if path is None:
+                raise HTTPException(status_code=404, detail="Artifact not found")
+
+            resolved = path.resolve()
+            if not resolved.exists() or not resolved.is_file():
+                raise HTTPException(status_code=404, detail="Artifact is no longer available")
+
+            media_type, _ = mimetypes.guess_type(str(resolved))
+            return FileResponse(
+                path=resolved,
+                media_type=media_type or "application/octet-stream",
+                filename=resolved.name,
+            )
 
         @router.get("/api/snapshot")
         def snapshot() -> Dict[str, Any]:

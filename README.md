@@ -127,7 +127,7 @@ world.run(duration=1.0, tick_dt=0.1)
 
 ### Visuals from Modules
 
-Modules may optionally expose web-native visuals via `visualize()`, returning a dict or list of dicts with keys `render` and `data`. The world can collect them without any transport layer:
+Modules may optionally expose visuals via `visualize()`, returning a dict or list of dicts with keys `render` and `data`. The world can collect them without any transport layer:
 
 ```python
 class MyModule(biosim.BioModule):
@@ -247,14 +247,14 @@ Troubleshooting:
 - VisualSpec types supported now:
   - `timeseries`: `data = { "series": [{ "name": str, "points": [[x, y], ...] }, ...] }`
   - `bar`: `data = { "items": [{ "label": str, "value": number }, ...] }`
+  - `scatter`: `data = { "points": [{ "x": number, "y": number, "label"?: str, "series"?: str }, ...] }`
+  - `heatmap`: `data = { "values": [[number, ...], ...], "x_labels"?: [str, ...], "y_labels"?: [str, ...] }`
   - `table`: `data = { "columns": [..], "rows": [[..], ...] }` or `data = { "items": [{...}, ...] }`
   - `image`: `data = { "src": str, "alt"?: str, "width"?: number, "height"?: number }`
-  - `scatter`: scatter plot data
-  - `heatmap`: matrix/heatmap data
-  - `graph`: placeholder renderer shows counts + JSON; richer graph lib can be added later
-  - `custom:<type>`: custom renderer namespace for user-defined types
-  - unknown types: rendered as JSON fallback
+  - `graph`: simple node-edge graph renderer
+  - `structure3d`: `data = { "title"?: str, "source": { "kind": "url", "url": str } | { "kind": "artifact", "artifact_id": str }, "format": "mmcif" | "pdb", "annotations"?: [{ "label": str, "value": str|number|bool }], "initial_view"?: {...} }`
 - VisualSpec may also include an optional `description` (string) for hover text or captions.
+- SimUI serves artifact-backed `structure3d` files through `/api/artifacts/{artifact_id}` so browser clients do not receive raw local filesystem paths.
 
 ## Terminology
 

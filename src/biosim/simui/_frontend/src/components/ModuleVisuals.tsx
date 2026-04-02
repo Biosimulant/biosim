@@ -5,6 +5,9 @@ import Bar from '../renderers/Bar'
 import Table from '../renderers/Table'
 import ImageView from '../renderers/ImageView'
 import Graph from '../renderers/Graph'
+import Structure3D from '../renderers/Structure3D'
+import Scatter from '../renderers/Scatter'
+import Heatmap from '../renderers/Heatmap'
 
 const RENDERERS: Record<string, React.ComponentType<{ data: any; isFullscreen?: boolean }>> = {
   timeseries: Timeseries,
@@ -12,6 +15,9 @@ const RENDERERS: Record<string, React.ComponentType<{ data: any; isFullscreen?: 
   table: Table,
   image: ImageView,
   graph: Graph,
+  structure3d: Structure3D,
+  scatter: Scatter,
+  heatmap: Heatmap,
 }
 
 function FullscreenButton({ isFullscreen, onClick }: { isFullscreen: boolean; onClick: () => void }) {

@@ -44,6 +44,32 @@ class VisualModule(BioModule):
         return {"render": "bar", "data": {"items": [{"label": "a", "value": 1}]}, "description": "Test vis"}
 
 
+class StructureVisualModule(BioModule):
+    def __init__(self, structure_path: Path):
+        self.min_dt = 0.1
+        self._structure_path = structure_path
+
+    def advance_to(self, t):
+        pass
+
+    def get_outputs(self):
+        return {}
+
+    def visualize(self):
+        return {
+            "render": "structure3d",
+            "data": {
+                "title": "Mock structure",
+                "source": {
+                    "kind": "artifact",
+                    "artifact_id": "artifact-1",
+                    "path": str(self._structure_path),
+                },
+                "format": "mmcif",
+            },
+        }
+
+
 def _make_world():
     world = BioWorld()
     world.add_biomodule("m", SimpleModule())
@@ -337,6 +363,36 @@ class TestVisualsEndpoint:
         assert len(data) > 0
         assert data[0]["visuals"][0]["render"] == "bar"
         assert data[0]["visuals"][0]["description"] == "Test vis"
+
+    def test_structure3d_visuals_strip_local_path_and_register_artifact(self, tmp_path):
+        structure_path = tmp_path / "structure.cif"
+        structure_path.write_text("data_mock\n", encoding="utf-8")
+
+        world = BioWorld()
+        world.add_biomodule("vis", StructureVisualModule(structure_path))
+        app, ui = _make_app(world=world)
+        client = TestClient(app)
+
+        client.post("/ui/api/run", json={"duration": 0.1, "tick_dt": 0.1})
+        ui._runner.join(timeout=5.0)
+
+        visuals_response = client.get("/ui/api/visuals")
+        assert visuals_response.status_code == 200
+        visuals = visuals_response.json()
+        source = visuals[0]["visuals"][0]["data"]["source"]
+        assert source["kind"] == "artifact"
+        assert source["artifact_id"] == "artifact-1"
+        assert "path" not in source
+
+        artifact_response = client.get("/ui/api/artifacts/artifact-1")
+        assert artifact_response.status_code == 200
+        assert artifact_response.text == "data_mock\n"
+
+    def test_artifact_endpoint_returns_404_for_unknown_artifact(self):
+        app, ui = _make_app()
+        client = TestClient(app)
+        response = client.get("/ui/api/artifacts/missing")
+        assert response.status_code == 404
 
 
 class TestResetEndpoint:

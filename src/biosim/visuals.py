@@ -8,7 +8,7 @@ class VisualSpec(TypedDict, total=False):
     """Renderer-agnostic visual specification for browser clients.
 
     Required keys:
-    - render: the visual type (e.g., 'timeseries', 'bar', 'graph', 'scatter', 'heatmap', 'table', 'image', 'text', 'custom:...')
+    - render: the visual type (e.g., 'timeseries', 'bar', 'graph', 'table', 'image', 'text', 'structure3d', 'custom:...')
     - data: JSON-serializable data payload interpreted by the client renderer for the given render type
     """
 

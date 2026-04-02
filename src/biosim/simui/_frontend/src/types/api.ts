@@ -15,6 +15,32 @@ export type Control = NumberControl | ButtonControl
 
 export type EventRecord = { id: number; ts: string; event: string; payload?: Record<string, unknown> }
 
+export type StructureArtifactSource = {
+  kind: 'artifact'
+  artifact_id: string
+}
+
+export type StructureUrlSource = {
+  kind: 'url'
+  url: string
+}
+
+export type StructureSource = StructureArtifactSource | StructureUrlSource
+
+export type Structure3DAnnotation = {
+  label: string
+  value: string | number | boolean
+}
+
+export type Structure3DData = {
+  title?: string
+  source: StructureSource
+  format: 'mmcif' | 'pdb'
+  description?: string
+  annotations?: Structure3DAnnotation[]
+  initial_view?: Record<string, unknown>
+}
+
 export type VisualSpec = { render: string; data: Record<string, unknown>; description?: string }
 export type ModuleVisuals = { module: string; visuals: VisualSpec[] }
 
