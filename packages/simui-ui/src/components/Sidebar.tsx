@@ -18,6 +18,70 @@ function toFiniteNumber(value: unknown): number {
   return Number.isFinite(n) ? n : Number.NaN
 }
 
+function SidebarActions({
+  onRun,
+  onPause,
+  onResume,
+  onReset,
+  runPending,
+  sidebarAction,
+}: Props) {
+  const { state } = useUi()
+  const st = state.status
+  const capabilities = state.spec?.capabilities
+  const controlsEnabled = capabilities?.controls ?? true
+  const runEnabled = controlsEnabled && (capabilities?.run ?? true)
+  const showRunWhenDisabled = capabilities?.showRunWhenDisabled ?? false
+  const showRunButton = runEnabled || showRunWhenDisabled
+  const runDisabledReason = capabilities?.runDisabledReason || 'Run is disabled for this space.'
+  const runButtonDisabled = !runEnabled || !!st?.running || !!runPending
+  const numberControls = (state.spec?.controls || []).filter(isNumberControl)
+  const controlDefault = (name: string): number | undefined => numberControls.find((c) => c.name === name)?.default
+  const duration = toFiniteNumber(state.controls.duration ?? controlDefault('duration'))
+  const tickDt = toFiniteNumber(state.controls.tick_dt ?? controlDefault('tick_dt'))
+  const progress = resolveRunProgress({ status: st, duration, tickDt })
+
+  let statusSummary = 'Idle'
+  if (st?.error) statusSummary = progress.progressPct !== null ? `Error · ${progress.progressLabel}` : 'Error'
+  else if (st?.running) {
+    statusSummary = progress.progressPct !== null
+      ? `${st.paused ? 'Paused' : 'Running'} · ${progress.progressLabel}`
+      : st.paused ? 'Paused' : 'Running'
+  } else if (progress.progressPct !== null) {
+    statusSummary = `Idle · Last run: ${progress.progressLabel}`
+  }
+
+  return (
+    <div className="sidebar-actions">
+      <div className="sidebar-actions-summary">{statusSummary}</div>
+      <div className="sidebar-actions-buttons">
+        {showRunButton && (
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={runEnabled ? onRun : undefined}
+            disabled={runButtonDisabled}
+            title={!runEnabled ? runDisabledReason : undefined}
+          >
+            {runPending ? 'Starting…' : 'Run Simulation'}
+          </button>
+        )}
+        {controlsEnabled && (capabilities?.pauseResume ?? true) && st?.running && (
+          <button type="button" className="btn btn-secondary" onClick={st.paused ? onResume : onPause}>
+            {st.paused ? 'Resume' : 'Pause'}
+          </button>
+        )}
+        {controlsEnabled && (capabilities?.reset ?? true) && (
+          <button type="button" className="btn btn-outline" onClick={onReset}>
+            Reset
+          </button>
+        )}
+        {sidebarAction}
+      </div>
+    </div>
+  )
+}
+
 function Controls() {
   const { state, actions } = useUi()
   const st = state.status
@@ -230,6 +294,7 @@ export default function Sidebar(props: Props) {
       </button>
       {open && (
         <div className="sidebar-panel-body">
+          <SidebarActions {...props} />
           <Controls />
           <ModuleManager />
         </div>
