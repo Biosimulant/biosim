@@ -52,7 +52,7 @@ See the release guide: [`docs/releasing.md`](docs/releasing.md).
 
 ## Packaging Models And Spaces
 
-`biosim` can package one model or one space into a single `.bsimpkg` file for portability, upload, caching, and validation.
+`biosim` can package one model or one space into a single archive for portability, upload, caching, and validation.
 
 Common commands:
 
@@ -63,14 +63,15 @@ python -m biosim pack build path/to/model-or-space
 # Validate an existing package file
 python -m biosim pack validate dist/local__counter-1.0.0.bsimpkg
 
-# Export a self-contained space package with referenced model packages bundled in
-python -m biosim pack export-space path/to/space
+# Build a self-contained space package (.bsispace)
+python -m biosim pack build path/to/space
 ```
 
 Notes:
 - `build` prefers `package:` and `version:` from `model.yaml` or `space.yaml` when present.
 - model dependencies in manifests must use exact `==` pins.
-- reference-based spaces should use `models[].package` and `models[].version`.
+- space builds are always self-contained and preserve the full runnable source tree inside the `.bsispace`.
+- nested space dependencies must use relative `path` refs and must already exist inside the packaged space directory.
 - `validate` prints human-readable success or failure output by default; add `--json` for machine-readable output.
 
 See [`docs/packaging.md`](docs/packaging.md) for the full package layout, recommended authoring flow, and CLI examples.
@@ -185,7 +186,7 @@ classifier.advance_to(0.001)
 print(classifier.get_outputs()["predicted_state"].value)
 ```
 
-Model packs can subclass `OnnxClassifierModule` to set repo-relative
+Model packs can subclass `OnnxClassifierModule` to set model-relative
 `model_path`, port names, and label sets while keeping the inference logic in
 the shared library.
 

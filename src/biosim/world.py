@@ -133,8 +133,8 @@ class BioWorld:
             source: "module.signal" source reference.
             target: "module.signal" target reference.
         """
-        src_parts = source.split(".", 1)
-        dst_parts = target.split(".", 1)
+        src_parts = source.rsplit(".", 1)
+        dst_parts = target.rsplit(".", 1)
         if len(src_parts) != 2 or len(dst_parts) != 2:
             raise ValueError("Source and target must be in format 'module.signal'")
         src_mod, src_sig = src_parts

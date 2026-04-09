@@ -1,16 +1,16 @@
 # Packaging
 
-`biosim` supports a single-file package format, `.bsimpkg`, for both models and spaces.
+`biosim` supports single-file package archives for both models and spaces.
 
 Package unit:
-- one model package wraps one `model.yaml`
-- one space package wraps one `space.yaml`
+- one model package wraps one `model.yaml` into a `.bsimodel`
+- one space package wraps one `space.yaml` into a self-contained `.bsispace`
 
 Typical use cases:
 - move a runnable model or space without shipping a whole repository
 - validate package structure before upload
 - cache and fetch package-backed models locally
-- export a self-contained space with bundled model packages
+- export a self-contained space whose full source tree is embedded in the archive
 
 ## CLI
 
@@ -38,12 +38,6 @@ Run a package locally:
 python -m biosim pack run path/to/package.bsimpkg
 ```
 
-Export a bundled space package:
-
-```bash
-python -m biosim pack export-space path/to/space
-```
-
 Use `--json` with any `biosim pack` command when you need machine-readable output.
 
 ## Source Layout
@@ -64,16 +58,16 @@ Space package source:
 
 ```text
 my-space/
+├── models/
+├── spaces/
 ├── space.yaml
-├── wiring.yaml
-├── run_local.py
 ├── tests/
 └── README.md
 ```
 
 ## Package Contents
 
-Each `.bsimpkg` is a ZIP archive with:
+Each package archive is a ZIP with:
 - `package.yaml`
 - `payload/`
 - `integrity/sha256sums.txt`
@@ -86,8 +80,9 @@ Model package payload usually includes:
 
 Space package payload usually includes:
 - `payload/space.yaml`
-- optional local helper files such as `payload/wiring.yaml`
-- optional `bundled-models/*.bsimpkg` for bundled exports
+- embedded model folders such as `payload/models/**`
+- embedded child-space folders such as `payload/spaces/**`
+- any additional helper files required by the space
 
 ## Package Identity
 
@@ -120,7 +115,9 @@ python -m biosim pack build path/to/model --package biosimulant/example-counter 
 - model manifests contain `biosim.entrypoint`
 - space manifests contain valid `models`, `wiring`, and `runtime`
 - model dependencies use exact `==` pins only
-- bundled space exports include all declared bundled model packages
+- space manifests use `path`-based nested dependencies only
+- every nested model and child space path stays inside the archive payload tree
+- every embedded model or child space manifest is valid
 
 The command is meant to be operator-friendly:
 - success prints a concise summary with package name, version, and type
@@ -148,13 +145,18 @@ python -m biosim pack fetch owner/model-name@1.0.0
 
 ## Spaces
 
-Reference-based spaces should prefer package references:
-
 ```yaml
 models:
-  - package: biosimulant/example-counter
-    version: 1.2.0
+  - path: models/example-counter
     alias: counter
 ```
 
-Use `export-space` when you need a single handoff file that embeds the referenced model packages.
+`biosim pack build path/to/space` always emits a self-contained `.bsispace`. The packaged
+payload preserves the runnable source tree exactly as it exists on disk under `payload/`.
+
+Nested `models[]` and `children[]` must use relative `path` refs only. Nested executable
+`package`, `version`, `model_id`, `space_id`, `hub_model_id`, and `hub_space_id` are invalid.
+
+If a space depends on another model or child space, that dependency must already exist inside
+the space directory before packaging. Packaging does not rewrite the manifest and does not bundle
+nested `.bsimodel` or `.bsispace` archives.

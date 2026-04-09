@@ -14,7 +14,7 @@ def _parse_ref(ref: str) -> Tuple[str, str]:
 
     Returns (name, port).
     """
-    parts = ref.split(".", 1)
+    parts = ref.rsplit(".", 1)
     if len(parts) != 2:
         raise ValueError(f"Invalid reference '{ref}', expected 'name.port' form")
     return parts[0], parts[1]

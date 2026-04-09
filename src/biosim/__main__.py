@@ -36,7 +36,6 @@ from typing import Any, Dict
 from .pack import (
     PackageError,
     build_package,
-    export_space_package,
     fetch_package,
     run_package,
     validate_package,
@@ -259,19 +258,12 @@ def _main_pack(argv: list[str]) -> None:
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    build_parser = subparsers.add_parser("build", help="Build a .bsimpkg from a model or space directory")
+    build_parser = subparsers.add_parser("build", help="Build a model or self-contained space package")
     build_parser.add_argument("source", type=Path)
     build_parser.add_argument("--out", type=Path, default=None)
     build_parser.add_argument("--package", dest="package_name", type=str, default=None)
     build_parser.add_argument("--version", type=str, default="0.1.0")
     build_parser.add_argument("--visibility", type=str, default="private")
-
-    export_parser = subparsers.add_parser("export-space", help="Export a bundled space package")
-    export_parser.add_argument("source", type=Path)
-    export_parser.add_argument("--out", type=Path, default=None)
-    export_parser.add_argument("--package", dest="package_name", type=str, default=None)
-    export_parser.add_argument("--version", type=str, default="0.1.0")
-    export_parser.add_argument("--visibility", type=str, default="private")
 
     validate_parser = subparsers.add_parser("validate", help="Validate a .bsimpkg")
     validate_parser.add_argument("package_file", type=Path)
@@ -304,29 +296,6 @@ def _main_pack(argv: list[str]) -> None:
                     "package": validation.metadata.get("package") if validation.metadata else None,
                     "version": validation.metadata.get("version") if validation.metadata else None,
                     "package_type": validation.metadata.get("package_type") if validation.metadata else None,
-                    "warnings": validation.warnings,
-                },
-            )
-            return
-        if args.command == "export-space":
-            target = export_space_package(
-                args.source,
-                output_path=args.out,
-                package_name=args.package_name,
-                version=args.version,
-                visibility=args.visibility,
-            )
-            validation = validate_package(target)
-            _print_pack_result(
-                args.json_output,
-                {
-                    "command": "export-space",
-                    "package_file": str(target),
-                    "valid": validation.valid,
-                    "package": validation.metadata.get("package") if validation.metadata else None,
-                    "version": validation.metadata.get("version") if validation.metadata else None,
-                    "package_type": validation.metadata.get("package_type") if validation.metadata else None,
-                    "bundle_mode": validation.metadata.get("bundle_mode") if validation.metadata else None,
                     "warnings": validation.warnings,
                 },
             )
@@ -383,8 +352,6 @@ def _print_pack_result(json_output: bool, payload: dict[str, Any]) -> None:
         print(f"Package: {payload['package']}@{payload.get('version')}")
     if payload.get("package_type"):
         print(f"Type: {payload['package_type']}")
-    if payload.get("bundle_mode"):
-        print(f"Bundle mode: {payload['bundle_mode']}")
     if payload.get("package_file"):
         print(f"File: {payload['package_file']}")
     warnings = payload.get("warnings") or []
@@ -400,7 +367,6 @@ def _print_validation_success(package_file: Path, result: Any, *, json_output: b
         "package": result.metadata.get("package") if result.metadata else None,
         "version": result.metadata.get("version") if result.metadata else None,
         "package_type": result.metadata.get("package_type") if result.metadata else None,
-        "bundle_mode": result.metadata.get("bundle_mode") if result.metadata else None,
         "warnings": result.warnings,
         "metadata": result.metadata,
     }
@@ -412,8 +378,6 @@ def _print_validation_success(package_file: Path, result: Any, *, json_output: b
     if result.metadata:
         print(f"Package: {result.metadata.get('package')}@{result.metadata.get('version')}")
         print(f"Type: {result.metadata.get('package_type')}")
-        if result.metadata.get("bundle_mode"):
-            print(f"Bundle mode: {result.metadata.get('bundle_mode')}")
     if result.warnings:
         for warning in result.warnings:
             print(f"Warning: {warning}")
@@ -451,7 +415,7 @@ def _print_run_result(package_file: Path, result: dict[str, Any], *, json_output
         print(f"Outputs: {outputs or '(none)'}")
     if "modules" in result:
         modules = ", ".join(
-            f"{item.get('alias')}={item.get('package')}@{item.get('version')}"
+            f"{item.get('alias')}={item.get('path')}"
             for item in result.get("modules", [])
         )
         print(f"Resolved models: {modules or '(none)'}")
