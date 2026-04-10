@@ -295,6 +295,23 @@ def test_export_space_alias_embeds_models(tmp_path: Path):
     assert result["package"] == "local/source-space"
 
 
+def test_space_build_ignores_generated_files(tmp_path: Path):
+    space_dir = _write_space(tmp_path / "space")
+    (space_dir / ".DS_Store").write_text("junk", encoding="utf-8")
+    (space_dir / "dist").mkdir(exist_ok=True)
+    (space_dir / "dist" / "old.bsispace").write_text("junk", encoding="utf-8")
+    pycache_dir = space_dir / "models" / "counter" / "__pycache__"
+    pycache_dir.mkdir(exist_ok=True)
+    (pycache_dir / "counter.cpython-311.pyc").write_bytes(b"junk")
+
+    package_path = build_package(space_dir, package_name="local/source-space", version="1.0.0")
+    unpacked = unpack_package(package_path, dest=tmp_path / "space-unpacked")
+
+    assert not (unpacked / "payload" / ".DS_Store").exists()
+    assert not (unpacked / "payload" / "dist").exists()
+    assert not (unpacked / "payload" / "models" / "counter" / "__pycache__").exists()
+
+
 def test_build_space_from_source_path_refs(tmp_path: Path):
     space_dir = _write_path_manifest_space(tmp_path / "source-space")
 

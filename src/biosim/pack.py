@@ -208,8 +208,34 @@ def _collect_space_entries(source_dir: Path) -> tuple[dict[str, Any], dict[str, 
         rel = path.relative_to(source_dir).as_posix()
         if rel in {"space.yaml", "space.yml", "package.yaml"}:
             continue
+        if _should_ignore_space_source_file(path.relative_to(source_dir)):
+            continue
         entries[f"payload/{rel}"] = path.read_bytes()
     return manifest, entries
+
+
+_IGNORED_SPACE_SOURCE_DIRS = frozenset(
+    {
+        "__pycache__",
+        ".pytest_cache",
+        ".mypy_cache",
+        ".ruff_cache",
+        ".tox",
+        "dist",
+    }
+)
+_IGNORED_SPACE_SOURCE_FILES = frozenset({".DS_Store"})
+_IGNORED_SPACE_SOURCE_SUFFIXES = (".pyc", ".pyo")
+
+
+def _should_ignore_space_source_file(relative_path: Path) -> bool:
+    for part in relative_path.parts[:-1]:
+        if part in _IGNORED_SPACE_SOURCE_DIRS:
+            return True
+    name = relative_path.name
+    if name in _IGNORED_SPACE_SOURCE_FILES:
+        return True
+    return name.endswith(_IGNORED_SPACE_SOURCE_SUFFIXES)
 
 
 def _collect_tree(root: Path, name: str) -> dict[str, bytes]:
