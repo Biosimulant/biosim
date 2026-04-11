@@ -81,6 +81,7 @@ dev = [
   "pytest>=7",
   "pytest-cov>=4",
   "pyyaml>=6",
+  "httpx>=0.26",
   "tomli>=2; python_version < '3.11'",
 ]
 ui = [
