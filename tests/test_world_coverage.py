@@ -409,6 +409,46 @@ def test_event_signals_filter_already_seen(biosim):
     assert len(received) == 1
 
 
+def test_routed_inputs_preserve_source_timestamp(biosim):
+    received = []
+
+    class Src(biosim.BioModule):
+        def __init__(self):
+            self.min_dt = 0.15
+            self._outputs = {}
+
+        def advance_to(self, t):
+            self._outputs = {"x": biosim.BioSignal(source="src", name="x", value=t, time=t)}
+
+        def get_outputs(self):
+            return dict(self._outputs)
+
+    class Dst(biosim.BioModule):
+        def __init__(self):
+            self.min_dt = 0.2
+
+        def set_inputs(self, signals):
+            if "x" in signals:
+                received.append(signals["x"].time)
+
+        def advance_to(self, t):
+            pass
+
+        def get_outputs(self):
+            return {}
+
+        def inputs(self):
+            return {"x"}
+
+    world = BioWorld()
+    world.add_biomodule("src", Src(), priority=1)
+    world.add_biomodule("dst", Dst())
+    world.connect("src.x", "dst.x")
+    world.run(duration=0.2, tick_dt=0.05)
+
+    assert received == [pytest.approx(0.15)]
+
+
 def test_warns_once_when_state_signal_is_stale(biosim, caplog):
     class Src(biosim.BioModule):
         def __init__(self):
@@ -520,7 +560,7 @@ def test_state_signals_hold_last_value_between_source_updates(biosim):
     world.run(duration=0.5, tick_dt=0.1)
 
     assert [value for value, _time in seen] == [0.2, 0.2, 0.4, 0.4]
-    assert [time for _value, time in seen] == pytest.approx([0.2, 0.3, 0.4, 0.5])
+    assert [time for _value, time in seen] == pytest.approx([0.2, 0.2, 0.4, 0.4])
 
 
 def test_empty_outputs_do_not_clear_signal_store(biosim):
@@ -561,7 +601,7 @@ def test_empty_outputs_do_not_clear_signal_store(biosim):
     world.run(duration=0.3, tick_dt=0.1)
 
     assert [value for value, _time in seen] == [1, 1, 1]
-    assert [time for _value, time in seen] == pytest.approx([0.1, 0.2, 0.3])
+    assert [time for _value, time in seen] == pytest.approx([0.1, 0.1, 0.1])
     assert world.get_outputs("src")["state"].value == 1
 
 

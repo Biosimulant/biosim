@@ -227,7 +227,8 @@ class BioWorld:
         signals still persist in the store, but delivery is gated by
         last_event_time so a persisted event is not re-delivered indefinitely.
         State-like signals also emit a warning if a consumer reads a source value
-        older than the consumer's own min_dt tolerance.
+        older than the consumer's own min_dt tolerance. Routed signals preserve
+        the upstream signal's production timestamp.
         """
         inputs: Dict[str, BioSignal] = {}
         for conn in self._connections_by_target.get(target_name, []):
@@ -244,7 +245,7 @@ class BioWorld:
                 source=conn.source_module,
                 name=conn.target_signal,
                 value=source_signal.value,
-                time=now,
+                time=source_signal.time,
                 metadata=source_signal.metadata,
             )
         return inputs
