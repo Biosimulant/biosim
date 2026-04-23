@@ -27,6 +27,19 @@ Key methods
 - `get_outputs(name)`
 - `collect_visuals()`
 
+Priority semantics
+- Modules are always scheduled by due time first.
+- If multiple modules are due at the same simulation time, higher `priority` values run earlier.
+
+Signal store semantics
+- The world keeps the latest non-empty output mapping for each module in an internal signal store.
+- A non-empty `get_outputs()` result replaces that module's previously stored outputs.
+- Returning `{}` or `None` does not clear previously stored outputs.
+- If a replacement mapping omits a previously published port, that omitted port disappears from the store.
+- The store is reset by `setup()`.
+- If a consumer reads a state-like signal older than its own `min_dt`, the world logs a stale-read warning once for that source timestamp.
+- Event signals still persist in the store, but downstream delivery is de-duplicated per connection using the signal timestamp.
+
 Example
 ```python
 world = biosim.BioWorld()
