@@ -21,11 +21,8 @@ def print_listener(event: biosim.WorldEvent, payload: dict) -> None:
 class StepLoggerModule(biosim.BioModule):
     """Example module that advances on its schedule."""
 
-    def __init__(self):
-        self.min_dt = 0.1
-
-    def advance_to(self, t: float) -> None:
-        print(f"[Module] tick @ t={t}")
+    def advance_window(self, start: float, end: float) -> None:
+        print(f"[Module] window [{start:.1f}, {end:.1f}]")
 
     def get_outputs(self):
         return {}
@@ -35,15 +32,20 @@ class Eye(biosim.BioModule):
     """Publishes a vision signal each step."""
 
     def __init__(self):
-        self.min_dt = 0.1
         self._outputs = {}
 
     def outputs(self):
-        return {"vision"}
+        return {"vision": biosim.SignalSpec.record(schema={"photon": "bool"})}
 
-    def advance_to(self, t: float) -> None:
+    def advance_window(self, start: float, end: float) -> None:
         self._outputs = {
-            "vision": biosim.BioSignal(source="eye", name="vision", value={"photon": True}, time=t)
+            "vision": biosim.RecordSignal(
+                source="eye",
+                name="vision",
+                value={"photon": True},
+                emitted_at=end,
+                spec=self.outputs()["vision"],
+            )
         }
 
     def get_outputs(self):
@@ -54,24 +56,27 @@ class LGN(biosim.BioModule):
     """Receives Eye.vision and relays to thalamus channel."""
 
     def __init__(self):
-        self.min_dt = 0.1
         self._outputs = {}
 
     def inputs(self):
-        return {"vision"}
+        return {"vision": biosim.SignalSpec.record(schema={"photon": "bool"})}
 
     def outputs(self):
-        return {"thalamus"}
+        return {"thalamus": biosim.SignalSpec.record(schema={"photon": "bool"})}
 
     def set_inputs(self, signals):
         if "vision" in signals:
             self._outputs = {
-                "thalamus": biosim.BioSignal(
-                    source="lgn", name="thalamus", value=signals["vision"].value, time=signals["vision"].time
+                "thalamus": biosim.RecordSignal(
+                    source="lgn",
+                    name="thalamus",
+                    value=signals["vision"].value,
+                    emitted_at=signals["vision"].emitted_at,
+                    spec=self.outputs()["thalamus"],
                 )
             }
 
-    def advance_to(self, t: float) -> None:
+    def advance_window(self, start: float, end: float) -> None:
         return
 
     def get_outputs(self):
@@ -81,17 +86,14 @@ class LGN(biosim.BioModule):
 class SuperiorColliculus(biosim.BioModule):
     """Receives LGN.thalamus signals."""
 
-    def __init__(self):
-        self.min_dt = 0.1
-
     def inputs(self):
-        return {"thalamus"}
+        return {"thalamus": biosim.SignalSpec.record(schema={"photon": "bool"})}
 
     def set_inputs(self, signals):
         if "thalamus" in signals:
             print("[SC] received:", signals["thalamus"].value)
 
-    def advance_to(self, t: float) -> None:
+    def advance_window(self, start: float, end: float) -> None:
         return
 
     def get_outputs(self):
@@ -99,23 +101,23 @@ class SuperiorColliculus(biosim.BioModule):
 
 
 def main() -> None:
-    world = biosim.BioWorld()
+    world = biosim.BioWorld(communication_step=0.1)
     world.on(print_listener)
     world.add_biomodule("logger", StepLoggerModule())
     world.run(duration=0.3, tick_dt=0.1)
 
     print("--- Signal routing demo ---")
-    bw = biosim.BioWorld()
+    bw = biosim.BioWorld(communication_step=0.1)
     eye = Eye()
     lgn = LGN()
     sc = SuperiorColliculus()
 
-    bw.add_biomodule("eye", eye, priority=2)
-    bw.add_biomodule("lgn", lgn, priority=1)
+    bw.add_biomodule("eye", eye)
+    bw.add_biomodule("lgn", lgn)
     bw.add_biomodule("sc", sc)
     bw.connect("eye.vision", "lgn.vision")
     bw.connect("lgn.thalamus", "sc.thalamus")
-    bw.run(duration=0.2, tick_dt=0.1)
+    bw.run(duration=0.3, tick_dt=0.1)
 
 
 if __name__ == "__main__":

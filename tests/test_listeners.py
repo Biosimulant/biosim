@@ -1,15 +1,17 @@
 
 def test_listener_on_off(biosim):
-    world = biosim.BioWorld()
+    world = biosim.BioWorld(communication_step=0.1)
     called = {"n": 0}
 
     class Ticker(biosim.BioModule):
         def __init__(self):
-            self.min_dt = 0.1
             self._outputs = {}
 
-        def advance_to(self, t: float) -> None:
-            self._outputs = {"out": biosim.BioSignal(source="ticker", name="out", value=t, time=t)}
+        def outputs(self):
+            return {"out": biosim.SignalSpec.scalar(dtype="float64")}
+
+        def advance_window(self, _start: float, t: float) -> None:
+            self._outputs = {"out": biosim.ScalarSignal(source="ticker", name="out", value=t, emitted_at=t)}
 
         def get_outputs(self):
             return dict(self._outputs)

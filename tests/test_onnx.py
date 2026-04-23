@@ -32,22 +32,24 @@ def test_onnx_classifier_emits_probabilities_and_label(biosim):
 
     module.set_inputs(
         {
-            "state_vector": biosim.BioSignal(
+            "state_vector": biosim.ArraySignal(
                 source="adapter",
                 name="state_vector",
                 value=[-64.0, 0.1, 0.6, 0.3],
-                time=0.0,
+                emitted_at=0.0,
+                spec=biosim.SignalSpec.array(dtype="float32", shape=(4,)),
             )
         }
     )
-    module.advance_to(0.001)
+    module.advance_window(0.0, 0.001)
 
     outputs = module.get_outputs()
     assert outputs["state_probabilities"].value == pytest.approx([0.1, 0.2, 0.7])
-    assert outputs["state_probabilities"].metadata.shape == (3,)
+    assert outputs["state_probabilities"].spec is not None
+    assert outputs["state_probabilities"].spec.shape == (3,)
     assert outputs["predicted_state"].value["label"] == "spiking"
     assert session.seen[0][0] == ("state_probabilities",)
-    assert session.seen[0][1]["state_vector"] == [[-64.0, 0.1, 0.6, 0.3]]
+    assert session.seen[0][1]["state_vector"][0] == pytest.approx([-64.0, 0.1, 0.6, 0.3])
 
 
 def test_onnx_classifier_normalizes_feature_dict_input(biosim):
@@ -64,17 +66,18 @@ def test_onnx_classifier_normalizes_feature_dict_input(biosim):
 
     module.set_inputs(
         {
-            "features": biosim.BioSignal(
+            "features": biosim.RecordSignal(
                 source="adapter",
                 name="features",
                 value={"features": [1, 2]},
-                time=0.0,
+                emitted_at=0.0,
+                spec=biosim.SignalSpec.record(schema={"features": "list"}),
             )
         }
     )
-    module.advance_to(0.1)
+    module.advance_window(0.0, 0.1)
 
     outputs = module.get_outputs()
     assert outputs["scores"].value == pytest.approx([0.1, 0.2, 0.7])
     assert outputs["label"].value["label"] == "burst"
-    assert session.seen[0][1]["state_vector"] == [[1.0, 2.0, 0.0, 0.0]]
+    assert session.seen[0][1]["state_vector"][0] == pytest.approx([1.0, 2.0, 0.0, 0.0])

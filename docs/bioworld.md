@@ -1,53 +1,58 @@
-# API: BioWorld and WorldEvent
+# API: `BioWorld`
 
-BioWorld orchestrates runnable biomodules, emits lifecycle events, and routes biosignals between modules.
+`BioWorld` is the 1.5 communication-step orchestrator.
 
-Class signature
+## Signature
+
 ```python
 class BioWorld:
-    def __init__(self, *, time_unit: str = "seconds") -> None: ...
+    def __init__(self, *, communication_step: float, time_unit: str = "seconds") -> None: ...
 ```
 
-Lifecycle
-- Emits: `STARTED`, `TICK`, `FINISHED`.
-- May also emit: `PAUSED`, `RESUMED`, `STOPPED`, `ERROR`.
-- Exceptions in listeners are logged and do not stop the world.
-- Event payloads now include additive progress fields during active runs:
-  `start`, `end`, `duration`, `progress`, `progress_pct`, `remaining`.
+`communication_step` is required and defines the world-wide synchronization cadence for inter-module exchange.
 
-Key methods
+## Execution model
+
+- Every run advances in windows `[t, t + communication_step]`.
+- Inputs for a window are collected from the committed signal store at the start boundary.
+- Every module advances independently across the same window via `advance_window(start, end)`.
+- Outputs are committed atomically at the end boundary.
+- Tied-time behavior is order-independent by design; the 1.5 kernel has no priority scheduling contract.
+
+## Key methods
+
 - `on(listener)` / `off(listener)`
-- `add_biomodule(name, module, min_dt=None, priority=0)`
+- `add_biomodule(name, module)`
 - `connect("src.port", "dst.port")`
 - `setup(config=None)`
-- `run(duration: float, tick_dt: Optional[float] = None)`
+- `run(duration, tick_dt=None)`
 - `request_pause()` / `request_resume()` / `request_stop()`
-- `current_time()`
-- `module_names`
+- `snapshot()` / `restore(snapshot)` / `branch()`
 - `get_outputs(name)`
 - `collect_visuals()`
 
-Priority semantics
-- Modules are always scheduled by due time first.
-- If multiple modules are due at the same simulation time, higher `priority` values run earlier.
+## Signal semantics
 
-Signal store semantics
-- The world keeps the latest non-empty output mapping for each module in an internal signal store.
-- A non-empty `get_outputs()` result replaces that module's previously stored outputs.
-- Returning `{}` or `None` does not clear previously stored outputs.
-- If a replacement mapping omits a previously published port, that omitted port disappears from the store.
-- The store is reset by `setup()`.
-- If a consumer reads a state-like signal older than its own `min_dt`, the world logs a stale-read warning once for that source timestamp.
-- Event signals still persist in the store, but downstream delivery is de-duplicated per connection using the signal timestamp.
+- Source timestamps are preserved as `emitted_at`.
+- State signals are held until overwritten by a non-empty output mapping from the same module.
+- Event signals persist in the store but are delivered once per connection per source timestamp.
+- Staleness is checked against the consuming port’s `SignalSpec.max_age` and `stale_policy`.
 
-Example
-```python
-world = biosim.BioWorld()
-world.on(lambda ev, p: print(ev.value, p))
+## Runtime events
 
-eye, lgn = Eye(), LGN()
-world.add_biomodule("eye", eye)
-world.add_biomodule("lgn", lgn)
-world.connect("eye.visual_stream", "lgn.retina")
-world.run(duration=0.2, tick_dt=0.1)
-```
+- Always emitted: `STARTED`, `TICK`, `FINISHED`
+- May also emit: `PAUSED`, `RESUMED`, `STOPPED`, `ERROR`
+
+Tick payloads include progress fields during active runs: `start`, `end`, `duration`, `progress`, `progress_pct`, and `remaining`.
+
+## Snapshot guarantees
+
+A world snapshot captures:
+
+- current simulation time
+- committed signal store and short signal history
+- per-connection event/staleness delivery state
+- per-module snapshot payloads
+- setup config and world timing metadata
+
+`branch()` deep-copies modules, restores the captured snapshot into a new `BioWorld`, and allows both worlds to diverge independently from the same boundary.

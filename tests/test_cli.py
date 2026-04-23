@@ -11,7 +11,7 @@ from biosim.__main__ import load_config, create_world, run_headless, main
 class TestLoadConfig:
     def test_yaml(self, tmp_path):
         p = tmp_path / "cfg.yaml"
-        p.write_text("modules:\n  eye:\n    class: examples.wiring_builder_demo.Eye\n    min_dt: 0.1\n")
+        p.write_text("runtime:\n  communication_step: 0.1\nmodules:\n  eye:\n    class: examples.wiring_builder_demo.Eye\n")
         result = load_config(p)
         assert "modules" in result
 
@@ -97,20 +97,20 @@ class TestLoadConfig:
 
 class TestCreateWorld:
     def test_creates_bioworld(self):
-        world = create_world()
+        world = create_world({"runtime": {"communication_step": 0.1}})
         from biosim.world import BioWorld
         assert isinstance(world, BioWorld)
 
 
 class TestRunHeadless:
     def test_basic_run(self, biosim, capsys):
-        world = biosim.BioWorld()
+        world = biosim.BioWorld(communication_step=0.1)
 
         class M(biosim.BioModule):
             def __init__(self):
-                self.min_dt = 0.1
+                pass
 
-            def advance_to(self, t):
+            def advance_window(self, _start, t):
                 pass
 
             def get_outputs(self):
@@ -124,13 +124,13 @@ class TestRunHeadless:
         assert "No visuals collected" in captured.out
 
     def test_with_visuals(self, biosim, capsys):
-        world = biosim.BioWorld()
+        world = biosim.BioWorld(communication_step=0.1)
 
         class VisModule(biosim.BioModule):
             def __init__(self):
-                self.min_dt = 0.1
+                pass
 
-            def advance_to(self, t):
+            def advance_window(self, _start, t):
                 pass
 
             def get_outputs(self):
@@ -143,7 +143,7 @@ class TestRunHeadless:
         run_headless(world, duration=0.1, tick_dt=0.1)
         captured = capsys.readouterr()
         assert "Collected visuals" in captured.out
-        assert "VisModule" in captured.out
+        assert "vis" in captured.out
         assert "bar" in captured.out
 
 
@@ -154,7 +154,7 @@ class TestRunSimui:
         with patch.dict(sys.modules, {"biosim.simui": None}):
             with pytest.raises(SystemExit):
                 run_simui(
-                    biosim.BioWorld(),
+                    biosim.BioWorld(communication_step=0.1),
                     {},
                     config_path=Path("/tmp/test.yaml"),
                     duration=1.0,
@@ -172,7 +172,7 @@ class TestRunSimui:
         with patch.object(Interface, "launch") as mock_launch:
             with patch.object(Interface, "mount"):
                 run_simui(
-                    biosim.BioWorld(),
+                    biosim.BioWorld(communication_step=0.1),
                     {"meta": {"title": "Test Sim", "description": "Desc"}},
                     config_path=Path("/tmp/test.yaml"),
                     duration=5.0,
@@ -200,9 +200,10 @@ class TestMain:
 modules:
   eye:
     class: "{Eye.__module__}.{Eye.__name__}"
-    min_dt: 0.1
   lgn:
     class: "{LGN.__module__}.{LGN.__name__}"
+runtime:
+  communication_step: 0.1
 wiring:
   - from: "eye.visual_stream"
     to: ["lgn.retina"]
@@ -219,7 +220,8 @@ wiring:
 modules:
   eye:
     class: "{Eye.__module__}.{Eye.__name__}"
-    min_dt: 0.1
+runtime:
+  communication_step: 0.1
 """)
         with patch("sys.argv", ["biosim", str(cfg), "--duration", "0.1", "--tick", "0"]):
             # tick <= 0 -> tick_dt = None
@@ -234,7 +236,8 @@ modules:
 modules:
   eye:
     class: "{Eye.__module__}.{Eye.__name__}"
-    min_dt: 0.1
+runtime:
+  communication_step: 0.1
 """)
         with patch("sys.argv", ["biosim", str(cfg), "--simui"]):
             with patch("biosim.__main__.run_simui") as mock_simui:
@@ -250,7 +253,8 @@ modules:
 modules:
   eye:
     class: "{Eye.__module__}.{Eye.__name__}"
-    min_dt: 0.1
+runtime:
+  communication_step: 0.1
 """)
         with patch("sys.argv", ["biosim", str(cfg), "--duration", "0.1"]):
             with patch("biosim.world.BioWorld.module_names", new_callable=lambda: property(lambda self: (_ for _ in ()).throw(RuntimeError("test")))):
@@ -271,6 +275,7 @@ tags: [test]
 authors: ["Tests"]
 biosim:
   entrypoint: "src.counter:Counter"
+  communication_step: 0.1
 """.strip()
             + "\n",
             encoding="utf-8",
@@ -283,7 +288,7 @@ from biosim import BioModule
 
 
 class Counter(BioModule):
-    def advance_to(self, t): return
+    def advance_window(self, _start, t): return
     def get_outputs(self): return {}
 """.strip()
             + "\n",
@@ -326,6 +331,7 @@ package: declared/counter
 version: 9.9.9
 biosim:
   entrypoint: "src.counter:Counter"
+  communication_step: 0.1
 """.strip()
             + "\n",
             encoding="utf-8",
@@ -338,7 +344,7 @@ from biosim import BioModule
 
 
 class Counter(BioModule):
-    def advance_to(self, t): return
+    def advance_window(self, _start, t): return
     def get_outputs(self): return {}
 """.strip()
             + "\n",

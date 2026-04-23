@@ -1,156 +1,49 @@
-"""Tests for biosim.modules – cover all default method implementations."""
+"""Tests for biosim.modules default V2 method behavior."""
+
+from __future__ import annotations
+
+
+def _minimal_module(biosim):
+    class Minimal(biosim.BioModule):
+        def advance_window(self, _start, t):
+            pass
+
+        def get_outputs(self):
+            return {}
+
+    return Minimal()
 
 
 def test_setup_default_noop(biosim):
-    """BioModule.setup() default is a no-op."""
-
-    class Minimal(biosim.BioModule):
-        def __init__(self):
-            self.min_dt = 0.1
-
-        def advance_to(self, t):
-            pass
-
-        def get_outputs(self):
-            return {}
-
-    m = Minimal()
-    result = m.setup()
-    assert result is None
+    assert _minimal_module(biosim).setup() is None
 
 
 def test_reset_default_noop(biosim):
-    class Minimal(biosim.BioModule):
-        def __init__(self):
-            self.min_dt = 0.1
-
-        def advance_to(self, t):
-            pass
-
-        def get_outputs(self):
-            return {}
-
-    m = Minimal()
-    result = m.reset()
-    assert result is None
+    assert _minimal_module(biosim).reset() is None
 
 
 def test_set_inputs_default_noop(biosim):
-    class Minimal(biosim.BioModule):
-        def __init__(self):
-            self.min_dt = 0.1
-
-        def advance_to(self, t):
-            pass
-
-        def get_outputs(self):
-            return {}
-
-    m = Minimal()
-    result = m.set_inputs({"x": biosim.BioSignal("src", "x", 1.0, 0.0)})
+    result = _minimal_module(biosim).set_inputs(
+        {"x": biosim.ScalarSignal("src", "x", 1.0, 0.0, spec=biosim.SignalSpec.scalar(dtype="float64"))}
+    )
     assert result is None
 
 
-def test_get_state_default_empty(biosim):
-    class Minimal(biosim.BioModule):
-        def __init__(self):
-            self.min_dt = 0.1
-
-        def advance_to(self, t):
-            pass
-
-        def get_outputs(self):
-            return {}
-
-    m = Minimal()
-    assert m.get_state() == {}
+def test_snapshot_default_empty(biosim):
+    assert _minimal_module(biosim).snapshot() == {}
 
 
-def test_next_due_time_default(biosim):
-    class Minimal(biosim.BioModule):
-        def __init__(self):
-            self.min_dt = 0.5
-
-        def advance_to(self, t):
-            pass
-
-        def get_outputs(self):
-            return {}
-
-    m = Minimal()
-    assert m.next_due_time(1.0) == 1.5
+def test_restore_default_noop(biosim):
+    assert _minimal_module(biosim).restore({}) is None
 
 
-def test_inputs_default_empty(biosim):
-    class Minimal(biosim.BioModule):
-        def __init__(self):
-            self.min_dt = 0.1
-
-        def advance_to(self, t):
-            pass
-
-        def get_outputs(self):
-            return {}
-
-    m = Minimal()
-    assert m.inputs() == set()
+def test_inputs_default_empty_mapping(biosim):
+    assert _minimal_module(biosim).inputs() == {}
 
 
-def test_outputs_default_empty(biosim):
-    class Minimal(biosim.BioModule):
-        def __init__(self):
-            self.min_dt = 0.1
-
-        def advance_to(self, t):
-            pass
-
-        def get_outputs(self):
-            return {}
-
-    m = Minimal()
-    assert m.outputs() == set()
-
-
-def test_input_schemas_default_empty(biosim):
-    class Minimal(biosim.BioModule):
-        def __init__(self):
-            self.min_dt = 0.1
-
-        def advance_to(self, t):
-            pass
-
-        def get_outputs(self):
-            return {}
-
-    m = Minimal()
-    assert m.input_schemas() == {}
-
-
-def test_output_schemas_default_empty(biosim):
-    class Minimal(biosim.BioModule):
-        def __init__(self):
-            self.min_dt = 0.1
-
-        def advance_to(self, t):
-            pass
-
-        def get_outputs(self):
-            return {}
-
-    m = Minimal()
-    assert m.output_schemas() == {}
+def test_outputs_default_empty_mapping(biosim):
+    assert _minimal_module(biosim).outputs() == {}
 
 
 def test_visualize_default_none(biosim):
-    class Minimal(biosim.BioModule):
-        def __init__(self):
-            self.min_dt = 0.1
-
-        def advance_to(self, t):
-            pass
-
-        def get_outputs(self):
-            return {}
-
-    m = Minimal()
-    assert m.visualize() is None
+    assert _minimal_module(biosim).visualize() is None

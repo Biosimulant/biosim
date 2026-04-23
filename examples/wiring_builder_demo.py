@@ -13,15 +13,14 @@ import biosim
 
 class Eye(biosim.BioModule):
     def __init__(self):
-        self.min_dt = 0.1
         self._outputs = {}
 
     def outputs(self):
-        return {"visual_stream"}
+        return {"visual_stream": biosim.SignalSpec.scalar(dtype="float64")}
 
-    def advance_to(self, t: float) -> None:
+    def advance_window(self, start: float, end: float) -> None:
         self._outputs = {
-            "visual_stream": biosim.BioSignal(source="eye", name="visual_stream", value=t, time=t)
+            "visual_stream": biosim.ScalarSignal(source="eye", name="visual_stream", value=end, emitted_at=end)
         }
 
     def get_outputs(self):
@@ -30,23 +29,22 @@ class Eye(biosim.BioModule):
 
 class LGN(biosim.BioModule):
     def __init__(self):
-        self.min_dt = 0.1
         self._outputs = {}
 
     def inputs(self):
-        return {"retina"}
+        return {"retina": biosim.SignalSpec.scalar(dtype="float64", max_age=0.2)}
 
     def outputs(self):
-        return {"thalamus"}
+        return {"thalamus": biosim.SignalSpec.scalar(dtype="float64")}
 
     def set_inputs(self, signals):
         if "retina" in signals:
             sig = signals["retina"]
             self._outputs = {
-                "thalamus": biosim.BioSignal(source="lgn", name="thalamus", value=sig.value, time=sig.time)
+                "thalamus": biosim.ScalarSignal(source="lgn", name="thalamus", value=sig.value, emitted_at=sig.emitted_at)
             }
 
-    def advance_to(self, t: float) -> None:
+    def advance_window(self, start: float, end: float) -> None:
         return
 
     def get_outputs(self):
@@ -54,17 +52,14 @@ class LGN(biosim.BioModule):
 
 
 class SC(biosim.BioModule):
-    def __init__(self):
-        self.min_dt = 0.1
-
     def inputs(self):
-        return {"vision"}
+        return {"vision": biosim.SignalSpec.scalar(dtype="float64", max_age=0.2)}
 
     def set_inputs(self, signals):
         if "vision" in signals:
             print("[SC] vision:", signals["vision"].value)
 
-    def advance_to(self, t: float) -> None:
+    def advance_window(self, start: float, end: float) -> None:
         return
 
     def get_outputs(self):
@@ -72,15 +67,16 @@ class SC(biosim.BioModule):
 
 
 def main() -> None:
-    world = biosim.BioWorld()
+    world = biosim.BioWorld(communication_step=0.1)
     eye, lgn, sc = Eye(), LGN(), SC()
 
     wb = biosim.WiringBuilder(world)
-    wb.add("eye", eye, priority=2).add("lgn", lgn, priority=1).add("sc", sc)
+    wb.add("eye", eye).add("lgn", lgn).add("sc", sc)
     wb.connect("eye.visual_stream", ["lgn.retina", "sc.vision"]).apply()
 
-    world.run(duration=0.2, tick_dt=0.1)
+    world.run(duration=0.3, tick_dt=0.1)
 
 
 if __name__ == "__main__":
     main()
+

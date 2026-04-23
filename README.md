@@ -95,33 +95,42 @@ Minimal usage:
 
 ```python
 import biosim
-from biosim import BioSignal, SignalMetadata
+from biosim import ScalarSignal, SignalSpec
+
 
 class Counter(biosim.BioModule):
-    min_dt = 0.1
-
     def __init__(self):
         self.value = 0
+        self._t = 0.0
 
-    def reset(self) -> None:
-        self.value = 0
+    def outputs(self):
+        return {"count": SignalSpec.scalar(dtype="int64", emitted_unit="1")}
 
-    def advance_to(self, t: float) -> None:
+    def advance_window(self, start: float, end: float) -> None:
+        _ = start
         self.value += 1
+        self._t = end
 
     def get_outputs(self):
-        source = getattr(self, "_world_name", "counter")
         return {
-            "count": BioSignal(
-                source=source,
+            "count": ScalarSignal(
+                source="counter",
                 name="count",
                 value=self.value,
-                time=0.0,
-                metadata=SignalMetadata(units="1", description="tick counter"),
+                emitted_at=self._t,
+                spec=self.outputs()["count"],
             )
         }
 
-world = biosim.BioWorld()
+    def snapshot(self) -> dict:
+        return {"value": self.value, "t": self._t}
+
+    def restore(self, snapshot: dict) -> None:
+        self.value = int(snapshot.get("value", 0))
+        self._t = float(snapshot.get("t", 0.0))
+
+
+world = biosim.BioWorld(communication_step=0.1)
 world.add_biomodule("counter", Counter())
 world.run(duration=1.0, tick_dt=0.1)
 ```
@@ -132,13 +141,17 @@ Modules may optionally expose visuals via `visualize()`, returning a dict or lis
 
 ```python
 class MyModule(biosim.BioModule):
-    min_dt = 0.1
-
-    def advance_to(self, t: float) -> None:
-        return
+    def advance_window(self, start: float, end: float) -> None:
+        _ = start, end
 
     def get_outputs(self):
         return {}
+
+    def snapshot(self) -> dict:
+        return {}
+
+    def restore(self, snapshot: dict) -> None:
+        _ = snapshot
 
     def visualize(self):
         return {
@@ -146,7 +159,7 @@ class MyModule(biosim.BioModule):
             "data": {"series": [{"name": "s", "points": [[0.0, 1.0]]}]},
         }
 
-world = biosim.BioWorld()
+world = biosim.BioWorld(communication_step=0.1)
 world.add_biomodule("module", MyModule())
 world.run(duration=0.1, tick_dt=0.1)
 print(world.collect_visuals())  # [{"module": "module", "visuals": [...]}]
@@ -161,7 +174,7 @@ the ML extras and wrap the ONNX model behind the standard `BioModule`
 interface:
 
 ```python
-from biosim import BioSignal, OnnxClassifierModule
+from biosim import OnnxClassifierModule, ScalarSignal, SignalSpec
 
 classifier = OnnxClassifierModule(
     model_path="artifacts/model.onnx",
@@ -174,15 +187,16 @@ classifier = OnnxClassifierModule(
 
 classifier.set_inputs(
     {
-        "state_vector": BioSignal(
+        "state_vector": ScalarSignal(
             source="adapter",
             name="state_vector",
-            value=[-64.0, 0.1, 0.6, 0.3],
-            time=0.0,
+            value=-64.0,
+            emitted_at=0.0,
+            spec=SignalSpec.scalar(dtype="float64"),
         )
     }
 )
-classifier.advance_to(0.001)
+classifier.advance_window(0.0, 0.001)
 print(classifier.get_outputs()["predicted_state"].value)
 ```
 

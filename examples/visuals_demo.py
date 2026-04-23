@@ -25,11 +25,10 @@ except ModuleNotFoundError:
 
 class StepSeries(biosim.BioModule):
     def __init__(self) -> None:
-        self.min_dt = 0.1
         self._points: list[list[float]] = []
 
-    def advance_to(self, t: float) -> None:
-        self._points.append([t, len(self._points)])
+    def advance_window(self, start: float, end: float) -> None:
+        self._points.append([end, len(self._points)])
 
     def get_outputs(self):
         return {}
@@ -42,7 +41,7 @@ class StepSeries(biosim.BioModule):
 
 
 def main() -> None:
-    world = biosim.BioWorld()
+    world = biosim.BioWorld(communication_step=0.1)
     world.add_biomodule("step_series", StepSeries())
     world.run(duration=0.5, tick_dt=0.1)
 

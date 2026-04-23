@@ -7,10 +7,10 @@ from __future__ import annotations
 
 import importlib
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Set
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence
 
 from .modules import BioModule
-from .signals import BioSignal, SignalMetadata
+from .signals import ArraySignal, RecordSignal, ScalarSignal, SignalSpec
 
 
 def _flatten_numeric_items(value: Any) -> List[float]:
@@ -42,13 +42,11 @@ class OnnxClassifierModule(BioModule):
         model_output_name: Optional[str] = None,
         base_dir: Optional[str] = None,
         input_vector_length: Optional[int] = None,
-        min_dt: float = 0.001,
         session_factory: Optional[Callable[[str], Any]] = None,
         providers: Optional[Sequence[str]] = None,
         probabilities_description: str = "Classifier probabilities over the declared ONNX class labels",
         predicted_description: str = "Most likely ONNX-predicted state",
     ) -> None:
-        self.min_dt = min_dt
         self.model_path = model_path
         self.class_labels = list(class_labels or ["class_0"])
         self.input_port = input_port
@@ -66,13 +64,32 @@ class OnnxClassifierModule(BioModule):
         self._latest_vector: List[float] = []
         self._latest_probs: List[float] = [1.0] + [0.0] * (len(self.class_labels) - 1)
         self._latest_label: str = self.class_labels[0]
-        self._outputs: Dict[str, BioSignal] = {}
+        self._outputs: Dict[str, Any] = {}
 
-    def inputs(self) -> Set[str]:
-        return {self.input_port}
+    def inputs(self) -> Mapping[str, SignalSpec]:
+        vector_length = self.input_vector_length or len(self.class_labels)
+        return {
+            self.input_port: SignalSpec.array(
+                dtype="float32",
+                shape=(vector_length,),
+                interpolation="zoh",
+                description="Input feature vector for ONNX inference",
+            )
+        }
 
-    def outputs(self) -> Set[str]:
-        return {self.probabilities_port, self.predicted_port}
+    def outputs(self) -> Mapping[str, SignalSpec]:
+        return {
+            self.probabilities_port: SignalSpec.array(
+                dtype="float32",
+                shape=(len(self.class_labels),),
+                interpolation="zoh",
+                description=self.probabilities_description,
+            ),
+            self.predicted_port: SignalSpec.record(
+                schema={"label": "str", "probabilities": "dict"},
+                description=self.predicted_description,
+            ),
+        }
 
     def reset(self) -> None:
         self._latest_vector = []
@@ -114,7 +131,7 @@ class OnnxClassifierModule(BioModule):
                 vector.append(0.0)
         return vector
 
-    def set_inputs(self, signals: Dict[str, BioSignal]) -> None:
+    def set_inputs(self, signals: Dict[str, Any]) -> None:
         signal = signals.get(self.input_port)
         if signal is None:
             return
@@ -129,44 +146,40 @@ class OnnxClassifierModule(BioModule):
         probs = _flatten_numeric_items(result[0])
         return probs or ([1.0] + [0.0] * (len(self.class_labels) - 1))
 
-    def advance_to(self, t: float) -> None:
+    def advance_window(self, start: float, end: float) -> None:
         probs = self._run_inference()
         if len(probs) < len(self.class_labels):
             probs = probs + [0.0] * (len(self.class_labels) - len(probs))
         self._latest_probs = probs[: len(self.class_labels)]
         max_idx = max(range(len(self._latest_probs)), key=self._latest_probs.__getitem__)
         self._latest_label = self.class_labels[max_idx]
+        specs = self.outputs()
 
         source = getattr(self, "_world_name", self.__class__.__name__)
         self._outputs = {
-            self.probabilities_port: BioSignal(
+            self.probabilities_port: ArraySignal(
                 source=source,
                 name=self.probabilities_port,
-                value=list(self._latest_probs),
-                time=t,
-                metadata=SignalMetadata(
-                    description=self.probabilities_description,
-                    dtype="float32",
-                    shape=(len(self.class_labels),),
-                    kind="state",
-                ),
+                value=self._latest_probs,
+                emitted_at=end,
+                spec=specs[self.probabilities_port],
             ),
-            self.predicted_port: BioSignal(
+            self.predicted_port: RecordSignal(
                 source=source,
                 name=self.predicted_port,
                 value={
                     "label": self._latest_label,
                     "probabilities": dict(zip(self.class_labels, self._latest_probs)),
                 },
-                time=t,
-                metadata=SignalMetadata(description=self.predicted_description, kind="state"),
+                emitted_at=end,
+                spec=specs[self.predicted_port],
             ),
         }
 
-    def get_outputs(self) -> Dict[str, BioSignal]:
+    def get_outputs(self) -> Dict[str, Any]:
         return dict(self._outputs)
 
-    def get_state(self) -> Dict[str, Any]:
+    def snapshot(self) -> Dict[str, Any]:
         return {
             "input_port": self.input_port,
             "model_path": self.model_path,
@@ -174,6 +187,11 @@ class OnnxClassifierModule(BioModule):
             "latest_probs": list(self._latest_probs),
             "latest_label": self._latest_label,
         }
+
+    def restore(self, snapshot: Mapping[str, Any]) -> None:
+        self._latest_vector = list(snapshot.get("latest_vector", []))
+        self._latest_probs = list(snapshot.get("latest_probs", self._latest_probs))
+        self._latest_label = str(snapshot.get("latest_label", self._latest_label))
 
     def visualize(self) -> Optional[Dict[str, Any]]:
         if not self._outputs:
@@ -188,3 +206,8 @@ class OnnxClassifierModule(BioModule):
             },
             "description": f"Latest ONNX classification result: {self._latest_label}.",
         }
+
+    def __getstate__(self) -> Dict[str, Any]:
+        state = dict(self.__dict__)
+        state["_session"] = None
+        return state

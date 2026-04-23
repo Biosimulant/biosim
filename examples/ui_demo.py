@@ -15,18 +15,17 @@ import biosim
 
 
 def main() -> None:
-    world = biosim.BioWorld()
+    world = biosim.BioWorld(communication_step=0.1)
 
     class TS(biosim.BioModule):
         def __init__(self):
-            self.min_dt = 0.1
             self._points = []
 
         def reset(self):
             self._points = []
 
-        def advance_to(self, t: float) -> None:
-            self._points.append([t, len(self._points)])
+        def advance_window(self, start: float, end: float) -> None:
+            self._points.append([end, len(self._points)])
 
         def get_outputs(self):
             return {}

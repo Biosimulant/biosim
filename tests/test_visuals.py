@@ -1,12 +1,12 @@
 
 def test_collect_visuals_empty(biosim):
-    world = biosim.BioWorld()
+    world = biosim.BioWorld(communication_step=0.1)
 
     class Silent(biosim.BioModule):
         def __init__(self):
-            self.min_dt = 0.1
+            pass
 
-        def advance_to(self, t: float) -> None:
+        def advance_window(self, _start: float, t: float) -> None:
             return
 
         def get_outputs(self):
@@ -19,14 +19,13 @@ def test_collect_visuals_empty(biosim):
 
 
 def test_collect_visuals_with_modules(biosim):
-    world = biosim.BioWorld()
+    world = biosim.BioWorld(communication_step=0.1)
 
     class TS(biosim.BioModule):
         def __init__(self):
-            self.min_dt = 0.1
             self._points = []
 
-        def advance_to(self, t: float) -> None:
+        def advance_window(self, _start: float, t: float) -> None:
             self._points.append([t, len(self._points)])
 
         def get_outputs(self):
@@ -40,9 +39,9 @@ def test_collect_visuals_with_modules(biosim):
 
     class GraphMod(biosim.BioModule):
         def __init__(self):
-            self.min_dt = 0.1
+            pass
 
-        def advance_to(self, t: float) -> None:
+        def advance_window(self, _start: float, t: float) -> None:
             return
 
         def get_outputs(self):
@@ -64,21 +63,21 @@ def test_collect_visuals_with_modules(biosim):
     collected = world.collect_visuals()
     assert len(collected) == 2
     kinds = {entry["module"]: entry for entry in collected}
-    assert "TS" in kinds and "GraphMod" in kinds
-    ts_vis = kinds["TS"]["visuals"][0]
+    assert "ts" in kinds and "graph" in kinds
+    ts_vis = kinds["ts"]["visuals"][0]
     assert ts_vis["render"] == "timeseries"
-    g_vis = kinds["GraphMod"]["visuals"][0]
+    g_vis = kinds["graph"]["visuals"][0]
     assert g_vis["render"] == "graph"
 
 
 def test_visuals_invalid_shapes_are_filtered(biosim):
-    world = biosim.BioWorld()
+    world = biosim.BioWorld(communication_step=0.1)
 
     class Bad1(biosim.BioModule):
         def __init__(self):
-            self.min_dt = 0.1
+            pass
 
-        def advance_to(self, t: float) -> None:
+        def advance_window(self, _start: float, t: float) -> None:
             return
 
         def get_outputs(self):
@@ -89,9 +88,9 @@ def test_visuals_invalid_shapes_are_filtered(biosim):
 
     class Bad2(biosim.BioModule):
         def __init__(self):
-            self.min_dt = 0.1
+            pass
 
-        def advance_to(self, t: float) -> None:
+        def advance_window(self, _start: float, t: float) -> None:
             return
 
         def get_outputs(self):
@@ -102,9 +101,9 @@ def test_visuals_invalid_shapes_are_filtered(biosim):
 
     class Good(biosim.BioModule):
         def __init__(self):
-            self.min_dt = 0.1
+            pass
 
-        def advance_to(self, t: float) -> None:
+        def advance_window(self, _start: float, t: float) -> None:
             return
 
         def get_outputs(self):
@@ -120,18 +119,18 @@ def test_visuals_invalid_shapes_are_filtered(biosim):
 
     collected = world.collect_visuals()
     assert len(collected) == 1
-    assert collected[0]["module"] == "Good"
+    assert collected[0]["module"] == "good"
     assert collected[0]["visuals"][0]["render"] == "bar"
 
 
 def test_visuals_description_is_preserved(biosim):
-    world = biosim.BioWorld()
+    world = biosim.BioWorld(communication_step=0.1)
 
     class WithDescription(biosim.BioModule):
         def __init__(self):
-            self.min_dt = 0.1
+            pass
 
-        def advance_to(self, t: float) -> None:
+        def advance_window(self, _start: float, t: float) -> None:
             return
 
         def get_outputs(self):
@@ -144,5 +143,5 @@ def test_visuals_description_is_preserved(biosim):
     world.run(duration=0.1, tick_dt=0.1)
 
     collected = world.collect_visuals()
-    assert collected[0]["module"] == "WithDescription"
+    assert collected[0]["module"] == "desc"
     assert collected[0]["visuals"][0]["description"] == "hello"

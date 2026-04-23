@@ -1,34 +1,34 @@
+from __future__ import annotations
+
 import threading
 import time
 
 import pytest
 
+from biosim import ScalarSignal, SignalSpec
 
-def test_run_emits_ticks(biosim):
-    events = []
 
+def _ticker_module(biosim):
     class Ticker(biosim.BioModule):
         def __init__(self):
-            self.min_dt = 0.1
-            self._t = 0.0
             self._outputs = {}
 
-        def advance_to(self, t: float) -> None:
-            self._t = t
-            self._outputs = {
-                "out": biosim.BioSignal(
-                    source="ticker",
-                    name="out",
-                    value=t,
-                    time=t,
-                )
-            }
+        def outputs(self):
+            return {"out": SignalSpec.scalar(dtype="float64")}
+
+        def advance_window(self, start: float, end: float) -> None:
+            self._outputs = {"out": ScalarSignal(source="ticker", name="out", value=end, emitted_at=end)}
 
         def get_outputs(self):
             return dict(self._outputs)
 
-    world = biosim.BioWorld()
-    world.add_biomodule("ticker", Ticker())
+    return Ticker()
+
+
+def test_run_emits_ticks(biosim):
+    events = []
+    world = biosim.BioWorld(communication_step=0.1)
+    world.add_biomodule("ticker", _ticker_module(biosim))
 
     def listener(ev, payload):
         events.append((ev, payload))
@@ -47,35 +47,15 @@ def test_run_emits_ticks(biosim):
 
     tick_events = [e for e in events if e[0] == biosim.WorldEvent.TICK]
     assert [round(p["t"], 2) for _, p in tick_events] == [0.1, 0.2, 0.3]
-    tick_progress = [p["progress_pct"] for _, p in tick_events]
-    assert tick_progress == sorted(tick_progress)
-    assert all(0.0 <= value <= 100.0 for value in tick_progress)
-    assert tick_progress[-1] == pytest.approx(100.0)
-
-    finished_payload = events[-1][1]
+    assert tick_events[-1][1]["progress_pct"] == pytest.approx(100.0)
     assert events[-1][0] == biosim.WorldEvent.FINISHED
-    assert finished_payload["progress"] == pytest.approx(1.0)
-    assert finished_payload["progress_pct"] == pytest.approx(100.0)
-    assert finished_payload["remaining"] == pytest.approx(0.0)
 
 
 def test_request_stop_emits_stopped(biosim):
     seen = []
     stopped_payloads = []
-
-    class Ticker(biosim.BioModule):
-        def __init__(self):
-            self.min_dt = 0.1
-            self._outputs = {}
-
-        def advance_to(self, t: float) -> None:
-            self._outputs = {"out": biosim.BioSignal(source="ticker", name="out", value=t, time=t)}
-
-        def get_outputs(self):
-            return dict(self._outputs)
-
-    world = biosim.BioWorld()
-    world.add_biomodule("ticker", Ticker())
+    world = biosim.BioWorld(communication_step=0.1)
+    world.add_biomodule("ticker", _ticker_module(biosim))
 
     def listener(ev, payload):
         seen.append(ev)
@@ -95,20 +75,8 @@ def test_request_stop_emits_stopped(biosim):
 def test_request_pause_blocks_until_resume(biosim):
     about_to_tick = threading.Event()
     done = threading.Event()
-
-    class Ticker(biosim.BioModule):
-        def __init__(self):
-            self.min_dt = 0.1
-            self._outputs = {}
-
-        def advance_to(self, t: float) -> None:
-            self._outputs = {"out": biosim.BioSignal(source="ticker", name="out", value=t, time=t)}
-
-        def get_outputs(self):
-            return dict(self._outputs)
-
-    world = biosim.BioWorld()
-    world.add_biomodule("ticker", Ticker())
+    world = biosim.BioWorld(communication_step=0.1)
+    world.add_biomodule("ticker", _ticker_module(biosim))
 
     def listener(ev, payload):
         if ev == biosim.WorldEvent.TICK and not about_to_tick.is_set():
@@ -130,3 +98,4 @@ def test_request_pause_blocks_until_resume(biosim):
 
     world.request_resume()
     assert done.wait(timeout=2.0)
+

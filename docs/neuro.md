@@ -69,7 +69,7 @@ python spaces/neuro-microcircuit/simui_local.py
 ```bash
 python -c "
 import biosim
-w = biosim.BioWorld()
+w = biosim.BioWorld(communication_step=0.001)
 biosim.load_wiring(w, 'spaces/neuro-single-neuron/wiring.yaml')
 w.run(duration=0.5, tick_dt=0.0001)
 print('Simulation complete')
@@ -105,10 +105,9 @@ Injects constant or time-varying current.
 **Parameters:**
 - `I: float` - Current amplitude (default: 10.0)
 - `schedule: list[tuple] | None` - Optional `[(start, end, I_value), ...]` for time-varying current
-- `min_dt: float` - Time step (default: 0.001)
 
 **Outputs:**
-- `current` - BioSignal with `value: float` (current amplitude)
+- `current` - `ScalarSignal` carrying the current amplitude
 
 **Visualizes:**
 - `timeseries` VisualSpec: current injection over time
@@ -136,14 +135,13 @@ A population of Izhikevich spiking neurons.
 - `u_init: float | None` - Initial recovery variable (default: b * v_init)
 - `I_bias: float` - Constant bias current (default: 0.0)
 - `sample_indices: list[int] | None` - Neuron indices for state output (default: first 5)
-- `min_dt: float` - Time step (default: 0.001)
 
 **Inputs:**
-- `current` - BioSignal with `value: float` (scalar) or `value: list[float]` (per-neuron)
+- `current` - `ScalarSignal` for broadcast current or `ArraySignal` for per-neuron current
 
 **Outputs:**
-- `spikes` - BioSignal with `value: list[int]` (spiked neuron IDs), kind="event"
-- `state` - BioSignal with `value: {"t": float, "indices": [int, ...], "v": [float, ...], "u": [float, ...]}`
+- `spikes` - `EventSignal` with `value: list[int]` for spiked neuron IDs
+- `state` - `RecordSignal` with `value: {"t": float, "indices": [int, ...], "v": [float, ...], "u": [float, ...]}`
 
 **Presets:**
 
@@ -171,11 +169,11 @@ A population of Hodgkin-Huxley conductance-based spiking neurons (1952 squid gia
 Uses voltage-gated Na+, K+, and leak channels with gating variables m, h, n.
 
 **Inputs:**
-- `current` - BioSignal with injected current
+- `current` - typed current input signal (`ScalarSignal` or `ArraySignal`)
 
 **Outputs:**
-- `spikes` - BioSignal with spiked neuron IDs
-- `state` - BioSignal with membrane state (Vm, gating variables)
+- `spikes` - `EventSignal` with spiked neuron IDs
+- `state` - `RecordSignal` with membrane state (Vm, gating variables)
 
 ### Synapse Modules
 
@@ -193,10 +191,10 @@ Converts incoming spikes to exponentially decaying synaptic current.
 - `delay_steps: int` - Spike delivery delay (default: 0)
 
 **Inputs:**
-- `spikes` - BioSignal with spiked neuron IDs
+- `spikes` - `EventSignal` with spiked neuron IDs
 
 **Outputs:**
-- `current` - BioSignal with per-neuron synaptic current array
+- `current` - `ArraySignal` with per-neuron synaptic current
 
 **Example:**
 ```python
@@ -288,33 +286,67 @@ Metrics computed:
 
 ## Signal Conventions
 
-The neuro packs use BioSignal objects with these conventions:
+The neuro packs use typed 1.5 signals with explicit `SignalSpec` declarations on every port.
 
-### Spike signals (kind="event")
-Emitted by populations and input generators. The `value` field contains a list of neuron indices that spiked:
+### Spike signals (`EventSignal`)
+Emitted by populations and input generators. The `value` field contains the neuron indices that spiked during the current communication window:
 ```python
-BioSignal(source="neuron", name="spikes", value=[0, 5, 12, 47], time=0.123,
-          metadata=SignalMetadata(kind="event"))
+from biosim import EventSignal, SignalSpec
+
+spike_spec = SignalSpec.event(description="Neuron indices that spiked in this boundary")
+EventSignal(
+    source="neuron",
+    name="spikes",
+    value=[0, 5, 12, 47],
+    emitted_at=0.123,
+    spec=spike_spec,
+)
 ```
 
-### Current signals (kind="state")
-Injected current as scalar or per-neuron array:
+### Current signals (`ScalarSignal` / `ArraySignal`)
+Injected current can be broadcast as a scalar or provided per neuron as an array:
 ```python
-# Scalar current
-BioSignal(source="dc", name="current", value=10.0, time=0.123,
-          metadata=SignalMetadata(units="nA", kind="state"))
+from biosim import ArraySignal, ScalarSignal, SignalSpec
 
-# Per-neuron array
-BioSignal(source="synapse", name="current", value=[1.2, 0.8, 1.5, ...], time=0.123,
-          metadata=SignalMetadata(kind="state"))
+scalar_current_spec = SignalSpec.scalar(dtype="float64", emitted_unit="nA")
+ScalarSignal(
+    source="dc",
+    name="current",
+    value=10.0,
+    emitted_at=0.123,
+    spec=scalar_current_spec,
+)
+
+array_current_spec = SignalSpec.array(dtype="float64", shape=(4,), emitted_unit="nA")
+ArraySignal(
+    source="synapse",
+    name="current",
+    value=[1.2, 0.8, 1.5, 0.4],
+    emitted_at=0.123,
+    spec=array_current_spec,
+)
 ```
 
-### State signals (kind="state")
-Neuron state for monitoring/visualization:
+### State signals (`RecordSignal`)
+Neuron state for monitoring and visualization is carried as a schema-bound record:
 ```python
-BioSignal(source="neuron", name="state",
-          value={"t": 0.123, "indices": [0, 1, 2], "v": [-65.2, -60.1, -70.0], "u": [-13.0, -12.0, -14.0]},
-          time=0.123, metadata=SignalMetadata(kind="state"))
+from biosim import RecordSignal, SignalSpec
+
+state_spec = SignalSpec.record(
+    schema={"t": "float64", "indices": "list[int]", "v": "list[float64]", "u": "list[float64]"},
+)
+RecordSignal(
+    source="neuron",
+    name="state",
+    value={
+        "t": 0.123,
+        "indices": [0, 1, 2],
+        "v": [-65.2, -60.1, -70.0],
+        "u": [-13.0, -12.0, -14.0],
+    },
+    emitted_at=0.123,
+    spec=state_spec,
+)
 ```
 
 ## Visual Outputs

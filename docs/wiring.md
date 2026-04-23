@@ -1,58 +1,41 @@
-# API: WiringBuilder and Loaders
+# Wiring Builder and Loaders
 
-WiringBuilder lets you assemble module graphs in code; YAML/TOML loaders let you declare them in files. Both share parsing rules and validation.
+`WiringBuilder` assembles a graph of named modules and validated port connections.
 
-Reference format
-- `"name.port"` for sources and destinations.
+## Code builder
 
-Validation
-- If a module declares `outputs()`, the source port must exist.
-- If a module declares `inputs()`, the destination port must exist.
-- Errors include the full connection context, e.g.:
-  - `connect eye.nope -> lgn.retina: module 'eye' has no output port 'nope'`
-
-Code builder
 ```python
-wb = biosim.WiringBuilder(world)
-wb.add("eye", Eye()).add("lgn", LGN()).add("sc", SC())
-wb.connect("eye.visual_stream", ["lgn.retina"])  # Eye -> LGN
-wb.connect("lgn.thalamus", ["sc.vision"]).apply()  # LGN -> SC
+world = biosim.BioWorld(communication_step=0.1)
+builder = biosim.WiringBuilder(world)
+builder.add("eye", Eye()).add("lgn", LGN()).add("sc", SC())
+builder.connect("eye.visual_stream", ["lgn.retina"])
+builder.connect("lgn.thalamus", ["sc.vision"]).apply()
 ```
 
-YAML
+## File-backed specs
+
 ```yaml
+runtime:
+  communication_step: 0.1
 modules:
   eye: { class: examples.wiring_builder_demo.Eye }
   lgn: { class: examples.wiring_builder_demo.LGN }
-  sc:  { class: examples.wiring_builder_demo.SC }
+  sc: { class: examples.wiring_builder_demo.SC }
 wiring:
   - { from: eye.visual_stream, to: [lgn.retina] }
-  - { from: lgn.thalamus,      to: [sc.vision] }
+  - { from: lgn.thalamus, to: [sc.vision] }
 ```
 
-TOML
-```toml
-[modules.eye]
-class = "examples.wiring_builder_demo.Eye"
-[modules.lgn]
-class = "examples.wiring_builder_demo.LGN"
-[modules.sc]
-class = "examples.wiring_builder_demo.SC"
+## Validation behavior
 
-[[wiring]]
-from = "eye.visual_stream"
-to = ["lgn.retina"]
-[[wiring]]
-from = "lgn.thalamus"
-to = ["sc.vision"]
-```
+- `from` and `to` references must use `name.port`.
+- Source ports must exist in the source module’s `outputs()`.
+- Destination ports must exist in the target module’s `inputs()`.
+- Connection compatibility is checked via `SignalSpec`.
 
-Spec builder
-- `biosim.build_from_spec(world, spec)` builds modules and wiring from a dict spec directly (used internally by the loaders).
-  - `spec["modules"]`: mapping of name -> dotted class path or `{class, args, min_dt, priority}`.
-  - `spec["wiring"]`: list of `{from: str, to: [str, ...]}`.
+## Loader helpers
 
-Loaders
-- `biosim.load_wiring(world, path)` auto-detects YAML/TOML by file extension.
-- `biosim.load_wiring_yaml(world, path)` and `biosim.load_wiring_toml(world, path)` for explicit formats.
-- TOML support requires Python 3.11+ or `tomli` installed.
+- `biosim.build_from_spec(world, spec)`
+- `biosim.load_wiring(world, path)`
+- `biosim.load_wiring_yaml(world, path)`
+- `biosim.load_wiring_toml(world, path)`

@@ -1,5 +1,5 @@
 def test_world_load_wiring_toml(tmp_path, biosim):
-    world = biosim.BioWorld()
+    world = biosim.BioWorld(communication_step=0.1)
     path = tmp_path / "wiring.toml"
     path.write_text(
         "\n".join(
@@ -8,7 +8,6 @@ def test_world_load_wiring_toml(tmp_path, biosim):
                 "",
                 "[modules.eye]",
                 'class = "examples.wiring_builder_demo.Eye"',
-                "min_dt = 0.01",
                 "",
                 "[modules.lgn]",
                 'class = "examples.wiring_builder_demo.LGN"',

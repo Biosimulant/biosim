@@ -18,10 +18,9 @@ from biosim.modules import BioModule
 
 class SimpleModule(BioModule):
     def __init__(self, slow=False):
-        self.min_dt = 0.01
         self._slow = slow
 
-    def advance_to(self, t):
+    def advance_window(self, _start, t):
         if self._slow:
             import time as _t
             _t.sleep(0.001)
@@ -32,9 +31,9 @@ class SimpleModule(BioModule):
 
 class VisualModule(BioModule):
     def __init__(self):
-        self.min_dt = 0.1
+        pass
 
-    def advance_to(self, t):
+    def advance_window(self, _start, t):
         pass
 
     def get_outputs(self):
@@ -46,10 +45,9 @@ class VisualModule(BioModule):
 
 class StructureVisualModule(BioModule):
     def __init__(self, structure_path: Path):
-        self.min_dt = 0.1
         self._structure_path = structure_path
 
-    def advance_to(self, t):
+    def advance_window(self, _start, t):
         pass
 
     def get_outputs(self):
@@ -71,7 +69,7 @@ class StructureVisualModule(BioModule):
 
 
 def _make_world():
-    world = BioWorld()
+    world = BioWorld(communication_step=0.1)
     world.add_biomodule("m", SimpleModule())
     return world
 
@@ -187,7 +185,7 @@ class TestRunEndpoint:
         ui._runner.join(timeout=5.0)
 
     def test_run_already_running(self):
-        world = BioWorld()
+        world = BioWorld(communication_step=0.1)
         world.add_biomodule("m", SimpleModule(slow=True))
         app, ui = _make_app(world=world)
         client = TestClient(app)
@@ -292,7 +290,7 @@ class TestPauseResumeEndpoints:
         assert r.json()["reason"] == "not_running"
 
     def test_pause_and_resume(self):
-        world = BioWorld()
+        world = BioWorld(communication_step=0.1)
         world.add_biomodule("m", SimpleModule(slow=True))
         app, ui = _make_app(world=world)
         client = TestClient(app)
@@ -351,7 +349,7 @@ class TestVisualsEndpoint:
         assert r.status_code == 200
 
     def test_visuals_with_module(self):
-        world = BioWorld()
+        world = BioWorld(communication_step=0.1)
         world.add_biomodule("vis", VisualModule())
         app, ui = _make_app(world=world)
         client = TestClient(app)
@@ -368,7 +366,7 @@ class TestVisualsEndpoint:
         structure_path = tmp_path / "structure.cif"
         structure_path.write_text("data_mock\n", encoding="utf-8")
 
-        world = BioWorld()
+        world = BioWorld(communication_step=0.1)
         world.add_biomodule("vis", StructureVisualModule(structure_path))
         app, ui = _make_app(world=world)
         client = TestClient(app)
@@ -487,7 +485,7 @@ class TestListenerAndSSE:
             assert result == []
 
     def test_collect_visuals_safe_with_description(self):
-        world = BioWorld()
+        world = BioWorld(communication_step=0.1)
         world.add_biomodule("vis", VisualModule())
         world.run(duration=0.1)
         ui = Interface(world)

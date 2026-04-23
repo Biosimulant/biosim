@@ -613,8 +613,7 @@ def _instantiate_model_from_package(loaded: _LoadedPackage, parameters: Mapping[
     if not isinstance(module, BioModule):
         raise PackageError(f"Entrypoint {entrypoint} did not construct a BioModule")
     return module, {
-        "min_dt": bsim_block.get("min_dt"),
-        "priority": int(bsim_block.get("priority") or 0),
+        "communication_step": bsim_block.get("communication_step"),
         "setup": dict(bsim_block.get("setup") or {}) if isinstance(bsim_block.get("setup"), Mapping) else {},
     }
 
@@ -707,8 +706,7 @@ def _instantiate_model_from_dir(
     if not isinstance(module, BioModule):
         raise PackageError(f"Entrypoint {entrypoint} did not construct a BioModule")
     return module, {
-        "min_dt": bsim_block.get("min_dt"),
-        "priority": int(bsim_block.get("priority") or 0),
+        "communication_step": bsim_block.get("communication_step"),
         "setup": dict(bsim_block.get("setup") or {}) if isinstance(bsim_block.get("setup"), Mapping) else {},
     }
 
@@ -799,14 +797,16 @@ def _run_model_loaded_package(loaded: _LoadedPackage, *, install_deps: bool = Tr
         _install_declared_dependencies(loaded.manifest)
     module, meta = _instantiate_model_from_package(loaded)
     module.setup(meta["setup"])
-    min_dt = float(meta["min_dt"]) if meta["min_dt"] is not None else float(getattr(module, "min_dt", 0.1) or 0.1)
-    module.advance_to(min_dt)
+    communication_step = meta["communication_step"]
+    if communication_step is None:
+        raise PackageError("Model package biosim.communication_step is required in the 1.5 kernel")
+    module.advance_window(0.0, float(communication_step))
     outputs = module.get_outputs()
     return {
         "package": loaded.package_yaml["package"],
         "version": loaded.package_yaml["version"],
         "outputs": sorted(outputs.keys()),
-        "state": module.get_state(),
+        "state": module.snapshot(),
     }
 
 
@@ -852,7 +852,7 @@ def _flatten_embedded_space_dir(
             "alias": _scoped_ref(prefix, alias),
             "model_dir": str(model_dir),
         }
-        for key in ("parameters", "module_config", "min_dt", "priority"):
+        for key in ("parameters", "module_config"):
             value = entry.get(key)
             if value is not None:
                 model_entry[key] = value
@@ -909,7 +909,10 @@ def _run_space_loaded_package(loaded: _LoadedPackage, *, install_deps: bool = Tr
         current_space_dir=loaded.payload_root,
     )
 
-    world = BioWorld()
+    communication_step = runtime.get("communication_step")
+    if communication_step is None:
+        raise PackageError("Space manifest runtime.communication_step is required in the 1.5 kernel")
+    world = BioWorld(communication_step=float(communication_step))
     builder = WiringBuilder(world)
     resolved_models: list[dict[str, Any]] = []
     setup_config: dict[str, dict[str, Any]] = {}
@@ -929,9 +932,9 @@ def _run_space_loaded_package(loaded: _LoadedPackage, *, install_deps: bool = Tr
             _install_declared_dependencies(manifest)
         parameters = entry.get("parameters") if isinstance(entry.get("parameters"), Mapping) else {}
         module, meta = _instantiate_model_from_dir(model_path, manifest=manifest, parameters=parameters)
-        min_dt = entry.get("min_dt") if entry.get("min_dt") is not None else meta["min_dt"]
-        priority = int(entry.get("priority")) if entry.get("priority") is not None else meta["priority"]
-        builder.add(alias, module, min_dt=min_dt, priority=priority)
+        if entry.get("min_dt") is not None or entry.get("priority") is not None:
+            raise PackageError("Space model entries cannot declare min_dt or priority in the 1.5 kernel")
+        builder.add(alias, module)
         if meta["setup"]:
             setup_config[alias] = dict(meta["setup"])
         relative_model_dir = model_path.resolve().relative_to(loaded.payload_root.resolve()).as_posix()

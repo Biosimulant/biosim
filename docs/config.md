@@ -1,42 +1,49 @@
 # Configuration Files
 
-You can declare modules and connections in TOML or YAML. Load with helpers in `biosim.wiring`.
+BioSim wiring configs are YAML or TOML mappings with three top-level sections:
 
-Keys
-- `modules`: mapping of name -> class path (or object with `class`, optional `args`, optional `min_dt`, optional `priority`).
-- `wiring`: list of edges with `from` and `to`.
-- References use `name.port`.
+- `runtime`
+- `modules`
+- `wiring`
 
-YAML example
+## Required runtime block
+
+```yaml
+runtime:
+  communication_step: 0.1
+```
+
+## Module declarations
+
+Each module is either:
+
+- a dotted class path string
+- or an object with `class` and optional `args`
+
 ```yaml
 modules:
-  eye: { class: examples.wiring_builder_demo.Eye, min_dt: 0.01 }
-  lgn: { class: examples.wiring_builder_demo.LGN }
-  sc:  { class: examples.wiring_builder_demo.SC }
+  eye:
+    class: examples.wiring_builder_demo.Eye
+  lgn:
+    class: examples.wiring_builder_demo.LGN
+    args:
+      gain: 2.0
+```
+
+## Wiring declarations
+
+```yaml
 wiring:
-  - { from: eye.visual_stream, to: [lgn.retina] }
-  - { from: lgn.thalamus,      to: [sc.vision] }
+  - from: eye.visual_stream
+    to: [lgn.retina]
+  - from: lgn.thalamus
+    to: [sc.vision]
 ```
 
-TOML example
-```toml
-[modules.eye]
-class = "examples.wiring_builder_demo.Eye"
-min_dt = 0.01
-[modules.lgn]
-class = "examples.wiring_builder_demo.LGN"
-[modules.sc]
-class = "examples.wiring_builder_demo.SC"
+References use `name.port`.
 
-[[wiring]]
-from = "eye.visual_stream"
-to = ["lgn.retina"]
-[[wiring]]
-from = "lgn.thalamus"
-to = ["sc.vision"]
-```
+## Validation
 
-Validation
-- If a module declares `outputs()`, its source port must appear in that set.
-- If a module declares `inputs()`, its destination port must appear in that set.
-- Errors include the full connection context for quick fixes.
+- Source and destination ports must be declared by the participating modules.
+- Port compatibility is checked from `SignalSpec`.
+- Invalid configs fail fast at build/load time.

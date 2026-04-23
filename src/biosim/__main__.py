@@ -20,7 +20,8 @@ YAML config format (simplified):
         class: some_package.CustomModule
         args:
           param: value
-        min_dt: 0.1
+    runtime:
+      communication_step: 0.1
 
     wiring:
       - from: module_a.signal
@@ -71,10 +72,15 @@ def load_config(path: Path) -> Dict[str, Any]:
     sys.exit(1)
 
 
-def create_world() -> "BioWorld":
+def create_world(config: Dict[str, Any] | None = None, communication_step: float | None = None) -> "BioWorld":
     import biosim
 
-    return biosim.BioWorld()
+    config = config or {}
+    runtime = config.get("runtime") if isinstance(config.get("runtime"), dict) else {}
+    step = communication_step if communication_step is not None else runtime.get("communication_step")
+    if step is None:
+        raise ValueError("runtime.communication_step is required for the 1.5 kernel")
+    return biosim.BioWorld(communication_step=float(step))
 
 
 def run_headless(world: "BioWorld", duration: float, tick_dt: float | None) -> None:
@@ -189,6 +195,12 @@ Examples:
         help="Tick interval for UI/events (default: 0.1)",
     )
     parser.add_argument(
+        "--communication-step",
+        type=float,
+        default=None,
+        help="Override runtime.communication_step from config",
+    )
+    parser.add_argument(
         "--port",
         type=int,
         default=8765,
@@ -215,7 +227,7 @@ Examples:
 
     config = load_config(args.config)
 
-    world = create_world()
+    world = create_world(config, args.communication_step)
 
     import biosim
     biosim.load_wiring(world, args.config)

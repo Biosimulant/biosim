@@ -27,6 +27,7 @@ def _write_counter_model(path: Path, *, package_name: str | None = None, version
         'authors: ["Tests"]',
         "biosim:",
         '  entrypoint: "src.counter:Counter"',
+        "  communication_step: 0.1",
     ]
     if package_name:
         model_yaml.append(f"package: {package_name}")
@@ -37,23 +38,22 @@ def _write_counter_model(path: Path, *, package_name: str | None = None, version
     src_dir.mkdir(exist_ok=True)
     (src_dir / "counter.py").write_text(
         """
-from biosim import BioModule, BioSignal
+from biosim import BioModule, SignalSpec, ScalarSignal
 
 
 class Counter(BioModule):
     def __init__(self, step: float = 1.0):
-        self.min_dt = 0.1
         self.value = 0.0
         self.step = step
 
     def outputs(self):
-        return {"count"}
+        return {"count": SignalSpec.scalar(dtype="float64")}
 
-    def advance_to(self, t: float) -> None:
+    def advance_window(self, _start: float, t: float) -> None:
         self.value += self.step
 
     def get_outputs(self):
-        return {"count": BioSignal(source="counter", name="count", value=self.value, time=0.1)}
+        return {"count": ScalarSignal(source="counter", name="count", value=self.value, emitted_at=0.1, spec=self.outputs()["count"])}
 """.strip()
         + "\n",
         encoding="utf-8",
@@ -72,6 +72,7 @@ def _write_accumulator_model(path: Path, *, package_name: str | None = None, ver
         'authors: ["Tests"]',
         "biosim:",
         '  entrypoint: "src.accumulator:Accumulator"',
+        "  communication_step: 0.1",
     ]
     if package_name:
         model_yaml.append(f"package: {package_name}")
@@ -82,30 +83,29 @@ def _write_accumulator_model(path: Path, *, package_name: str | None = None, ver
     src_dir.mkdir(exist_ok=True)
     (src_dir / "accumulator.py").write_text(
         """
-from biosim import BioModule, BioSignal
+from biosim import BioModule, SignalSpec, ScalarSignal
 
 
 class Accumulator(BioModule):
     def __init__(self):
-        self.min_dt = 0.1
         self.total = 0.0
 
     def inputs(self):
-        return {"value"}
+        return {"value": SignalSpec.scalar(dtype="float64")}
 
     def outputs(self):
-        return {"total"}
+        return {"total": SignalSpec.scalar(dtype="float64")}
 
     def set_inputs(self, signals):
         signal = signals.get("value")
         if signal is not None:
             self.total += float(signal.value)
 
-    def advance_to(self, t: float) -> None:
+    def advance_window(self, _start: float, t: float) -> None:
         return
 
     def get_outputs(self):
-        return {"total": BioSignal(source="acc", name="total", value=self.total, time=0.1)}
+        return {"total": ScalarSignal(source="acc", name="total", value=self.total, emitted_at=0.1, spec=self.outputs()["total"])}
 """.strip()
         + "\n",
         encoding="utf-8",
@@ -136,6 +136,7 @@ models:
   - path: models/accumulator
     alias: accumulator
 runtime:
+  communication_step: 0.1
   duration: 0.2
   tick_dt: 0.1
   initial_inputs: {}
@@ -161,6 +162,7 @@ models:
   - path: models/counter
     alias: counter
 runtime:
+  communication_step: 0.1
   duration: 0.2
   tick_dt: 0.1
   initial_inputs: {}
@@ -192,6 +194,7 @@ io:
     - name: count
       maps_to: counter.count
 runtime:
+  communication_step: 0.1
   duration: 0.2
   tick_dt: 0.1
   initial_inputs: {}
@@ -223,6 +226,7 @@ children:
   - path: spaces/child-space
     alias: nested
 runtime:
+  communication_step: 0.1
   duration: 0.2
   tick_dt: 0.1
   initial_inputs: {}
@@ -423,6 +427,7 @@ tags: [test]
 authors: ["Tests"]
 biosim:
   entrypoint: "src.bad:Bad"
+  communication_step: 0.1
 runtime:
   dependencies:
     packages:
@@ -439,7 +444,7 @@ from biosim import BioModule
 
 
 class Bad(BioModule):
-    def advance_to(self, t): return
+    def advance_window(self, _start, t): return
     def get_outputs(self): return {}
 """.strip()
         + "\n",

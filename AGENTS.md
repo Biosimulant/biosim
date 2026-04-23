@@ -45,7 +45,7 @@ Tip: Import the library as `import biosim`.
 - CI readiness: ensure `pytest` passes locally and pre-commit hooks are clean.
 
 ## Architecture Overview (Brief)
-- Orchestration: `BioWorld` schedules modules via `min_dt`/`next_due_time` and routes signals.
+- Orchestration: `BioWorld` advances modules across shared communication windows and routes typed signals between committed boundaries.
 - Events: `WorldEvent` published by `BioWorld`; subscribe via `world.on(...)`.
 - Modules: implement the runnable `BioModule` contract and add with `world.add_biomodule(...)`.
 

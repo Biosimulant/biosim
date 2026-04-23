@@ -1,14 +1,14 @@
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
-import heapq
 import logging
 import threading
+from typing import Any, Callable, Dict, List, Mapping, Optional
 
 from .modules import BioModule
-from .signals import BioSignal
+from .signals import BioSignal, SignalSpec, validate_connection_specs, validate_port_spec_direction
 from .visuals import normalize_visuals
 
 logger = logging.getLogger(__name__)
@@ -37,9 +37,8 @@ class SimulationStop(Exception):
 class ModuleEntry:
     name: str
     module: BioModule
-    min_dt: float
-    priority: int = 0
-    last_time: float = 0.0
+    input_specs: dict[str, SignalSpec]
+    output_specs: dict[str, SignalSpec]
 
 
 @dataclass
@@ -48,25 +47,28 @@ class Connection:
     source_signal: str
     target_module: str
     target_signal: str
-    last_event_time: float = -1.0
-    last_stale_warning_time: float = -1.0
+    last_event_time: Optional[float] = None
+    last_stale_warning_time: Optional[float] = None
 
 
 class BioWorld:
-    """Multi-rate orchestration kernel for runnable biomodules."""
+    """Communication-step orchestration kernel for runnable biomodules."""
 
-    def __init__(self, *, time_unit: str = "seconds") -> None:
+    def __init__(self, *, communication_step: float, time_unit: str = "seconds") -> None:
+        if communication_step <= 0:
+            raise ValueError("communication_step must be positive")
+        self.communication_step = float(communication_step)
         self.time_unit = time_unit
         self._modules: Dict[str, ModuleEntry] = {}
         self._connections_by_target: Dict[str, List[Connection]] = {}
         self._signal_store: Dict[str, Dict[str, BioSignal]] = {}
-        self._queue: List[tuple[float, int, str]] = []
-        self._seq: int = 0
+        self._signal_history: Dict[str, Dict[str, List[BioSignal]]] = {}
         self._current_time: float = 0.0
         self._is_setup: bool = False
         self._listeners: List[Listener] = []
         self._active_run_start: Optional[float] = None
         self._active_run_end: Optional[float] = None
+        self._setup_config: Dict[str, Dict[str, Any]] = {}
 
         self._stop_requested: bool = False
         self._run_event = threading.Event()
@@ -74,11 +76,9 @@ class BioWorld:
 
     # --- Listener management -----------------------------------------
     def on(self, listener: Listener) -> None:
-        """Register a listener for runtime events."""
         self._listeners.append(listener)
 
     def off(self, listener: Listener) -> None:
-        """Unregister a listener if present."""
         try:
             self._listeners.remove(listener)
         except ValueError:
@@ -114,26 +114,56 @@ class BioWorld:
         }
 
     # --- Module registration -----------------------------------------
-    def add_biomodule(self, name: str, module: BioModule, *, min_dt: Optional[float] = None, priority: int = 0) -> None:
+    def add_biomodule(
+        self,
+        name: str,
+        module: BioModule,
+    ) -> None:
         if name in self._modules and self._modules[name].module is not module:
             raise ValueError(f"Module name already registered: {name}")
+
+        input_specs = self._normalize_port_specs(module.inputs(), direction="input", module_name=name)
+        output_specs = self._normalize_port_specs(module.outputs(), direction="output", module_name=name)
+
         try:
             setattr(module, "_world_name", name)
         except Exception:  # pragma: no cover - defensive: setattr may fail on frozen modules
             pass
-        module_min_dt = min_dt if min_dt is not None else getattr(module, "min_dt", None)
-        if module_min_dt is None or module_min_dt <= 0:
-            raise ValueError(f"Module '{name}' must define a positive min_dt")
-        self._modules[name] = ModuleEntry(name=name, module=module, min_dt=float(module_min_dt), priority=priority)
+
+        self._modules[name] = ModuleEntry(
+            name=name,
+            module=module,
+            input_specs=input_specs,
+            output_specs=output_specs,
+        )
+
+    def _normalize_port_specs(
+        self,
+        specs: Mapping[str, SignalSpec] | None,
+        *,
+        direction: str,
+        module_name: str,
+    ) -> dict[str, SignalSpec]:
+        if specs is None:
+            return {}
+        if not isinstance(specs, Mapping):
+            raise TypeError(f"Module '{module_name}' {direction}s() must return a mapping of port -> SignalSpec")
+        normalized: dict[str, SignalSpec] = {}
+        for port, spec in specs.items():
+            if not isinstance(port, str) or not port:
+                raise TypeError(f"Module '{module_name}' {direction} port names must be non-empty strings")
+            if isinstance(spec, Mapping):
+                spec = SignalSpec.from_dict(spec)
+            if not isinstance(spec, SignalSpec):
+                raise TypeError(
+                    f"Module '{module_name}' {direction} port '{port}' must declare a SignalSpec, got {type(spec)!r}"
+                )
+            validate_port_spec_direction(spec, direction=direction)
+            normalized[port] = spec
+        return normalized
 
     # --- Wiring -------------------------------------------------------
     def connect(self, source: str, target: str) -> None:
-        """Connect a signal from one module to another.
-
-        Args:
-            source: "module.signal" source reference.
-            target: "module.signal" target reference.
-        """
         src_parts = source.rsplit(".", 1)
         dst_parts = target.rsplit(".", 1)
         if len(src_parts) != 2 or len(dst_parts) != 2:
@@ -145,6 +175,14 @@ class BioWorld:
         if dst_mod not in self._modules:
             raise KeyError(f"Unknown target module '{dst_mod}'")
 
+        src_entry = self._modules[src_mod]
+        dst_entry = self._modules[dst_mod]
+        if src_sig not in src_entry.output_specs:
+            raise KeyError(f"Unknown source signal '{src_mod}.{src_sig}'")
+        if dst_sig not in dst_entry.input_specs:
+            raise KeyError(f"Unknown target signal '{dst_mod}.{dst_sig}'")
+        validate_connection_specs(src_entry.output_specs[src_sig], dst_entry.input_specs[dst_sig])
+
         conn = Connection(
             source_module=src_mod,
             source_signal=src_sig,
@@ -153,114 +191,120 @@ class BioWorld:
         )
         self._connections_by_target.setdefault(dst_mod, []).append(conn)
 
-    # --- Setup and scheduling ----------------------------------------
+    # --- Setup --------------------------------------------------------
     def setup(self, config: Optional[Dict[str, Any]] = None) -> None:
-        """Initialize all registered modules and seed the scheduler."""
         config = config or {}
+        self._setup_config = {name: dict(module_cfg or {}) for name, module_cfg in config.items()}
         self._signal_store = {}
-        self._queue = []
+        self._signal_history = {}
         self._current_time = 0.0
+        for connections in self._connections_by_target.values():
+            for conn in connections:
+                conn.last_event_time = None
+                conn.last_stale_warning_time = None
 
-        # Setup modules (priority order, higher first)
-        sorted_entries = sorted(self._modules.values(), key=lambda e: -e.priority)
-        for entry in sorted_entries:
-            entry.module.setup(config.get(entry.name, {}))
-            entry.last_time = 0.0
-            outputs = entry.module.get_outputs() or {}
-            self._update_signal_store(entry.name, outputs)
-
-        # Seed scheduler
         for entry in self._modules.values():
-            next_time = entry.module.next_due_time(self._current_time)
-            if next_time <= self._current_time:
-                raise ValueError(
-                    f"Module '{entry.name}' next_due_time({self._current_time}) must be > current time"
-                )
-            self._schedule(entry.name, next_time)
+            entry.module.setup(self._setup_config.get(entry.name, {}))
+            outputs = self._normalize_outputs(entry.name, entry.module.get_outputs() or {})
+            self._commit_outputs(entry.name, outputs)
 
         self._is_setup = True
 
-    def _schedule(self, name: str, t: float) -> None:
-        self._seq += 1
-        heapq.heappush(self._queue, (t, -self._modules[name].priority, self._seq, name))
+    def _normalize_outputs(self, module_name: str, outputs: Mapping[str, BioSignal]) -> Dict[str, BioSignal]:
+        if not isinstance(outputs, Mapping):
+            raise TypeError(f"Module '{module_name}' get_outputs() must return a mapping")
+        declared = self._modules[module_name].output_specs
+        normalized: Dict[str, BioSignal] = {}
+        for port, signal in outputs.items():
+            if port not in declared:
+                raise KeyError(f"Module '{module_name}' produced undeclared output port '{port}'")
+            if not isinstance(signal, BioSignal):
+                raise TypeError(
+                    f"Module '{module_name}' output '{port}' must be a typed BioSignal, got {type(signal)!r}"
+                )
+            bound = signal.with_spec(declared[port]) if signal.spec is None else signal.with_spec(declared[port])
+            if bound.source != module_name:
+                bound = bound.__class__(
+                    source=module_name,
+                    name=bound.name,
+                    value=copy.deepcopy(bound.value),
+                    emitted_at=bound.emitted_at,
+                    spec=bound.spec,
+                )
+            if bound.name != port:
+                bound = bound.retarget(name=port)
+            normalized[port] = bound
+        return normalized
 
-    def _update_signal_store(self, name: str, outputs: Optional[Dict[str, BioSignal]]) -> None:
-        """Persist the latest non-empty output mapping for one module.
+    def _commit_outputs(self, module_name: str, outputs: Mapping[str, BioSignal]) -> None:
+        if not outputs:
+            return
+        self._signal_store[module_name] = dict(outputs)
+        history = self._signal_history.setdefault(module_name, {})
+        for port, signal in outputs.items():
+            samples = history.setdefault(port, [])
+            samples.append(signal)
+            if len(samples) > 2:
+                del samples[:-2]
 
-        This gives state-like signals hold-last-value semantics between producer
-        updates. Returning {} or None does not clear previously stored outputs;
-        the store is only reset by setup() or replaced by a later non-empty
-        mapping from the same module.
-        """
-        if outputs:
-            self._signal_store[name] = outputs
-
-    def _warn_if_input_stale(self, conn: Connection, source_signal: BioSignal, now: float) -> None:
-        """Warn once per source timestamp when a consumer reads stale state."""
-        if source_signal.metadata.kind == "event":
+    def _warn_if_input_stale(self, conn: Connection, source_signal: BioSignal, target_spec: SignalSpec, now: float) -> None:
+        if source_signal.kind == "event":
+            return
+        if target_spec.max_age is None:
+            return
+        age = now - source_signal.emitted_at
+        if age - target_spec.max_age <= 1e-12:
+            return
+        if conn.last_stale_warning_time is not None and source_signal.emitted_at <= conn.last_stale_warning_time:
             return
 
-        tolerance = self._modules[conn.target_module].min_dt
-        age = now - source_signal.time
-        if age - tolerance <= 1e-12:
+        if target_spec.stale_policy == "ignore":
             return
-        if source_signal.time <= conn.last_stale_warning_time:
-            return
+        if target_spec.stale_policy == "error":
+            raise ValueError(
+                f"stale signal read: target '{conn.target_module}' consumed '{conn.source_module}.{conn.source_signal}' "
+                f"at t={now:.6f} using source time {source_signal.emitted_at:.6f} "
+                f"(age={age:.6f} > max_age={target_spec.max_age:.6f})"
+            )
 
-        conn.last_stale_warning_time = source_signal.time
+        conn.last_stale_warning_time = source_signal.emitted_at
         logger.warning(
             "stale signal read: target '%s' consumed '%s.%s' at t=%.6f using source time %.6f "
-            "(age=%.6f > tolerance=%.6f)",
+            "(age=%.6f > max_age=%.6f)",
             conn.target_module,
             conn.source_module,
             conn.source_signal,
             now,
-            source_signal.time,
+            source_signal.emitted_at,
             age,
-            tolerance,
+            target_spec.max_age,
         )
 
-    def _collect_inputs(self, target_name: str, now: float) -> Dict[str, BioSignal]:
-        """Collect inputs from the latest stored upstream outputs.
-
-        Each target port reads from the most recent stored source signal. Event
-        signals still persist in the store, but delivery is gated by
-        last_event_time so a persisted event is not re-delivered indefinitely.
-        State-like signals also emit a warning if a consumer reads a source value
-        older than the consumer's own min_dt tolerance. Routed signals preserve
-        the upstream signal's production timestamp.
-        """
+    def _collect_inputs(self, target_name: str, start: float, end: float) -> Dict[str, BioSignal]:
         inputs: Dict[str, BioSignal] = {}
+        entry = self._modules[target_name]
         for conn in self._connections_by_target.get(target_name, []):
             source_outputs = self._signal_store.get(conn.source_module, {})
             source_signal = source_outputs.get(conn.source_signal)
-            if source_signal is None:  # pragma: no cover - defensive: signal should exist if routed
+            if source_signal is None:
                 continue
-            self._warn_if_input_stale(conn, source_signal, now)
-            if source_signal.metadata.kind == "event":
-                if source_signal.time <= conn.last_event_time:
+            target_spec = entry.input_specs[conn.target_signal]
+            self._warn_if_input_stale(conn, source_signal, target_spec, start)
+            if source_signal.kind == "event":
+                if conn.last_event_time is not None and source_signal.emitted_at <= conn.last_event_time:
                     continue
-                conn.last_event_time = source_signal.time
-            inputs[conn.target_signal] = BioSignal(
-                source=conn.source_module,
-                name=conn.target_signal,
-                value=source_signal.value,
-                time=source_signal.time,
-                metadata=source_signal.metadata,
-            )
+                conn.last_event_time = source_signal.emitted_at
+            inputs[conn.target_signal] = source_signal.retarget(name=conn.target_signal)
         return inputs
 
-    # --- Run loop ------------------------------------------------------
+    # --- Run loop -----------------------------------------------------
     def run(self, duration: float, *, tick_dt: Optional[float] = None) -> None:
         if not self._is_setup:
             self.setup()
         if duration <= 0:
             return
 
-        # Floating point time accumulation can produce values like 0.30000000000000004
-        # which should still be treated as "at" the requested end_time.
         eps = 1e-12
-
         end_time = self._current_time + duration
         next_tick_time = self._current_time if tick_dt is None else self._current_time + tick_dt
         self._active_run_start = self._current_time
@@ -271,7 +315,7 @@ class BioWorld:
         self._emit(WorldEvent.STARTED, {"t": self._current_time, **self._progress_payload(self._current_time)})
 
         try:
-            while self._queue:
+            while self._current_time < end_time - eps:
                 if self._stop_requested:
                     raise SimulationStop()
 
@@ -280,35 +324,40 @@ class BioWorld:
                 if self._stop_requested:
                     raise SimulationStop()
 
-                due_time, _prio, _seq, name = heapq.heappop(self._queue)
-                if due_time - end_time > eps:
-                    # Not due in this run; requeue and finish
-                    heapq.heappush(self._queue, (due_time, _prio, _seq, name))
-                    self._current_time = end_time
-                    break
+                window_start = self._current_time
+                window_end = min(window_start + self.communication_step, end_time)
+                window_inputs = {
+                    name: self._collect_inputs(name, window_start, window_end)
+                    for name in self._modules.keys()
+                }
 
-                self._current_time = due_time
-                entry = self._modules[name]
+                for name, entry in self._modules.items():
+                    inputs = window_inputs.get(name) or {}
+                    if inputs:
+                        entry.module.set_inputs(inputs)
 
-                inputs = self._collect_inputs(name, self._current_time)
-                if inputs:
-                    entry.module.set_inputs(inputs)
+                for entry in self._modules.values():
+                    entry.module.advance_window(window_start, window_end)
 
-                entry.module.advance_to(self._current_time)
-                entry.last_time = self._current_time
+                pending_outputs: Dict[str, Dict[str, BioSignal]] = {}
+                for name, entry in self._modules.items():
+                    pending_outputs[name] = self._normalize_outputs(name, entry.module.get_outputs() or {})
 
-                outputs = entry.module.get_outputs() or {}
-                self._update_signal_store(name, outputs)
+                for name, outputs in pending_outputs.items():
+                    self._commit_outputs(name, outputs)
 
-                next_time = entry.module.next_due_time(self._current_time)
-                if next_time <= self._current_time:
-                    raise ValueError(
-                        f"Module '{name}' next_due_time({self._current_time}) must be > current time"
-                    )
-                self._schedule(name, next_time)
+                self._current_time = window_end
 
                 if tick_dt is None:
-                    self._emit(WorldEvent.TICK, {"t": self._current_time, "module": name, **self._progress_payload(self._current_time)})
+                    self._emit(
+                        WorldEvent.TICK,
+                        {
+                            "t": self._current_time,
+                            "window_start": window_start,
+                            "window_end": window_end,
+                            **self._progress_payload(self._current_time),
+                        },
+                    )
                 else:
                     while next_tick_time <= self._current_time + eps:
                         self._emit(WorldEvent.TICK, {"t": next_tick_time, **self._progress_payload(next_tick_time)})
@@ -317,14 +366,17 @@ class BioWorld:
         except SimulationStop:
             self._emit(WorldEvent.STOPPED, {"t": self._current_time, **self._progress_payload(self._current_time)})
         except Exception as exc:
-            self._emit(WorldEvent.ERROR, {"t": self._current_time, "error": exc, **self._progress_payload(self._current_time)})
+            self._emit(
+                WorldEvent.ERROR,
+                {"t": self._current_time, "error": exc, **self._progress_payload(self._current_time)},
+            )
             raise
         finally:
             self._emit(WorldEvent.FINISHED, {"t": self._current_time, **self._progress_payload(self._current_time)})
             self._active_run_start = None
             self._active_run_end = None
 
-    # --- Cooperative controls -----------------------------------------
+    # --- Cooperative controls ----------------------------------------
     def request_stop(self) -> None:
         self._stop_requested = True
         self._run_event.set()
@@ -337,7 +389,107 @@ class BioWorld:
         self._run_event.set()
         self._emit(WorldEvent.RESUMED, {"t": self._current_time, **self._progress_payload(self._current_time)})
 
-    # --- Introspection -------------------------------------------------
+    # --- Snapshot / restore ------------------------------------------
+    def snapshot(self) -> Dict[str, Any]:
+        return {
+            "time_unit": self.time_unit,
+            "communication_step": self.communication_step,
+            "current_time": self._current_time,
+            "is_setup": self._is_setup,
+            "setup_config": copy.deepcopy(self._setup_config),
+            "signal_store": {
+                module_name: {port: signal.to_dict() for port, signal in outputs.items()}
+                for module_name, outputs in self._signal_store.items()
+            },
+            "signal_history": {
+                module_name: {
+                    port: [signal.to_dict() for signal in history]
+                    for port, history in port_map.items()
+                }
+                for module_name, port_map in self._signal_history.items()
+            },
+            "connections": {
+                target: [
+                    {
+                        "source_module": conn.source_module,
+                        "source_signal": conn.source_signal,
+                        "target_module": conn.target_module,
+                        "target_signal": conn.target_signal,
+                        "last_event_time": conn.last_event_time,
+                        "last_stale_warning_time": conn.last_stale_warning_time,
+                    }
+                    for conn in conns
+                ]
+                for target, conns in self._connections_by_target.items()
+            },
+            "modules": {
+                name: copy.deepcopy(entry.module.snapshot())
+                for name, entry in self._modules.items()
+            },
+        }
+
+    def restore(self, snapshot: Mapping[str, Any]) -> None:
+        if not self._is_setup:
+            setup_config = snapshot.get("setup_config")
+            self.setup(copy.deepcopy(setup_config) if isinstance(setup_config, Mapping) else None)
+
+        module_states = snapshot.get("modules")
+        if not isinstance(module_states, Mapping):
+            raise ValueError("snapshot is missing module state")
+        for name, entry in self._modules.items():
+            if name not in module_states:
+                raise KeyError(f"snapshot missing module state for '{name}'")
+            entry.module.restore(copy.deepcopy(module_states[name]))
+
+        self._current_time = float(snapshot.get("current_time", 0.0))
+        self._is_setup = bool(snapshot.get("is_setup", True))
+        self._setup_config = copy.deepcopy(snapshot.get("setup_config", {}))
+
+        signal_store: Dict[str, Dict[str, BioSignal]] = {}
+        for module_name, outputs in snapshot.get("signal_store", {}).items():
+            signal_store[module_name] = {
+                port: BioSignal.from_dict(signal_dict)
+                for port, signal_dict in outputs.items()
+            }
+        self._signal_store = signal_store
+
+        signal_history: Dict[str, Dict[str, List[BioSignal]]] = {}
+        for module_name, port_map in snapshot.get("signal_history", {}).items():
+            signal_history[module_name] = {
+                port: [BioSignal.from_dict(signal_dict) for signal_dict in samples]
+                for port, samples in port_map.items()
+            }
+        self._signal_history = signal_history
+
+        snapshot_connections = snapshot.get("connections", {})
+        if not isinstance(snapshot_connections, Mapping):
+            raise ValueError("snapshot connections must be a mapping")
+        for target, conns in self._connections_by_target.items():
+            raw_conns = snapshot_connections.get(target, [])
+            if len(raw_conns) != len(conns):
+                raise ValueError(f"snapshot connection count mismatch for target '{target}'")
+            for conn, raw in zip(conns, raw_conns):
+                conn.last_event_time = raw.get("last_event_time")
+                conn.last_stale_warning_time = raw.get("last_stale_warning_time")
+
+    def branch(self) -> "BioWorld":
+        snapshot = self.snapshot()
+        branched = BioWorld(communication_step=self.communication_step, time_unit=self.time_unit)
+        for name, entry in self._modules.items():
+            try:
+                module_copy = copy.deepcopy(entry.module)
+            except Exception as exc:  # pragma: no cover - depends on module implementation
+                raise TypeError(
+                    f"Module '{name}' could not be deep-copied for branching; implement deepcopy-safe state"
+                ) from exc
+            branched.add_biomodule(name, module_copy)
+        for target, connections in self._connections_by_target.items():
+            for conn in connections:
+                branched.connect(f"{conn.source_module}.{conn.source_signal}", f"{target}.{conn.target_signal}")
+        branched.restore(copy.deepcopy(snapshot))
+        return branched
+
+    # --- Introspection ------------------------------------------------
     @property
     def current_time(self) -> float:
         return self._current_time
@@ -350,7 +502,6 @@ class BioWorld:
         return self._signal_store.get(name, {})
 
     def collect_visuals(self) -> List[Dict[str, Any]]:
-        """Collect visual specs from all attached modules."""
         out: List[Dict[str, Any]] = []
         for entry in self._modules.values():
             module = entry.module
@@ -361,13 +512,7 @@ class BioWorld:
                 continue
             if not visuals:
                 continue
-            normed = normalize_visuals(visuals)
-            if not normed:
-                continue
-            out.append(
-                {
-                    "module": module.__class__.__name__,
-                    "visuals": normed,
-                }
-            )
+            normalized = normalize_visuals(visuals)
+            if normalized:
+                out.append({"module": entry.name, "visuals": normalized})
         return out

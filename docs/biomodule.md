@@ -1,63 +1,69 @@
-# API: BioModule
+# API: `BioModule`
 
-BioModule encapsulates behavior with local state. It:
-- Implements a runnable contract (`setup/reset/advance_to/...`).
-- Receives inputs via `set_inputs(...)` and emits outputs via `get_outputs()`.
-- Optionally declares connection ports for validation via `inputs()` and `outputs()`.
+`BioModule` is the runnable unit in the 1.5 kernel. Modules no longer participate in a per-module due-time scheduler. Instead, the world advances every module across the same communication window and commits outputs atomically at the boundary.
 
-Signature (selected)
+## Required runtime contract
+
 ```python
 class BioModule:
-    min_dt: float  # required positive value (seconds by default), defaults to 0.0
-
-    def setup(self, config: Optional[Dict[str, Any]] = None) -> None: ...
+    def setup(self, config: dict[str, Any] | None = None) -> None: ...
     def reset(self) -> None: ...
-    def advance_to(self, t: float) -> None: ...       # abstract
-    def set_inputs(self, signals: Dict[str, BioSignal]) -> None: ...
-    def get_outputs(self) -> Dict[str, BioSignal]: ... # abstract
-    def get_state(self) -> Dict[str, Any]: ...
-    def next_due_time(self, now: float) -> float: ...  # returns now + min_dt by default
-    def inputs(self) -> Set[str]: ...
-    def outputs(self) -> Set[str]: ...
-    def input_schemas(self) -> Dict[str, Any]: ...     # optional, for future tooling
-    def output_schemas(self) -> Dict[str, Any]: ...    # optional, for future tooling
-    def visualize(self) -> Optional[VisualSpec | List[VisualSpec]]: ...
+    def set_inputs(self, signals: dict[str, BioSignal]) -> None: ...
+    def advance_window(self, start: float, end: float) -> None: ...
+    def get_outputs(self) -> dict[str, BioSignal]: ...
+    def inputs(self) -> Mapping[str, SignalSpec]: ...
+    def outputs(self) -> Mapping[str, SignalSpec]: ...
+    def snapshot(self) -> dict[str, Any]: ...
+    def restore(self, snapshot: Mapping[str, Any]) -> None: ...
+    def visualize(self) -> VisualSpec | list[VisualSpec] | None: ...
 ```
 
-Notes:
-- `advance_to` and `get_outputs` are abstract (must be implemented).
-- `setup` receives an optional config dict (per-module section from the world config), not the BioWorld instance.
-- `next_due_time` returns `float` (not Optional); default implementation is `now + min_dt`.
-- `input_schemas`/`output_schemas` return port-name-to-schema mappings; currently unused but reserved for future validation.
-- `visualize` returns a VisualSpec dict or list of dicts for browser rendering (see README VisualSpec types).
+## Rules
 
-Example with local state
+- `advance_window(start, end)` is the world-facing simulation hook.
+- `inputs()` and `outputs()` declare port contracts as `port -> SignalSpec`.
+- `get_outputs()` must only emit declared ports.
+- Signals should be emitted as `ScalarSignal`, `ArraySignal`, `RecordSignal`, or `EventSignal`.
+- `snapshot()` / `restore()` should round-trip the full module state needed for deterministic continuation from a communication boundary.
+
+## Minimal example
+
 ```python
-class Eye(biosim.BioModule):
-    min_dt = 0.01
+import biosim
 
-    def __init__(self):
-        self.photons_seen = 0
+
+class Counter(biosim.BioModule):
+    def __init__(self) -> None:
+        self.count = 0
+        self._outputs = {}
 
     def outputs(self):
-        return {"visual_stream"}
+        return {"count": biosim.SignalSpec.scalar(dtype="int64")}
 
-    def advance_to(self, t: float) -> None:
-        self.photons_seen += 1
-
-    def get_outputs(self):
-        source = getattr(self, "_world_name", "eye")
-        return {
-            "visual_stream": biosim.BioSignal(
-                source=source,
-                name="visual_stream",
-                value={"count": self.photons_seen},
-                time=0.0,
-                metadata=biosim.SignalMetadata(units="1"),
+    def advance_window(self, start: float, end: float) -> None:
+        self.count += 1
+        self._outputs = {
+            "count": biosim.ScalarSignal(
+                source="counter",
+                name="count",
+                value=self.count,
+                emitted_at=end,
+                spec=self.outputs()["count"],
             )
         }
+
+    def get_outputs(self):
+        return dict(self._outputs)
+
+    def snapshot(self):
+        return {"count": self.count}
+
+    def restore(self, snapshot):
+        self.count = int(snapshot["count"])
 ```
 
-Typical values at runtime
-- `t` -> current world time (float)
-- `self.photons_seen` after two ticks -> `2`
+## Notes
+
+- The world binds `_world_name` on registered modules so emitted signals can use the registered module name as their source.
+- `reset()` is useful for UI-driven reruns, but `snapshot()` / `restore()` is the durability contract for branching and replay.
+- Visualization remains optional and should return JSON-serializable specs.

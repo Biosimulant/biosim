@@ -12,22 +12,24 @@ from biosim.wiring import (
 from biosim.world import BioWorld
 
 
-def _make_module(biosim, min_dt=0.1, inputs_set=None, outputs_set=None):
+def _make_module(biosim, inputs_set=None, outputs_set=None):
+    scalar = biosim.SignalSpec.scalar(dtype="float64")
+
     class M(biosim.BioModule):
         def __init__(self):
-            self.min_dt = min_dt
+            pass
 
-        def advance_to(self, t):
+        def advance_window(self, _start, t):
             pass
 
         def get_outputs(self):
             return {}
 
         def inputs(self):
-            return inputs_set or set()
+            return {name: scalar for name in (inputs_set or set())}
 
         def outputs(self):
-            return outputs_set or set()
+            return {name: scalar for name in (outputs_set or {"x"})}
 
     return M()
 
@@ -54,7 +56,7 @@ def test_import_from_string_invalid():
 
 
 def test_wiring_builder_duplicate_name_different_module(biosim):
-    world = BioWorld()
+    world = BioWorld(communication_step=0.1)
     builder = WiringBuilder(world)
     m1 = _make_module(biosim)
     m2 = _make_module(biosim)
@@ -64,7 +66,7 @@ def test_wiring_builder_duplicate_name_different_module(biosim):
 
 
 def test_wiring_builder_unknown_source_on_apply(biosim):
-    world = BioWorld()
+    world = BioWorld(communication_step=0.1)
     builder = WiringBuilder(world)
     builder._pending_connections.append(("unknown.port", ["m.port"]))
     with pytest.raises(KeyError, match="unknown module name"):
@@ -72,7 +74,7 @@ def test_wiring_builder_unknown_source_on_apply(biosim):
 
 
 def test_wiring_builder_unknown_dst_on_apply(biosim):
-    world = BioWorld()
+    world = BioWorld(communication_step=0.1)
     builder = WiringBuilder(world)
     m = _make_module(biosim)
     builder.add("src", m)
@@ -82,7 +84,7 @@ def test_wiring_builder_unknown_dst_on_apply(biosim):
 
 
 def test_wiring_builder_invalid_src_port(biosim):
-    world = BioWorld()
+    world = BioWorld(communication_step=0.1)
     builder = WiringBuilder(world)
     m = _make_module(biosim, outputs_set={"valid_out"})
     builder.add("src", m)
@@ -93,7 +95,7 @@ def test_wiring_builder_invalid_src_port(biosim):
 
 
 def test_wiring_builder_invalid_dst_port(biosim):
-    world = BioWorld()
+    world = BioWorld(communication_step=0.1)
     builder = WiringBuilder(world)
     builder.add("src", _make_module(biosim))
     builder.add("dst", _make_module(biosim, inputs_set={"valid_in"}))
@@ -106,7 +108,7 @@ def test_build_from_spec_string_module(biosim):
     """Module entry can be a dotted string (shorthand)."""
     from examples.wiring_builder_demo import Eye
 
-    world = BioWorld()
+    world = BioWorld(communication_step=0.1)
     spec = {
         "modules": {
             "eye": f"{Eye.__module__}.{Eye.__name__}",
@@ -117,7 +119,7 @@ def test_build_from_spec_string_module(biosim):
 
 
 def test_build_from_spec_invalid_class(biosim):
-    world = BioWorld()
+    world = BioWorld(communication_step=0.1)
     spec = {"modules": {"bad": {"class": 123}}}
     with pytest.raises(ValueError, match="Invalid class"):
         build_from_spec(world, spec)
@@ -126,21 +128,21 @@ def test_build_from_spec_invalid_class(biosim):
 def test_build_from_spec_invalid_args(biosim):
     from examples.wiring_builder_demo import Eye
 
-    world = BioWorld()
+    world = BioWorld(communication_step=0.1)
     spec = {"modules": {"bad": {"class": f"{Eye.__module__}.{Eye.__name__}", "args": "not_a_dict"}}}
     with pytest.raises(ValueError, match="Invalid args"):
         build_from_spec(world, spec)
 
 
 def test_build_from_spec_invalid_entry_type(biosim):
-    world = BioWorld()
+    world = BioWorld(communication_step=0.1)
     spec = {"modules": {"bad": 42}}
     with pytest.raises(ValueError, match="Invalid module entry"):
         build_from_spec(world, spec)
 
 
 def test_build_from_spec_not_biomodule(biosim):
-    world = BioWorld()
+    world = BioWorld(communication_step=0.1)
     spec = {"modules": {"bad": "biosim.world.BioWorld"}}
     with pytest.raises(TypeError, match="not a BioModule"):
         build_from_spec(world, spec)
@@ -149,7 +151,7 @@ def test_build_from_spec_not_biomodule(biosim):
 def test_build_from_spec_invalid_wiring_entry(biosim):
     from examples.wiring_builder_demo import Eye
 
-    world = BioWorld()
+    world = BioWorld(communication_step=0.1)
     spec = {
         "modules": {"eye": f"{Eye.__module__}.{Eye.__name__}"},
         "wiring": ["not_a_dict"],
@@ -161,7 +163,7 @@ def test_build_from_spec_invalid_wiring_entry(biosim):
 def test_build_from_spec_wiring_missing_fields(biosim):
     from examples.wiring_builder_demo import Eye
 
-    world = BioWorld()
+    world = BioWorld(communication_step=0.1)
     spec = {
         "modules": {"eye": f"{Eye.__module__}.{Eye.__name__}"},
         "wiring": [{"from": "eye.x"}],  # missing 'to'
@@ -172,20 +174,20 @@ def test_build_from_spec_wiring_missing_fields(biosim):
 
 def test_build_from_spec_empty():
     """Empty/None spec should work fine."""
-    world = BioWorld()
+    world = BioWorld(communication_step=0.1)
     builder = build_from_spec(world, {})
     assert len(builder.registry) == 0
 
 
 def test_build_from_spec_non_mapping():
     """Non-mapping spec should still work (treated as no modules/wiring)."""
-    world = BioWorld()
+    world = BioWorld(communication_step=0.1)
     builder = build_from_spec(world, [])
     assert len(builder.registry) == 0
 
 
 def test_load_wiring_unsupported_suffix(biosim, tmp_path):
-    world = BioWorld()
+    world = BioWorld(communication_step=0.1)
     path = tmp_path / "wiring.json"
     path.write_text("{}")
     with pytest.raises(ValueError, match="Unsupported"):
@@ -193,25 +195,24 @@ def test_load_wiring_unsupported_suffix(biosim, tmp_path):
 
 
 def test_load_wiring_yaml_non_mapping(biosim, tmp_path):
-    world = BioWorld()
+    world = BioWorld(communication_step=0.1)
     path = tmp_path / "wiring.yaml"
     path.write_text("- item1\n- item2\n")
     with pytest.raises(ValueError, match="mapping"):
         load_wiring_yaml(world, path)
 
 
-def test_build_from_spec_with_priority_and_min_dt(biosim):
+def test_build_from_spec_with_legacy_scheduler_fields(biosim):
     from examples.wiring_builder_demo import Eye
 
-    world = BioWorld()
+    world = BioWorld(communication_step=0.1)
     spec = {
         "modules": {
             "eye": {
                 "class": f"{Eye.__module__}.{Eye.__name__}",
                 "min_dt": 0.5,
-                "priority": 10,
             },
         },
     }
-    builder = build_from_spec(world, spec)
-    assert "eye" in builder.registry
+    with pytest.raises(ValueError, match="cannot declare"):
+        build_from_spec(world, spec)

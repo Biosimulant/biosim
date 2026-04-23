@@ -1,126 +1,155 @@
-"""Tests for biosim.signals – cover all uncovered lines."""
+"""Tests for biosim.signals V2 contracts."""
+
+from __future__ import annotations
+
 import numpy as np
 import pytest
 
-from biosim.signals import BioSignal, SignalMetadata
+from biosim.signals import (
+    AcceptedSignalProfile,
+    ArraySignal,
+    BioSignal,
+    EventSignal,
+    RecordSignal,
+    ScalarSignal,
+    SignalSpec,
+    validate_connection_specs,
+    validate_port_spec_direction,
+)
 
 
-def test_signal_metadata_shape_list_to_tuple():
-    """SignalMetadata should convert list shapes to tuples."""
-    meta = SignalMetadata(shape=[3, 4])
-    assert meta.shape == (3, 4)
-    assert isinstance(meta.shape, tuple)
+def test_signal_spec_shape_list_to_tuple() -> None:
+    spec = SignalSpec.array(dtype="float32", shape=[3, 4])  # type: ignore[arg-type]
+    assert spec.shape == (3, 4)
 
 
-def test_signal_metadata_all_fields():
-    meta = SignalMetadata(
-        units="mV",
-        shape=(10,),
-        description="test signal",
-        min_value=-100.0,
-        max_value=100.0,
-        dtype="float64",
-        kind="event",
+def test_signal_spec_rejects_invalid_linear_interpolation() -> None:
+    with pytest.raises(ValueError, match="linear interpolation is only valid"):
+        SignalSpec.record(schema={"value": "str"}, description="bad").__class__(
+            signal_type="record",
+            kind="state",
+            schema={"value": "str"},
+            interpolation="linear",
+        )
+
+
+def test_scalar_signal_round_trip() -> None:
+    spec = SignalSpec.scalar(dtype="float64", emitted_unit="mV")
+    signal = ScalarSignal(source="src", name="x", value=1.5, emitted_at=0.25, spec=spec)
+    payload = signal.to_dict()
+
+    restored = BioSignal.from_dict(payload)
+
+    assert isinstance(restored, ScalarSignal)
+    assert restored.value == pytest.approx(1.5)
+    assert restored.emitted_at == pytest.approx(0.25)
+    assert restored.spec is not None
+    assert restored.spec.emitted_unit == "mV"
+
+
+def test_array_signal_serializes_with_envelope() -> None:
+    spec = SignalSpec.array(dtype="float32", shape=(2,))
+    signal = ArraySignal(source="src", name="x", value=np.array([1.0, 2.0], dtype=np.float32), emitted_at=0.1, spec=spec)
+
+    payload = signal.to_dict()
+
+    assert payload["value"] == {"type": "array", "dtype": "float32", "shape": [2], "data": [1.0, 2.0]}
+
+
+def test_record_signal_validates_schema() -> None:
+    spec = SignalSpec.record(schema={"label": "str", "count": "int"})
+    signal = RecordSignal(
+        source="src",
+        name="record",
+        value={"label": "ok", "count": 2},
+        emitted_at=0.0,
+        spec=spec,
     )
-    assert meta.units == "mV"
-    assert meta.shape == (10,)
-    assert meta.kind == "event"
+    assert signal.spec is not None
+    assert signal.spec.schema == {"label": "str", "count": "int"}
+
+    with pytest.raises(ValueError, match="schema keys"):
+        RecordSignal(
+            source="src",
+            name="record",
+            value={"label": "bad"},
+            emitted_at=0.0,
+            spec=spec,
+        )
 
 
-def test_biosignal_metadata_from_dict():
-    """BioSignal.__post_init__ should convert dict metadata to SignalMetadata."""
-    sig = BioSignal(
-        source="mod",
+def test_event_signal_requires_event_spec() -> None:
+    spec = SignalSpec.event(schema={"code": "str"})
+    signal = EventSignal(source="src", name="pulse", value={"code": "go"}, emitted_at=1.0, spec=spec)
+    assert signal.kind == "event"
+    assert signal.emitted_at == pytest.approx(1.0)
+
+
+def test_validate_connection_specs_checks_incompatible_profiles() -> None:
+    with pytest.raises(ValueError, match="incompatible input profiles"):
+        validate_connection_specs(
+            SignalSpec.scalar(dtype="float64", emitted_unit="mV"),
+            SignalSpec.scalar(
+                accepted_profiles=[
+                    AcceptedSignalProfile(signal_type="scalar", dtype="int32", accepted_units=["mA"]),
+                ]
+            ),
+        )
+
+
+def test_validate_connection_specs_accepts_matching_profile_membership() -> None:
+    validate_connection_specs(
+        SignalSpec.scalar(dtype="float64", emitted_unit="V"),
+        SignalSpec.scalar(
+            accepted_profiles=[
+                AcceptedSignalProfile(signal_type="scalar", dtype="float64", accepted_units=["mV", "V", "kV"]),
+                AcceptedSignalProfile(signal_type="scalar", dtype="int32", accepted_units=["mV"]),
+            ]
+        ),
+    )
+
+
+def test_port_direction_validation_rejects_mismatched_unit_fields() -> None:
+    with pytest.raises(ValueError, match="input SignalSpec declarations cannot set emitted_unit"):
+        validate_port_spec_direction(
+            SignalSpec.scalar(dtype="float64", emitted_unit="mV"),
+            direction="input",
+        )
+
+    with pytest.raises(ValueError, match="output SignalSpec declarations cannot set accepted_profiles"):
+        validate_port_spec_direction(
+            SignalSpec.scalar(
+                accepted_profiles=[
+                    AcceptedSignalProfile(signal_type="scalar", dtype="float64", accepted_units=["mV"]),
+                ]
+            ),
+            direction="output",
+        )
+
+
+def test_input_profile_round_trip() -> None:
+    spec = SignalSpec.scalar(
+        accepted_profiles=[
+            AcceptedSignalProfile(signal_type="scalar", dtype="float64", accepted_units=["mV", "V"]),
+            AcceptedSignalProfile(signal_type="array", dtype="float32", shape=(2,), accepted_units=["mV"]),
+        ]
+    )
+
+    restored = SignalSpec.from_dict(spec.to_dict())
+
+    assert restored.accepted_profiles is not None
+    assert len(restored.accepted_profiles) == 2
+    assert restored.accepted_profiles[0].accepted_units == ("mV", "V")
+    assert restored.accepted_profiles[1].shape == (2,)
+
+
+def test_array_signal_as_array() -> None:
+    signal = ArraySignal(
+        source="src",
         name="x",
-        value=1.0,
-        time=0.0,
-        metadata={"units": "Hz", "kind": "state"},
+        value=[1, 2, 3],
+        emitted_at=0.0,
+        spec=SignalSpec.array(dtype="int64", shape=(3,)),
     )
-    assert isinstance(sig.metadata, SignalMetadata)
-    assert sig.metadata.units == "Hz"
-
-
-def test_biosignal_is_scalar():
-    sig = BioSignal(source="m", name="x", value=42.0, time=0.0)
-    assert sig.is_scalar is True
-    assert sig.is_array is False
-
-
-def test_biosignal_is_array_list():
-    sig = BioSignal(source="m", name="x", value=[1, 2, 3], time=0.0)
-    assert sig.is_scalar is False
-    assert sig.is_array is True
-
-
-def test_biosignal_is_array_numpy():
-    sig = BioSignal(source="m", name="x", value=np.array([1, 2]), time=0.0)
-    assert sig.is_array is True
-
-
-def test_biosignal_is_array_tuple():
-    sig = BioSignal(source="m", name="x", value=(1, 2), time=0.0)
-    assert sig.is_array is True
-
-
-def test_biosignal_as_float():
-    sig = BioSignal(source="m", name="x", value=3.14, time=0.0)
-    assert sig.as_float() == pytest.approx(3.14)
-
-
-def test_biosignal_as_float_raises_for_array():
-    sig = BioSignal(source="m", name="x", value=[1, 2], time=0.0)
-    with pytest.raises(ValueError, match="array"):
-        sig.as_float()
-
-
-def test_biosignal_as_array_from_list():
-    sig = BioSignal(source="m", name="x", value=[1, 2, 3], time=0.0)
-    arr = sig.as_array()
-    assert isinstance(arr, np.ndarray)
-    np.testing.assert_array_equal(arr, [1, 2, 3])
-
-
-def test_biosignal_as_array_passthrough():
-    original = np.array([4, 5, 6])
-    sig = BioSignal(source="m", name="x", value=original, time=0.0)
-    arr = sig.as_array()
-    assert arr is original
-
-
-def test_biosignal_to_dict_scalar():
-    sig = BioSignal(source="m", name="x", value=1.0, time=0.5)
-    d = sig.to_dict()
-    assert d["source"] == "m"
-    assert d["name"] == "x"
-    assert d["value"] == 1.0
-    assert d["time"] == 0.5
-    assert d["metadata"]["kind"] == "state"
-
-
-def test_biosignal_to_dict_ndarray():
-    sig = BioSignal(source="m", name="x", value=np.array([1, 2]), time=0.0)
-    d = sig.to_dict()
-    assert d["value"] == [1, 2]
-
-
-def test_biosignal_from_dict():
-    data = {
-        "source": "s",
-        "name": "n",
-        "value": 99,
-        "time": 1.0,
-        "metadata": {"units": "mM", "kind": "event"},
-    }
-    sig = BioSignal.from_dict(data)
-    assert sig.source == "s"
-    assert sig.name == "n"
-    assert sig.value == 99
-    assert sig.time == 1.0
-    assert sig.metadata.units == "mM"
-    assert sig.metadata.kind == "event"
-
-
-def test_biosignal_from_dict_no_metadata():
-    data = {"source": "s", "name": "n", "value": 0, "time": 0.0}
-    sig = BioSignal.from_dict(data)
-    assert isinstance(sig.metadata, SignalMetadata)
+    arr = signal.as_array()
+    assert list(arr) == [1, 2, 3]

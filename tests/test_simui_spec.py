@@ -12,7 +12,7 @@ def fastapi_client():
 
 
 def _make_world(biosim):
-    return biosim.BioWorld()
+    return biosim.BioWorld(communication_step=0.1)
 
 
 def test_spec_version_and_modules(biosim, fastapi_client):
@@ -21,9 +21,9 @@ def test_spec_version_and_modules(biosim, fastapi_client):
 
     class M1(biosim.BioModule):
         def __init__(self):
-            self.min_dt = 0.1
+            pass
 
-        def advance_to(self, t: float) -> None:
+        def advance_window(self, _start: float, t: float) -> None:
             return
 
         def get_outputs(self):
@@ -31,9 +31,9 @@ def test_spec_version_and_modules(biosim, fastapi_client):
 
     class M2(biosim.BioModule):
         def __init__(self):
-            self.min_dt = 0.1
+            pass
 
-        def advance_to(self, t: float) -> None:
+        def advance_window(self, _start: float, t: float) -> None:
             return
 
         def get_outputs(self):
@@ -60,9 +60,9 @@ def test_run_endpoint_accepts_duration(biosim, fastapi_client):
 
     class M1(biosim.BioModule):
         def __init__(self):
-            self.min_dt = 0.1
+            pass
 
-        def advance_to(self, t: float) -> None:
+        def advance_window(self, _start: float, t: float) -> None:
             return
 
         def get_outputs(self):

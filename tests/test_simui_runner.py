@@ -12,16 +12,16 @@ def _make_world_with_module(slow=False):
 
     class M(biosim.BioModule):
         def __init__(self):
-            self.min_dt = 0.01
+            pass
 
-        def advance_to(self, t):
+        def advance_window(self, _start, t):
             if slow:
                 time.sleep(0.001)
 
         def get_outputs(self):
             return {}
 
-    world = BioWorld()
+    world = BioWorld(communication_step=0.1)
     world.add_biomodule("m", M())
     return world
 

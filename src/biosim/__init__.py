@@ -10,7 +10,17 @@ from typing import TYPE_CHECKING
 from .__about__ import __version__
 from .world import BioWorld, WorldEvent
 from .modules import BioModule
-from .signals import BioSignal, SignalMetadata
+from .signals import (
+    AcceptedSignalProfile,
+    ArraySignal,
+    BioSignal,
+    EventSignal,
+    RecordSignal,
+    ScalarSignal,
+    SignalSpec,
+    validate_connection_specs,
+    validate_port_spec_direction,
+)
 from .visuals import VisualSpec, validate_visual_spec, normalize_visuals
 from .wiring import (
     WiringBuilder,
@@ -41,7 +51,14 @@ __all__ = [
     "normalize_visuals",
     "BioModule",
     "BioSignal",
-    "SignalMetadata",
+    "AcceptedSignalProfile",
+    "ScalarSignal",
+    "ArraySignal",
+    "RecordSignal",
+    "EventSignal",
+    "SignalSpec",
+    "validate_connection_specs",
+    "validate_port_spec_direction",
     "WiringBuilder",
     "build_from_spec",
     "load_wiring",

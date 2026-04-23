@@ -1,89 +1,87 @@
 # Quickstart
 
-Install
-- Create a virtualenv and install dev tools (zsh-safe):
-  - `pip install -e '.[dev]'`
+## Install
 
-Run an example
-- Version check: `python examples/basic_usage.py`
-- World, events, and biosignals: `python examples/world_simulation.py`
-- Declarative wiring (code): `python examples/wiring_builder_demo.py`
-- Declarative wiring (files):
-  - Load a YAML/TOML wiring spec and run (bring your own file, or use one from the models labs directory):
-    - https://github.com/Biosimulant/models/tree/main/spaces
-    - `python -c "import biosim; w=biosim.BioWorld(); biosim.load_wiring(w, '<path-to-wiring.yaml>'); w.run(duration=0.5, tick_dt=0.1)"`
+```bash
+pip install -e '.[dev]'
+```
 
-Minimal code
+## Minimal 1.5 example
+
 ```python
 import biosim
-from biosim import BioSignal, SignalMetadata
+
 
 class Eye(biosim.BioModule):
-    min_dt = 0.1
-
     def __init__(self):
-        self._time = 0.0
+        self._outputs = {}
 
-    def advance_to(self, t: float) -> None:
-        self._time = t
+    def outputs(self):
+        return {"visual_stream": biosim.SignalSpec.scalar(dtype="float64")}
 
-    def get_outputs(self):
-        source = getattr(self, "_world_name", "eye")
-        return {
-            "visual_stream": BioSignal(
-                source=source,
+    def advance_window(self, start: float, end: float) -> None:
+        self._outputs = {
+            "visual_stream": biosim.ScalarSignal(
+                source="eye",
                 name="visual_stream",
-                value={"t": self._time},
-                time=self._time,
-                metadata=SignalMetadata(units="s"),
+                value=end,
+                emitted_at=end,
+                spec=self.outputs()["visual_stream"],
             )
         }
 
-class LGN(biosim.BioModule):
-    min_dt = 0.1
+    def get_outputs(self):
+        return dict(self._outputs)
 
+
+class LGN(biosim.BioModule):
     def __init__(self):
         self._inputs = {}
 
-    def set_inputs(self, signals):
-        self._inputs = signals
+    def inputs(self):
+        return {"retina": biosim.SignalSpec.scalar(dtype="float64", max_age=0.2)}
 
-    def advance_to(self, t: float) -> None:
+    def outputs(self):
+        return {"thalamus": biosim.SignalSpec.scalar(dtype="float64")}
+
+    def set_inputs(self, signals):
+        self._inputs = dict(signals)
+
+    def advance_window(self, start: float, end: float) -> None:
         return
 
     def get_outputs(self):
-        if "retina" not in self._inputs:
+        signal = self._inputs.get("retina")
+        if signal is None:
             return {}
-        return {"thalamus": self._inputs["retina"]}
+        return {
+            "thalamus": biosim.ScalarSignal(
+                source="lgn",
+                name="thalamus",
+                value=signal.value,
+                emitted_at=signal.emitted_at,
+                spec=self.outputs()["thalamus"],
+            )
+        }
 
-world = biosim.BioWorld()
-wb = biosim.WiringBuilder(world)
-wb.add("eye", Eye()).add("lgn", LGN())
-wb.connect("eye.visual_stream", ["lgn.retina"]).apply()
-world.run(duration=0.2, tick_dt=0.1)
+
+world = biosim.BioWorld(communication_step=0.1)
+builder = biosim.WiringBuilder(world)
+builder.add("eye", Eye()).add("lgn", LGN())
+builder.connect("eye.visual_stream", ["lgn.retina"]).apply()
+world.run(duration=0.3, tick_dt=0.1)
 ```
 
-## SimUI: Per-run resets for clean visuals
+## Run the built-in examples
 
-When using the SimUI, each new Run starts with a clean slate:
+- `python examples/world_simulation.py`
+- `python examples/wiring_builder_demo.py`
+- `python examples/visuals_demo.py`
+- `python examples/ui_demo.py`
 
-- The backend clears its event buffer and last-step snapshot.
-- The frontend clears visuals and events before posting `/api/run`.
-- If your modules keep their own history (e.g., points for a chart), implement an optional `reset()` method on the module. The world will call `reset()` on each module before every run.
+## Next reading
 
-Example:
-
-```python
-class SineWave(biosim.BioModule):
-    min_dt = 0.1
-
-    def __init__(self):
-        self.points = []
-
-    def advance_to(self, t: float) -> None:
-        self.points.append([t, math.sin(t)])
-
-    def reset(self):
-        # Clear history between runs so charts do not overlap
-        self.points = []
-```
+- `docs/biomodule.md`
+- `docs/bioworld.md`
+- `docs/wiring.md`
+- `docs/migration-1-5.md`

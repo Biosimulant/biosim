@@ -13,14 +13,13 @@ import biosim
 
 class SineWave(biosim.BioModule):
     def __init__(self):
-        self.min_dt = 0.1
         self.points = []
 
     def reset(self):
         self.points = []
 
-    def advance_to(self, t: float) -> None:
-        self.points.append([t, math.sin(t)])
+    def advance_window(self, start: float, end: float) -> None:
+        self.points.append([end, math.sin(end)])
 
     def get_outputs(self):
         return {}
@@ -67,7 +66,6 @@ class SineWave(biosim.BioModule):
 
 class BarCounts(biosim.BioModule):
     def __init__(self):
-        self.min_dt = 0.1
         self.values = {"A": 1, "B": 2, "C": 3}
         self._i = 0
 
@@ -75,7 +73,7 @@ class BarCounts(biosim.BioModule):
         self.values = {"A": 1, "B": 2, "C": 3}
         self._i = 0
 
-    def advance_to(self, t: float) -> None:
+    def advance_window(self, start: float, end: float) -> None:
         self._i += 1
         key = random.choice(list(self.values.keys()))
         self.values[key] += random.randint(0, 2)
@@ -90,7 +88,6 @@ class BarCounts(biosim.BioModule):
 
 class TableSnapshot(biosim.BioModule):
     def __init__(self, bar_mod: BarCounts):
-        self.min_dt = 0.1
         self.bar_mod = bar_mod
         self.snap = []
         self._i = 0
@@ -99,7 +96,7 @@ class TableSnapshot(biosim.BioModule):
         self.snap = []
         self._i = 0
 
-    def advance_to(self, t: float) -> None:
+    def advance_window(self, start: float, end: float) -> None:
         self._i += 1
         if self._i % 10 == 0:
             total = sum(self.bar_mod.values.values())
@@ -115,10 +112,7 @@ class TableSnapshot(biosim.BioModule):
 
 
 class SmallGraph(biosim.BioModule):
-    def __init__(self):
-        self.min_dt = 0.5
-
-    def advance_to(self, t: float) -> None:
+    def advance_window(self, start: float, end: float) -> None:
         return
 
     def get_outputs(self):
@@ -138,7 +132,7 @@ class SmallGraph(biosim.BioModule):
 
 
 def main():
-    world = biosim.BioWorld()
+    world = biosim.BioWorld(communication_step=0.1)
     bar = BarCounts()
     world.add_biomodule("sine", SineWave())
     world.add_biomodule("bar", bar)

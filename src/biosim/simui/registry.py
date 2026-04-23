@@ -95,26 +95,24 @@ def introspect_module(cls: Type[BioModule], class_path: str, category: str = "un
         outputs = set(instance.outputs())
     except Exception as e:
         logger.debug(f"Could not instantiate {class_path} for port introspection: {e}")
-        # Try to extract from class methods directly
+        # Try to extract declared port names from source as a last resort.
         try:
             if hasattr(cls, "inputs"):
                 src = inspect.getsource(cls.inputs)
-                # Simple heuristic: look for return {"port1", "port2"}
                 if "return" in src and "{" in src:
-                    # Extract set literals
                     import re
-                    match = re.search(r'return\s*\{([^}]+)\}', src)
-                    if match:
-                        ports = match.group(1)
-                        inputs = {p.strip().strip('"\'') for p in ports.split(",")}
+                    ports = set(re.findall(r'["\']([^"\']+)["\']\s*:', src))
+                    if not ports:
+                        ports = set(re.findall(r'["\']([^"\']+)["\']', src))
+                    inputs = ports
             if hasattr(cls, "outputs"):
                 src = inspect.getsource(cls.outputs)
                 if "return" in src and "{" in src:
                     import re
-                    match = re.search(r'return\s*\{([^}]+)\}', src)
-                    if match:
-                        ports = match.group(1)
-                        outputs = {p.strip().strip('"\'') for p in ports.split(",")}
+                    ports = set(re.findall(r'["\']([^"\']+)["\']\s*:', src))
+                    if not ports:
+                        ports = set(re.findall(r'["\']([^"\']+)["\']', src))
+                    outputs = ports
         except Exception:  # pragma: no cover - defensive: source parsing may fail
             pass
 

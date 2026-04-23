@@ -1,73 +1,54 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, Dict, List, Mapping, Optional, TYPE_CHECKING
 
-from .signals import BioSignal
+from .signals import BioSignal, SignalSpec
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from .visuals import VisualSpec
 
 
 class BioModule(ABC):
-    """Runnable module interface for the BioWorld orchestrator."""
-
-    # Minimum time step for this module (in BioWorld's canonical time unit).
-    min_dt: float = 0.0
+    """Runnable module interface for the 1.5 communication-step kernel."""
 
     def setup(self, config: Optional[Dict[str, Any]] = None) -> None:
-        """Initialize the module for a run. Default is a no-op."""
+        """Initialize the module for a run."""
         return
 
     def reset(self) -> None:
-        """Reset the module to its initial state. Default is a no-op."""
+        """Reset the module to its initial state."""
+        return
+
+    def set_inputs(self, signals: Dict[str, BioSignal]) -> None:
+        """Receive committed inputs for the current communication window."""
         return
 
     @abstractmethod
-    def advance_to(self, t: float) -> None:
-        """Advance the module's internal state to time t."""
+    def advance_window(self, start: float, end: float) -> None:
+        """Advance internal state across one communication window."""
         raise NotImplementedError  # pragma: no cover - abstract
-
-    def set_inputs(self, signals: Dict[str, BioSignal]) -> None:
-        """Receive input signals for the next advance step."""
-        return
 
     @abstractmethod
     def get_outputs(self) -> Dict[str, BioSignal]:
-        """Return current output signals."""
+        """Return current output signals for atomic boundary commit."""
         raise NotImplementedError  # pragma: no cover - abstract
 
-    def get_state(self) -> Dict[str, Any]:
-        """Return serializable state for checkpointing."""
+    def inputs(self) -> Mapping[str, SignalSpec]:
+        """Declared input port specifications."""
         return {}
 
-    def next_due_time(self, now: float) -> float:
-        """Return the next time this module should be stepped."""
-        return now + self.min_dt
-
-    # --- Optional Port Metadata (for validation and tooling) ---
-    # Return declared input and output port names. Defaults are empty, meaning
-    # permissive (no validation). If non-empty, the wiring builder/loader will
-    # validate connections against these sets.
-    def inputs(self) -> Set[str]:
-        return set()
-
-    def outputs(self) -> Set[str]:
-        return set()
-
-    # Optional schema maps: port name -> schema/type object. If both source and
-    # destination declare schemas for a connected port, simple equality checks
-    # can be applied by tooling in the future. Currently unused.
-    def input_schemas(self) -> Dict[str, Any]:
+    def outputs(self) -> Mapping[str, SignalSpec]:
+        """Declared output port specifications."""
         return {}
 
-    def output_schemas(self) -> Dict[str, Any]:
+    def snapshot(self) -> Dict[str, Any]:
+        """Return serializable module state for branching/restoration."""
         return {}
 
-    # --- Optional: visualization ---
-    # Modules can optionally expose a web-native visualization spec to be
-    # rendered by a browser client. Return either a single dict or a list of
-    # dicts with the fixed shape: {"render": <type>, "data": <payload>}.
-    # Default returns None (no visuals).
+    def restore(self, snapshot: Mapping[str, Any]) -> None:
+        """Restore module state from a prior snapshot."""
+        return
+
     def visualize(self) -> Optional["VisualSpec" | List["VisualSpec"]]:
         return None

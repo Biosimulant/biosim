@@ -2,22 +2,38 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from importlib import import_module
+import inspect
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Tuple
 
 from .modules import BioModule
+from .signals import SignalSpec, validate_connection_specs, validate_port_spec_direction
 from .world import BioWorld
 
 
 def _parse_ref(ref: str) -> Tuple[str, str]:
-    """Parse references like "eye.visual_stream".
-
-    Returns (name, port).
-    """
     parts = ref.rsplit(".", 1)
     if len(parts) != 2:
         raise ValueError(f"Invalid reference '{ref}', expected 'name.port' form")
     return parts[0], parts[1]
+
+
+def _normalize_declared_ports(specs: Mapping[str, SignalSpec] | None, *, direction: str, module_name: str) -> dict[str, SignalSpec]:
+    if specs is None:
+        return {}
+    if not isinstance(specs, Mapping):
+        raise TypeError(f"Module '{module_name}' {direction}s() must return a mapping of port -> SignalSpec")
+    normalized: dict[str, SignalSpec] = {}
+    for port, spec in specs.items():
+        if isinstance(spec, Mapping):
+            spec = SignalSpec.from_dict(spec)
+        if not isinstance(spec, SignalSpec):
+            raise TypeError(
+                f"Module '{module_name}' {direction} port '{port}' must declare a SignalSpec, got {type(spec)!r}"
+            )
+        validate_port_spec_direction(spec, direction=direction)
+        normalized[str(port)] = spec
+    return normalized
 
 
 @dataclass
@@ -26,11 +42,15 @@ class WiringBuilder:
     registry: Dict[str, BioModule] = field(default_factory=dict)
     _pending_connections: List[Tuple[str, List[str]]] = field(default_factory=list)
 
-    def add(self, name: str, module: BioModule, *, min_dt: Optional[float] = None, priority: int = 0) -> "WiringBuilder":
+    def add(
+        self,
+        name: str,
+        module: BioModule,
+    ) -> "WiringBuilder":
         if name in self.registry and self.registry[name] is not module:
             raise ValueError(f"Module name already registered: {name}")
         self.registry[name] = module
-        self.world.add_biomodule(name, module, min_dt=min_dt, priority=priority)
+        self.world.add_biomodule(name, module)
         return self
 
     def connect(self, src_ref: str, dst_refs: Iterable[str]) -> "WiringBuilder":
@@ -43,9 +63,8 @@ class WiringBuilder:
             src_mod = self.registry.get(src_name)
             if src_mod is None:
                 raise KeyError(f"connect {src_ref}: unknown module name '{src_name}'")
-            # Validate source port if declared
-            declared_out = set(src_mod.outputs())
-            if declared_out and src_port not in declared_out:
+            declared_out = _normalize_declared_ports(src_mod.outputs(), direction="output", module_name=src_name)
+            if src_port not in declared_out:
                 raise ValueError(
                     f"connect {src_ref}: module '{src_name}' has no output port '{src_port}'. "
                     f"Declared outputs: {sorted(declared_out)}"
@@ -55,12 +74,13 @@ class WiringBuilder:
                 dst_mod = self.registry.get(dst_name)
                 if dst_mod is None:
                     raise KeyError(f"connect {src_ref} -> {dst_ref}: unknown module '{dst_name}'")
-                declared_in = set(dst_mod.inputs())
-                if declared_in and dst_port not in declared_in:
+                declared_in = _normalize_declared_ports(dst_mod.inputs(), direction="input", module_name=dst_name)
+                if dst_port not in declared_in:
                     raise ValueError(
                         f"connect {src_ref} -> {dst_ref}: module '{dst_name}' has no input port '{dst_port}'. "
                         f"Declared inputs: {sorted(declared_in)}"
                     )
+                validate_connection_specs(declared_out[src_port], declared_in[dst_port])
                 self.world.connect(f"{src_name}.{src_port}", f"{dst_name}.{dst_port}")
         self._pending_connections.clear()
 
@@ -74,42 +94,33 @@ def _import_from_string(path: str) -> Any:
 
 
 def build_from_spec(world: BioWorld, spec: Mapping[str, Any]) -> WiringBuilder:
-    """Build modules and wiring from a spec dict.
-
-    Spec format (keys optional):
-    - modules: mapping of name -> one of:
-        - dotted path string (e.g., "biosim.packs.neuro.IzhikevichPopulation")
-        - {class: dotted, args: {...}, min_dt: float, priority: int}
-    - wiring: list of {from: str, to: [str, ...]}
-    """
+    """Build modules and wiring from a 1.5 wiring spec dict."""
     builder = WiringBuilder(world)
 
     modules_section = spec.get("modules") if isinstance(spec, Mapping) else None
     if isinstance(modules_section, Mapping):
         for name, entry in modules_section.items():
-            min_dt = None
-            priority = 0
             if isinstance(entry, str):
                 cls = _import_from_string(entry)
+                if not inspect.isclass(cls) or not issubclass(cls, BioModule):
+                    raise TypeError(f"Module '{name}' is not a BioModule: {cls!r}")
                 module = cls()
             elif isinstance(entry, Mapping):
                 cls_path = entry.get("class")
                 if not isinstance(cls_path, str):
                     raise ValueError(f"Invalid class for module '{name}'")
+                if entry.get("min_dt") is not None or entry.get("priority") is not None:
+                    raise ValueError(f"Module '{name}' cannot declare min_dt or priority in the 1.5 kernel")
                 cls = _import_from_string(cls_path)
+                if not inspect.isclass(cls) or not issubclass(cls, BioModule):
+                    raise TypeError(f"Module '{name}' is not a BioModule: {cls!r}")
                 kwargs = entry.get("args") or {}
                 if not isinstance(kwargs, Mapping):
                     raise ValueError(f"Invalid args for module '{name}'")
                 module = cls(**dict(kwargs))
-                if "min_dt" in entry:
-                    min_dt = float(entry["min_dt"])
-                if "priority" in entry:
-                    priority = int(entry["priority"])
             else:
                 raise ValueError(f"Invalid module entry for '{name}'")
-            if not isinstance(module, BioModule):
-                raise TypeError(f"Module '{name}' is not a BioModule: {type(module)!r}")
-            builder.add(name, module, min_dt=min_dt, priority=priority)
+            builder.add(name, module)
 
     wiring_section = spec.get("wiring") if isinstance(spec, Mapping) else None
     if isinstance(wiring_section, list):
