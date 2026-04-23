@@ -199,7 +199,7 @@ class BioWorld:
                 source=conn.source_module,
                 name=conn.target_signal,
                 value=source_signal.value,
-                time=now,
+                time=source_signal.time,
                 metadata=source_signal.metadata,
             )
         return inputs
