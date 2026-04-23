@@ -409,6 +409,91 @@ def test_event_signals_filter_already_seen(biosim):
     assert len(received) == 1
 
 
+def test_routed_inputs_preserve_source_timestamp(biosim):
+    received = []
+
+    class Src(biosim.BioModule):
+        def __init__(self):
+            self.min_dt = 0.15
+            self._outputs = {}
+
+        def advance_to(self, t):
+            self._outputs = {"x": biosim.BioSignal(source="src", name="x", value=t, time=t)}
+
+        def get_outputs(self):
+            return dict(self._outputs)
+
+    class Dst(biosim.BioModule):
+        def __init__(self):
+            self.min_dt = 0.2
+
+        def set_inputs(self, signals):
+            if "x" in signals:
+                received.append(signals["x"].time)
+
+        def advance_to(self, t):
+            pass
+
+        def get_outputs(self):
+            return {}
+
+        def inputs(self):
+            return {"x"}
+
+    world = BioWorld()
+    world.add_biomodule("src", Src(), priority=1)
+    world.add_biomodule("dst", Dst())
+    world.connect("src.x", "dst.x")
+    world.run(duration=0.2, tick_dt=0.05)
+
+    assert received == [pytest.approx(0.15)]
+
+
+def test_multirate_inputs_keep_held_source_timestamp(biosim):
+    received = []
+
+    class Src(biosim.BioModule):
+        def __init__(self):
+            self.min_dt = 0.3
+            self._outputs = {}
+
+        def advance_to(self, t):
+            self._outputs = {"x": biosim.BioSignal(source="src", name="x", value=t, time=t)}
+
+        def get_outputs(self):
+            return dict(self._outputs)
+
+    class Dst(biosim.BioModule):
+        def __init__(self):
+            self.min_dt = 0.1
+            self._pending = None
+
+        def set_inputs(self, signals):
+            self._pending = signals.get("x")
+
+        def advance_to(self, t):
+            if self._pending is not None:
+                received.append((t, self._pending.time))
+
+        def get_outputs(self):
+            return {}
+
+        def inputs(self):
+            return {"x"}
+
+    world = BioWorld()
+    world.add_biomodule("src", Src(), priority=1)
+    world.add_biomodule("dst", Dst())
+    world.connect("src.x", "dst.x")
+    world.run(duration=0.5, tick_dt=0.1)
+
+    assert received == [
+        (pytest.approx(0.3), pytest.approx(0.3)),
+        (pytest.approx(0.4), pytest.approx(0.3)),
+        (pytest.approx(0.5), pytest.approx(0.3)),
+    ]
+
+
 def test_current_time_property(biosim):
     world = BioWorld()
     assert world.current_time == 0.0
