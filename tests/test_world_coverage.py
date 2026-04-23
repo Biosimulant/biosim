@@ -409,6 +409,277 @@ def test_event_signals_filter_already_seen(biosim):
     assert len(received) == 1
 
 
+def test_warns_once_when_state_signal_is_stale(biosim, caplog):
+    class Src(biosim.BioModule):
+        def __init__(self):
+            self.min_dt = 0.3
+            self._outputs = {}
+
+        def advance_to(self, t):
+            self._outputs = {"state": biosim.BioSignal(source="src", name="state", value=t, time=t)}
+
+        def get_outputs(self):
+            return dict(self._outputs)
+
+    class Dst(biosim.BioModule):
+        def __init__(self):
+            self.min_dt = 0.1
+
+        def advance_to(self, t):
+            pass
+
+        def set_inputs(self, signals):
+            return
+
+        def get_outputs(self):
+            return {}
+
+    world = BioWorld()
+    world.add_biomodule("src", Src(), priority=1)
+    world.add_biomodule("dst", Dst())
+    world.connect("src.state", "dst.state")
+
+    with caplog.at_level("WARNING", logger="biosim.world"):
+        world.run(duration=0.5, tick_dt=0.1)
+
+    records = [record for record in caplog.records if "stale signal read" in record.message]
+    assert len(records) == 1
+    assert "src.state" in records[0].message
+    assert "target 'dst'" in records[0].message
+
+
+def test_does_not_warn_when_signal_is_within_tolerance(biosim, caplog):
+    class Src(biosim.BioModule):
+        def __init__(self):
+            self.min_dt = 0.2
+            self._outputs = {}
+
+        def advance_to(self, t):
+            self._outputs = {"state": biosim.BioSignal(source="src", name="state", value=t, time=t)}
+
+        def get_outputs(self):
+            return dict(self._outputs)
+
+    class Dst(biosim.BioModule):
+        def __init__(self):
+            self.min_dt = 0.2
+
+        def advance_to(self, t):
+            pass
+
+        def set_inputs(self, signals):
+            return
+
+        def get_outputs(self):
+            return {}
+
+    world = BioWorld()
+    world.add_biomodule("src", Src(), priority=1)
+    world.add_biomodule("dst", Dst())
+    world.connect("src.state", "dst.state")
+
+    with caplog.at_level("WARNING", logger="biosim.world"):
+        world.run(duration=0.4, tick_dt=0.1)
+
+    assert not [record for record in caplog.records if "stale signal read" in record.message]
+
+
+def test_state_signals_hold_last_value_between_source_updates(biosim):
+    seen = []
+
+    class Src(biosim.BioModule):
+        def __init__(self):
+            self.min_dt = 0.2
+            self._outputs = {}
+
+        def advance_to(self, t):
+            self._outputs = {"state": biosim.BioSignal(source="src", name="state", value=t, time=t)}
+
+        def get_outputs(self):
+            return dict(self._outputs)
+
+    class Dst(biosim.BioModule):
+        def __init__(self):
+            self.min_dt = 0.1
+
+        def advance_to(self, t):
+            pass
+
+        def set_inputs(self, signals):
+            sig = signals.get("state")
+            if sig is not None:
+                seen.append((sig.value, sig.time))
+
+        def get_outputs(self):
+            return {}
+
+    world = BioWorld()
+    world.add_biomodule("src", Src(), priority=1)
+    world.add_biomodule("dst", Dst())
+    world.connect("src.state", "dst.state")
+    world.run(duration=0.5, tick_dt=0.1)
+
+    assert [value for value, _time in seen] == [0.2, 0.2, 0.4, 0.4]
+    assert [time for _value, time in seen] == pytest.approx([0.2, 0.3, 0.4, 0.5])
+
+
+def test_empty_outputs_do_not_clear_signal_store(biosim):
+    seen = []
+
+    class Src(biosim.BioModule):
+        def __init__(self):
+            self.min_dt = 0.1
+            self._step = 0
+
+        def advance_to(self, t):
+            self._step += 1
+
+        def get_outputs(self):
+            if self._step == 1:
+                return {"state": biosim.BioSignal(source="src", name="state", value=1, time=0.1)}
+            return {}
+
+    class Dst(biosim.BioModule):
+        def __init__(self):
+            self.min_dt = 0.1
+
+        def advance_to(self, t):
+            pass
+
+        def set_inputs(self, signals):
+            sig = signals.get("state")
+            if sig is not None:
+                seen.append((sig.value, sig.time))
+
+        def get_outputs(self):
+            return {}
+
+    world = BioWorld()
+    world.add_biomodule("src", Src(), priority=1)
+    world.add_biomodule("dst", Dst())
+    world.connect("src.state", "dst.state")
+    world.run(duration=0.3, tick_dt=0.1)
+
+    assert [value for value, _time in seen] == [1, 1, 1]
+    assert [time for _value, time in seen] == pytest.approx([0.1, 0.2, 0.3])
+    assert world.get_outputs("src")["state"].value == 1
+
+
+def test_non_empty_output_map_replaces_prior_ports(biosim):
+    seen = []
+
+    class Src(biosim.BioModule):
+        def __init__(self):
+            self.min_dt = 0.1
+            self._step = 0
+
+        def advance_to(self, t):
+            self._step += 1
+
+        def get_outputs(self):
+            if self._step == 1:
+                return {
+                    "a": biosim.BioSignal(source="src", name="a", value="A1", time=0.1),
+                    "b": biosim.BioSignal(source="src", name="b", value="B1", time=0.1),
+                }
+            return {"a": biosim.BioSignal(source="src", name="a", value=f"A{self._step}", time=0.1 * self._step)}
+
+    class Dst(biosim.BioModule):
+        def __init__(self):
+            self.min_dt = 0.1
+
+        def advance_to(self, t):
+            pass
+
+        def set_inputs(self, signals):
+            seen.append(tuple(sorted(signals.keys())))
+
+        def get_outputs(self):
+            return {}
+
+    world = BioWorld()
+    world.add_biomodule("src", Src(), priority=1)
+    world.add_biomodule("dst", Dst())
+    world.connect("src.a", "dst.a")
+    world.connect("src.b", "dst.b")
+    world.run(duration=0.3, tick_dt=0.1)
+
+    assert seen == [("a", "b"), ("a",), ("a",)]
+    assert set(world.get_outputs("src")) == {"a"}
+
+
+def test_setup_resets_signal_store(biosim):
+    class Src(biosim.BioModule):
+        def __init__(self):
+            self.min_dt = 0.1
+            self._outputs = {}
+
+        def setup(self, _config=None):
+            self._outputs = {}
+
+        def advance_to(self, t):
+            self._outputs = {"state": biosim.BioSignal(source="src", name="state", value=t, time=t)}
+
+        def get_outputs(self):
+            return dict(self._outputs)
+
+    world = BioWorld()
+    world.add_biomodule("src", Src())
+    world.run(duration=0.1, tick_dt=0.1)
+
+    assert "state" in world.get_outputs("src")
+
+    world.setup()
+
+    assert world.get_outputs("src") == {}
+
+
+def test_event_signals_persist_in_store_but_deliver_once_per_timestamp(biosim):
+    received = []
+
+    class Src(biosim.BioModule):
+        def __init__(self):
+            self.min_dt = 0.1
+
+        def advance_to(self, t):
+            pass
+
+        def get_outputs(self):
+            return {
+                "ev": biosim.BioSignal(
+                    source="src",
+                    name="ev",
+                    value="pulse",
+                    time=0.1,
+                    metadata={"kind": "event"},
+                )
+            }
+
+    class Dst(biosim.BioModule):
+        def __init__(self):
+            self.min_dt = 0.1
+
+        def advance_to(self, t):
+            pass
+
+        def set_inputs(self, signals):
+            if "ev" in signals:
+                received.append(signals["ev"].value)
+
+        def get_outputs(self):
+            return {}
+
+    world = BioWorld()
+    world.add_biomodule("src", Src(), priority=1)
+    world.add_biomodule("dst", Dst())
+    world.connect("src.ev", "dst.ev")
+    world.run(duration=0.3, tick_dt=0.1)
+
+    assert received == ["pulse"]
+    assert world.get_outputs("src")["ev"].metadata.kind == "event"
+    assert world.get_outputs("src")["ev"].value == "pulse"
+
+
 def test_current_time_property(biosim):
     world = BioWorld()
     assert world.current_time == 0.0

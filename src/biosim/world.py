@@ -49,6 +49,7 @@ class Connection:
     target_module: str
     target_signal: str
     last_event_time: float = -1.0
+    last_stale_warning_time: float = -1.0
 
 
 class BioWorld:
@@ -166,8 +167,7 @@ class BioWorld:
             entry.module.setup(config.get(entry.name, {}))
             entry.last_time = 0.0
             outputs = entry.module.get_outputs() or {}
-            if outputs:
-                self._signal_store[entry.name] = outputs
+            self._update_signal_store(entry.name, outputs)
 
         # Seed scheduler
         for entry in self._modules.values():
@@ -184,13 +184,58 @@ class BioWorld:
         self._seq += 1
         heapq.heappush(self._queue, (t, -self._modules[name].priority, self._seq, name))
 
+    def _update_signal_store(self, name: str, outputs: Optional[Dict[str, BioSignal]]) -> None:
+        """Persist the latest non-empty output mapping for one module.
+
+        This gives state-like signals hold-last-value semantics between producer
+        updates. Returning {} or None does not clear previously stored outputs;
+        the store is only reset by setup() or replaced by a later non-empty
+        mapping from the same module.
+        """
+        if outputs:
+            self._signal_store[name] = outputs
+
+    def _warn_if_input_stale(self, conn: Connection, source_signal: BioSignal, now: float) -> None:
+        """Warn once per source timestamp when a consumer reads stale state."""
+        if source_signal.metadata.kind == "event":
+            return
+
+        tolerance = self._modules[conn.target_module].min_dt
+        age = now - source_signal.time
+        if age - tolerance <= 1e-12:
+            return
+        if source_signal.time <= conn.last_stale_warning_time:
+            return
+
+        conn.last_stale_warning_time = source_signal.time
+        logger.warning(
+            "stale signal read: target '%s' consumed '%s.%s' at t=%.6f using source time %.6f "
+            "(age=%.6f > tolerance=%.6f)",
+            conn.target_module,
+            conn.source_module,
+            conn.source_signal,
+            now,
+            source_signal.time,
+            age,
+            tolerance,
+        )
+
     def _collect_inputs(self, target_name: str, now: float) -> Dict[str, BioSignal]:
+        """Collect inputs from the latest stored upstream outputs.
+
+        Each target port reads from the most recent stored source signal. Event
+        signals still persist in the store, but delivery is gated by
+        last_event_time so a persisted event is not re-delivered indefinitely.
+        State-like signals also emit a warning if a consumer reads a source value
+        older than the consumer's own min_dt tolerance.
+        """
         inputs: Dict[str, BioSignal] = {}
         for conn in self._connections_by_target.get(target_name, []):
             source_outputs = self._signal_store.get(conn.source_module, {})
             source_signal = source_outputs.get(conn.source_signal)
             if source_signal is None:  # pragma: no cover - defensive: signal should exist if routed
                 continue
+            self._warn_if_input_stale(conn, source_signal, now)
             if source_signal.metadata.kind == "event":
                 if source_signal.time <= conn.last_event_time:
                     continue
@@ -252,8 +297,7 @@ class BioWorld:
                 entry.last_time = self._current_time
 
                 outputs = entry.module.get_outputs() or {}
-                if outputs:
-                    self._signal_store[name] = outputs
+                self._update_signal_store(name, outputs)
 
                 next_time = entry.module.next_due_time(self._current_time)
                 if next_time <= self._current_time:
