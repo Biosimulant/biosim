@@ -94,7 +94,7 @@ def _import_from_string(path: str) -> Any:
 
 
 def build_from_spec(world: BioWorld, spec: Mapping[str, Any]) -> WiringBuilder:
-    """Build modules and wiring from a 1.5 wiring spec dict."""
+    """Build modules and wiring from a communication-step wiring spec dict."""
     builder = WiringBuilder(world)
 
     modules_section = spec.get("modules") if isinstance(spec, Mapping) else None
@@ -110,7 +110,7 @@ def build_from_spec(world: BioWorld, spec: Mapping[str, Any]) -> WiringBuilder:
                 if not isinstance(cls_path, str):
                     raise ValueError(f"Invalid class for module '{name}'")
                 if entry.get("min_dt") is not None or entry.get("priority") is not None:
-                    raise ValueError(f"Module '{name}' cannot declare min_dt or priority in the 1.5 kernel")
+                    raise ValueError(f"Module '{name}' cannot declare min_dt or priority in the communication-step kernel")
                 cls = _import_from_string(cls_path)
                 if not inspect.isclass(cls) or not issubclass(cls, BioModule):
                     raise TypeError(f"Module '{name}' is not a BioModule: {cls!r}")

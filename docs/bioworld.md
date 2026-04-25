@@ -1,12 +1,12 @@
 # API: `BioWorld`
 
-`BioWorld` is the 1.5 communication-step orchestrator.
+`BioWorld` is the communication-step orchestrator.
 
 ## Signature
 
 ```python
 class BioWorld:
-    def __init__(self, *, communication_step: float, time_unit: str = "seconds") -> None: ...
+    def __init__(self, *, communication_step: float) -> None: ...
 ```
 
 `communication_step` is required and defines the world-wide synchronization cadence for inter-module exchange.
@@ -17,7 +17,7 @@ class BioWorld:
 - Inputs for a window are collected from the committed signal store at the start boundary.
 - Every module advances independently across the same window via `advance_window(start, end)`.
 - Outputs are committed atomically at the end boundary.
-- Tied-time behavior is order-independent by design; the 1.5 kernel has no priority scheduling contract.
+- Tied-time behavior is order-independent by design; the kernel has no priority scheduling contract.
 
 ## Key methods
 
@@ -25,7 +25,7 @@ class BioWorld:
 - `add_biomodule(name, module)`
 - `connect("src.port", "dst.port")`
 - `setup(config=None)`
-- `run(duration, tick_dt=None)`
+- `run(duration)`
 - `request_pause()` / `request_resume()` / `request_stop()`
 - `snapshot()` / `restore(snapshot)` / `branch()`
 - `get_outputs(name)`
@@ -40,19 +40,19 @@ class BioWorld:
 
 ## Runtime events
 
-- Always emitted: `STARTED`, `TICK`, `FINISHED`
+- Always emitted: `STARTED`, `STEP`, `FINISHED`
 - May also emit: `PAUSED`, `RESUMED`, `STOPPED`, `ERROR`
 
-Tick payloads include progress fields during active runs: `start`, `end`, `duration`, `progress`, `progress_pct`, and `remaining`.
+Step payloads include progress fields during active runs: `start`, `end`, `duration`, `progress`, `progress_pct`, and `remaining`.
 
 ## Snapshot guarantees
 
 A world snapshot captures:
 
 - current simulation time
-- committed signal store and short signal history
+- committed signal store
 - per-connection event/staleness delivery state
 - per-module snapshot payloads
-- setup config and world timing metadata
+- setup config
 
 `branch()` deep-copies modules, restores the captured snapshot into a new `BioWorld`, and allows both worlds to diverge independently from the same boundary.

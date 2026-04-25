@@ -40,7 +40,7 @@ def main() -> None:
     ui = Interface(
         world,
         title="BioSim UI",
-        controls=[Number("duration", 5, label="Duration", minimum=0.1), Number("tick_dt", 0.1, label="tick_dt", step=0.1), Button("Run")],
+        controls=[Number("duration", 5, label="Duration", minimum=0.1), Button("Run")],
         outputs=[EventLog(limit=200), VisualsPanel(refresh="auto", interval_ms=800)],
     )
     ui.launch(port=7861)

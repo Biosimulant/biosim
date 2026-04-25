@@ -69,7 +69,7 @@ world = biosim.BioWorld(communication_step=0.1)
 builder = biosim.WiringBuilder(world)
 builder.add("eye", Eye()).add("lgn", LGN())
 builder.connect("eye.visual_stream", ["lgn.retina"]).apply()
-world.run(duration=0.3, tick_dt=0.1)
+world.run(duration=0.3)
 ```
 
 ## Run the built-in examples

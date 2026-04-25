@@ -13,7 +13,7 @@ def test_collect_visuals_empty(biosim):
             return {}
 
     world.add_biomodule("silent", Silent())
-    world.run(duration=0.1, tick_dt=0.1)
+    world.run(duration=0.1)
     collected = world.collect_visuals()
     assert collected == []
 
@@ -58,7 +58,7 @@ def test_collect_visuals_with_modules(biosim):
 
     world.add_biomodule("ts", TS())
     world.add_biomodule("graph", GraphMod())
-    world.run(duration=0.2, tick_dt=0.1)
+    world.run(duration=0.2)
 
     collected = world.collect_visuals()
     assert len(collected) == 2
@@ -115,7 +115,7 @@ def test_visuals_invalid_shapes_are_filtered(biosim):
     world.add_biomodule("bad1", Bad1())
     world.add_biomodule("bad2", Bad2())
     world.add_biomodule("good", Good())
-    world.run(duration=0.1, tick_dt=0.1)
+    world.run(duration=0.1)
 
     collected = world.collect_visuals()
     assert len(collected) == 1
@@ -140,7 +140,7 @@ def test_visuals_description_is_preserved(biosim):
             return {"render": "bar", "data": {"items": [{"label": "a", "value": 1}]}, "description": "hello"}
 
     world.add_biomodule("desc", WithDescription())
-    world.run(duration=0.1, tick_dt=0.1)
+    world.run(duration=0.1)
 
     collected = world.collect_visuals()
     assert collected[0]["module"] == "desc"

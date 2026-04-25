@@ -36,7 +36,7 @@ def test_port_validation_success_with_declared_ports(biosim):
     wb = biosim.WiringBuilder(world)
     wb.add("eye", Eye()).add("lgn", LGN())
     wb.connect("eye.visual_stream", ["lgn.retina"]).apply()
-    world.run(duration=0.1, tick_dt=0.1)
+    world.run(duration=0.1)
 
 
 def test_port_validation_raises_for_unknown_output(biosim):
@@ -152,6 +152,6 @@ def test_port_routing_supports_dst_port_mapping(biosim):
     wb.add("src", Src()).add("dst", Dst())
 
     wb.connect("src.out_port", ["dst.in_port"]).apply()
-    world.run(duration=0.3, tick_dt=0.1)
+    world.run(duration=0.3)
 
     assert received["count"] >= 1

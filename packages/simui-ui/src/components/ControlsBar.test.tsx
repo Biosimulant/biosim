@@ -4,12 +4,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockState: any = {
   status: { running: false, paused: false },
-  controls: { duration: 10, tick_dt: 0.1 },
+  controls: { duration: 10 },
   spec: {
-    controls: [
-      { type: "number", name: "duration", default: 10 },
-      { type: "number", name: "tick_dt", default: 0.1 },
-    ],
+    controls: [{ type: "number", name: "duration", default: 10 }],
     capabilities: {},
   },
 };
@@ -30,12 +27,9 @@ import ControlsBar from "./ControlsBar";
 beforeEach(() => {
   mockActions.setControls.mockReset();
   mockState.status = { running: false, paused: false };
-  mockState.controls = { duration: 10, tick_dt: 0.1 };
+  mockState.controls = { duration: 10 };
   mockState.spec = {
-    controls: [
-      { type: "number", name: "duration", default: 10 },
-      { type: "number", name: "tick_dt", default: 0.1 },
-    ],
+    controls: [{ type: "number", name: "duration", default: 10 }],
     capabilities: {},
   };
 });
@@ -47,7 +41,7 @@ describe("ControlsBar progress", () => {
       paused: false,
       progress_pct: 25,
       sim_time: 2.5,
-      tick_count: 5,
+      step_count: 5,
     };
 
     const html = renderToStaticMarkup(
@@ -58,18 +52,18 @@ describe("ControlsBar progress", () => {
     expect(html).toContain("controls-bar-progress");
   });
 
-  it("falls back to tick-based estimate when backend progress is missing", () => {
+  it("shows unknown progress when backend progress is missing", () => {
     mockState.status = {
       running: true,
       paused: false,
-      tick_count: 50,
+      step_count: 50,
     };
-    mockState.controls = { duration: 10, tick_dt: 0.1 };
+    mockState.controls = { duration: 10 };
 
     const html = renderToStaticMarkup(
       <ControlsBar onRun={() => {}} onPause={() => {}} onResume={() => {}} onReset={() => {}} />,
     );
 
-    expect(html).toContain("50.0%");
+    expect(html).toContain("—");
   });
 });

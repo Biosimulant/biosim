@@ -1,5 +1,5 @@
 """
-Typed signal primitives and port specifications for the BioSim 1.5 kernel.
+Typed signal primitives and port specifications for the BioSim communication-step kernel.
 """
 
 from __future__ import annotations
@@ -448,7 +448,7 @@ def validate_connection_specs(source: SignalSpec, target: SignalSpec) -> None:
 
 
 class BioSignal:
-    """Base class for all typed 1.5 signals."""
+    """Base class for all typed signals."""
 
     signal_type: SignalType = "record"
 

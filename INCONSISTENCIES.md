@@ -6,7 +6,7 @@ Source reviewed: `product-docs/PRD.md`
 
 - Wiring uses `name.port` references; port validation is enforced when declared.
 - BioWorld orchestration contract replaces legacy runtime layers.
-- SimUI run parameters align with `duration` + `tick_dt`.
+- SimUI run parameters align with `duration`.
 
 ## Placeholders / unfinished
 

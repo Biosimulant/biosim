@@ -3,12 +3,12 @@
 biosim is a modular biological simulation library. It centers around four ideas:
 
 - **BioWorld**: the runtime container that orchestrates multi-rate biomodules, routes signals, and publishes lifecycle events. Supports cooperative pause/resume/stop.
-- **BioModule**: a unit of behavior with local state that implements the 1.5 runnable contract (`setup/reset/advance_window/get_outputs/snapshot/restore/...`).
+- **BioModule**: a unit of behavior with local state that implements the runnable contract (`setup/reset/advance_window/get_outputs/snapshot/restore/...`).
 - **BioSignal**: typed data exchanged between modules over named ports. Each signal carries `source`, `name`, `value`, `emitted_at`, and a bound `SignalSpec`.
 - **SimUI**: a lightweight web UI layer for running, visualizing, and editing simulations from the browser, backed by FastAPI + a React SPA.
 
 ## Event flow (typical)
-- STARTED -> TICK x N -> FINISHED
+- STARTED -> STEP x N -> FINISHED
 - PAUSED, RESUMED, STOPPED, and ERROR may be emitted depending on runtime control flow.
 
 ## Directed biosignals
@@ -39,4 +39,4 @@ biosim is a modular biological simulation library. It centers around four ideas:
 Curated model packs and composed labs live in the companion [`Biosimulant/models`](https://github.com/Biosimulant/models) repo.
 
 ## Minimal data example (after wiring Eye -> LGN on port "visual_stream")
-- Run: `world.run(duration=0.2, tick_dt=0.1)` to advance the orchestrator and dispatch signals.
+- Run: `world.run(duration=0.2)` to advance the orchestrator and dispatch signals.

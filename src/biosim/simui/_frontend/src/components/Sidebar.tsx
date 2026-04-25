@@ -19,7 +19,7 @@ function StatusDisplay() {
   if (st.running) return (
     <div className="status-display">
       <div className={`status-badge ${st.paused ? 'status-paused' : 'status-running'}`}>{st.paused ? 'Paused' : 'Running'}</div>
-      <div className="status-info">Ticks: {st.tick_count?.toLocaleString() || 0}</div>
+      <div className="status-info">Steps: {st.step_count?.toLocaleString() || 0}</div>
     </div>
   )
   return <div className="status-display"><div className="status-badge status-idle">Idle</div></div>
@@ -38,8 +38,7 @@ function Controls({ onRun, onPause, onResume, onReset }: SimProps) {
   }
   const controlDefault = (name: string): number | undefined => numberControls.find((c) => c.name === name)?.default
   const duration = toFiniteNumber(state.controls.duration ?? controlDefault('duration'))
-  const tickDt = toFiniteNumber(state.controls.tick_dt ?? controlDefault('tick_dt'))
-  const simTime = toFiniteNumber(st?.tick_count) * tickDt
+  const simTime = toFiniteNumber(st?.sim_time)
 
   return (
     <div className="controls">

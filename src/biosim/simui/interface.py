@@ -79,7 +79,7 @@ class Interface:
         self._description = description
         self._config_path: Path | None = Path(config_path) if config_path else None
         # Base controls
-        base_controls = [Number("duration", 10.0), Number("tick_dt", 0.1), Button("Run")]
+        base_controls = [Number("duration", 10.0), Button("Run")]
         self._controls = list(controls or base_controls)
         self._outputs = list(outputs or [EventLog(), VisualsPanel()])
         self._mount_path = mount_path.rstrip("/") or "/ui"
@@ -166,14 +166,13 @@ class Interface:
         }
         with self._events_lock:
             self._events.append(record)
-            if event == WorldEvent.TICK:
+            if event == WorldEvent.STEP:
                 self._last_step = payload
 
         # Push to SSE subscribers
-        if event == WorldEvent.TICK:
-            # On STEP, send a tick with status, visuals, and the event
+        if event == WorldEvent.STEP:
             self._broadcast_sse({
-                "type": "tick",
+                "type": "step",
                 "data": {
                     "status": self._runner.status(),
                     "visuals": self._collect_visuals_safe(),
@@ -335,20 +334,15 @@ class Interface:
 
         @router.post("/api/run")
         def run(params: Dict[str, Any]) -> JSONResponse:
+            if "tick_dt" in params:
+                raise HTTPException(status_code=400, detail="'tick_dt' is not supported")
             duration = params.get("duration")
-            tick_dt = params.get("tick_dt")
             try:
                 duration_f = float(duration)
             except Exception:
                 raise HTTPException(status_code=400, detail="'duration' must be a number")
             if duration_f <= 0:
                 raise HTTPException(status_code=400, detail="'duration' must be positive")
-            try:
-                tick_f = float(tick_dt) if tick_dt is not None else None
-            except Exception:
-                raise HTTPException(status_code=400, detail="'tick_dt' must be a number")
-            if tick_f is not None and tick_f <= 0:
-                raise HTTPException(status_code=400, detail="'tick_dt' must be positive")
 
             def _on_start() -> None:
                 # Clear backend event buffers for a fresh run view (before the worker thread starts emitting).
@@ -357,7 +351,7 @@ class Interface:
                     self._event_seq = 0
                 self._last_step = None
 
-            started = self._runner.start_run(duration=duration_f, tick_dt=tick_f, on_start=_on_start)
+            started = self._runner.start_run(duration=duration_f, on_start=_on_start)
             if not started:
                 return JSONResponse({"ok": False, "reason": "already_running"}, status_code=409)
             return JSONResponse({"ok": True}, status_code=202)

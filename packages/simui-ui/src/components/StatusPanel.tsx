@@ -15,10 +15,9 @@ function StatusDisplay() {
   const numberControls = (state.spec?.controls || []).filter(isNumberControl)
   const controlDefault = (name: string): number | undefined => numberControls.find((c) => c.name === name)?.default
   const duration = toFiniteNumber(state.controls.duration ?? controlDefault('duration'))
-  const tickDt = toFiniteNumber(state.controls.tick_dt ?? controlDefault('tick_dt'))
-  const progress = resolveRunProgress({ status: st, duration, tickDt })
+  const progress = resolveRunProgress({ status: st, duration })
   const progressDisplay = progress.progressPct !== null && (
-    <div className="sim-progress-row" title={progress.estimated ? 'Estimated from ticks' : 'Simulation-time progress'}>
+    <div className="sim-progress-row" title="Simulation-time progress">
       <span className="sim-progress-label">{progress.progressLabel}</span>
       <div className="sim-progress-track" aria-hidden="true">
         <div className="sim-progress-fill" style={{ width: `${progress.progressPct}%` }} />
@@ -37,7 +36,7 @@ function StatusDisplay() {
   if (st.running) return (
     <div className="status-display">
       <div className={`status-badge ${st.paused ? 'status-paused' : 'status-running'}`}>{st.paused ? 'Paused' : 'Running'}</div>
-      <div className="status-info">Ticks: {st.tick_count?.toLocaleString() || 0}</div>
+      <div className="status-info">Steps: {st.step_count?.toLocaleString() || 0}</div>
       {progressDisplay}
     </div>
   )
@@ -59,17 +58,16 @@ export function useStatusSummary(): string {
     const numberControls = (state.spec?.controls || []).filter(isNumberControl)
     const controlDefault = (name: string): number | undefined => numberControls.find((c) => c.name === name)?.default
     const duration = toFiniteNumber(state.controls.duration ?? controlDefault('duration'))
-    const tickDt = toFiniteNumber(state.controls.tick_dt ?? controlDefault('tick_dt'))
-    const progress = resolveRunProgress({ status: st, duration, tickDt })
+    const progress = resolveRunProgress({ status: st, duration })
     if (st.error) return progress.progressPct !== null ? `Error · ${progress.progressLabel}` : 'Error'
     if (st.running) {
       return progress.progressPct !== null
         ? `${st.paused ? 'Paused' : 'Running'} · ${progress.progressLabel}`
-        : `${st.paused ? 'Paused' : 'Running'} · Ticks: ${st.tick_count?.toLocaleString() || 0}`
+        : `${st.paused ? 'Paused' : 'Running'} · Steps: ${st.step_count?.toLocaleString() || 0}`
     }
     if (progress.progressPct !== null) return `Idle · Last run: ${progress.progressLabel}`
     return 'Idle'
-  }, [state.controls.duration, state.controls.tick_dt, state.spec?.controls, state.status])
+  }, [state.controls.duration, state.spec?.controls, state.status])
 }
 
 export default function StatusPanel() {

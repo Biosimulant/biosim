@@ -24,7 +24,7 @@ def test_setup_called_and_outputs_available(biosim):
 
     world = biosim.BioWorld(communication_step=0.1)
     world.add_biomodule("test", TestModule())
-    world.run(duration=0.1, tick_dt=0.1)
+    world.run(duration=0.1)
 
     assert seen["setup"] == 1
     outputs = world.get_outputs("test")

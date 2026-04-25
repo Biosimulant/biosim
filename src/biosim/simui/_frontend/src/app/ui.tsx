@@ -29,7 +29,7 @@ export function UiProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatusState] = useState<RunStatus | null>(null)
   const [visuals, setVisualsState] = useState<ModuleVisuals[]>([])
   const [events, setEventsState] = useState<EventRecord[]>([])
-  const [controls, setControlsState] = useState<ControlsState>({ duration: 10, tick_dt: 0.1 })
+  const [controls, setControlsState] = useState<ControlsState>({ duration: 10 })
   const [visibleModules, setVisibleModulesState] = useState<Set<string>>(new Set())
 
   const actions: UiActions = React.useMemo(() => ({

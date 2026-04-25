@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ApiProvider, useApi } from "./app/providers";
 import { UiProvider, useUi, isJsonControl, isNumberControl } from "./app/ui";
-import type { EventRecord, RunStatus, Snapshot, TickData, UiSpec } from "./types/api";
+import type { EventRecord, RunStatus, Snapshot, StepData, UiSpec } from "./types/api";
 import type { SSEMessage, SSESubscription, SimulationApi } from "./lib/api";
 import type { ChatAdapter } from "./types/chat";
 import Sidebar from "./components/Sidebar";
@@ -122,11 +122,11 @@ function SimulationView({
           if (Array.isArray(snap?.events)) actions.setEvents(snap.events);
           break;
         }
-        case "tick": {
-          const tick = msg.data as TickData;
-          if (tick?.status) actions.setStatus(tick.status);
-          if (Array.isArray(tick?.visuals)) actions.setVisuals(tick.visuals);
-          if (tick?.event) actions.appendEvent(tick.event);
+        case "step": {
+          const step = msg.data as StepData;
+          if (step?.status) actions.setStatus(step.status);
+          if (Array.isArray(step?.visuals)) actions.setVisuals(step.visuals);
+          if (step?.event) actions.appendEvent(step.event);
           break;
         }
         case "event": {
@@ -207,10 +207,9 @@ function SimulationView({
         }
       }
       const duration = Number(payload.duration);
-      const tickDt = typeof payload.tick_dt === "number" ? (payload.tick_dt as number) : undefined;
       actions.setVisuals([]);
       actions.setEvents([]);
-      await api.run(duration, tickDt, payload);
+      await api.run(duration, payload);
     } finally {
       setRunPending(false);
     }

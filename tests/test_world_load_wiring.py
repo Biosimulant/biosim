@@ -21,4 +21,4 @@ def test_world_load_wiring_toml(tmp_path, biosim):
         encoding="utf-8",
     )
     biosim.load_wiring(world, path)
-    world.run(duration=0.1, tick_dt=0.1)
+    world.run(duration=0.1)

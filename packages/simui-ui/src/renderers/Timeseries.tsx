@@ -49,13 +49,13 @@ export default function Timeseries({ data, isFullscreen }: { data: { series?: Se
         <line x1={ML} y1={MT} x2={ML} y2={H - MB} className="axis" />
         {ticks(xMin, xMax, 5).map((tx) => (
           <g key={`tx-${tx}`}>
-            <line x1={sx(tx)} y1={H - MB} x2={sx(tx)} y2={H - MB + 4} className="tick" />
+            <line x1={sx(tx)} y1={H - MB} x2={sx(tx)} y2={H - MB + 4} className="step" />
             <text x={sx(tx)} y={H - 6} className="ticklbl" textAnchor="middle">{tx.toFixed(2)}</text>
           </g>
         ))}
         {ticks(yMin, yMax, 4).map((ty) => (
           <g key={`ty-${ty}`}>
-            <line x1={ML - 4} y1={sy(ty)} x2={ML} y2={sy(ty)} className="tick" />
+            <line x1={ML - 4} y1={sy(ty)} x2={ML} y2={sy(ty)} className="step" />
             <text x={ML - 6} y={sy(ty) + 3} className="ticklbl" textAnchor="end">{ty.toFixed(2)}</text>
           </g>
         ))}

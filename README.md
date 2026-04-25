@@ -132,7 +132,7 @@ class Counter(biosim.BioModule):
 
 world = biosim.BioWorld(communication_step=0.1)
 world.add_biomodule("counter", Counter())
-world.run(duration=1.0, tick_dt=0.1)
+world.run(duration=1.0)
 ```
 
 ### Visuals from Modules
@@ -161,7 +161,7 @@ class MyModule(biosim.BioModule):
 
 world = biosim.BioWorld(communication_step=0.1)
 world.add_biomodule("module", MyModule())
-world.run(duration=0.1, tick_dt=0.1)
+world.run(duration=0.1)
 print(world.collect_visuals())  # [{"module": "module", "visuals": [...]}]
 ```
 
@@ -215,10 +215,10 @@ SimUI lets you build and launch a small web UI entirely from Python (similar to 
 
     ```python
     from biosim.simui import Interface, Number, Button, EventLog, VisualsPanel
-    world = biosim.BioWorld()
+    world = biosim.BioWorld(communication_step=0.1)
     ui = Interface(
         world,
-        controls=[Number("duration", 10), Number("tick_dt", 0.1), Button("Run")],
+        controls=[Number("duration", 10), Button("Run")],
         outputs=[EventLog(), VisualsPanel()],
     )
     ui.launch()

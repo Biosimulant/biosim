@@ -41,7 +41,7 @@ def test_listener_error_is_logged(biosim, caplog):
         raise RuntimeError("boom")
 
     world.on(bad_listener)
-    world.run(duration=0.1, tick_dt=0.1)
+    world.run(duration=0.1)
 
     assert world.current_time == pytest.approx(0.1)
     assert any("world listener raised" in record.message for record in caplog.records)
@@ -126,7 +126,7 @@ def test_run_auto_setup_and_tick_payloads(biosim):
 
     assert world.current_time == pytest.approx(0.2)
     assert any(ev == WorldEvent.STARTED for ev, _ in events)
-    ticks = [payload for ev, payload in events if ev == WorldEvent.TICK]
+    ticks = [payload for ev, payload in events if ev == WorldEvent.STEP]
     assert ticks
     assert ticks[0]["window_start"] == pytest.approx(0.0)
     assert ticks[0]["window_end"] == pytest.approx(0.1)
@@ -156,7 +156,7 @@ def test_request_pause_and_resume_emit_events(biosim):
     world.add_biomodule("m", _make_module(biosim))
 
     def runner():
-        world.run(duration=0.3, tick_dt=0.1)
+        world.run(duration=0.3)
 
     thread = threading.Thread(target=runner, daemon=True)
     world.on(lambda ev, _payload: events.append(ev))

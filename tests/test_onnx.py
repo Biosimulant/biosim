@@ -81,3 +81,20 @@ def test_onnx_classifier_normalizes_feature_dict_input(biosim):
     assert outputs["scores"].value == pytest.approx([0.1, 0.2, 0.7])
     assert outputs["label"].value["label"] == "burst"
     assert session.seen[0][1]["state_vector"][0] == pytest.approx([1.0, 2.0, 0.0, 0.0])
+
+
+def test_onnx_classifier_uses_zero_vector_before_first_input(biosim):
+    session = _FakeSession()
+    module = biosim.OnnxClassifierModule(
+        model_path="artifacts/demo.onnx",
+        class_labels=["quiescent", "subthreshold", "spiking"],
+        session_factory=lambda model_path: session,
+        input_vector_length=4,
+    )
+
+    module.advance_window(0.0, 0.001)
+
+    outputs = module.get_outputs()
+    assert outputs["state_probabilities"].value == pytest.approx([0.1, 0.2, 0.7])
+    assert outputs["predicted_state"].value["label"] == "spiking"
+    assert session.seen[0][1]["state_vector"][0] == pytest.approx([0.0, 0.0, 0.0, 0.0])

@@ -43,7 +43,7 @@ class StepSeries(biosim.BioModule):
 def main() -> None:
     world = biosim.BioWorld(communication_step=0.1)
     world.add_biomodule("step_series", StepSeries())
-    world.run(duration=0.5, tick_dt=0.1)
+    world.run(duration=0.5)
 
     visuals = world.collect_visuals()
     print("Collected visuals:")

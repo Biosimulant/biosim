@@ -104,7 +104,7 @@ def main() -> None:
     world = biosim.BioWorld(communication_step=0.1)
     world.on(print_listener)
     world.add_biomodule("logger", StepLoggerModule())
-    world.run(duration=0.3, tick_dt=0.1)
+    world.run(duration=0.3)
 
     print("--- Signal routing demo ---")
     bw = biosim.BioWorld(communication_step=0.1)
@@ -117,7 +117,7 @@ def main() -> None:
     bw.add_biomodule("sc", sc)
     bw.connect("eye.vision", "lgn.vision")
     bw.connect("lgn.thalamus", "sc.thalamus")
-    bw.run(duration=0.3, tick_dt=0.1)
+    bw.run(duration=0.3)
 
 
 if __name__ == "__main__":

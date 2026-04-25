@@ -14,7 +14,6 @@ describe("resolveRunProgress", () => {
         sim_remaining: 7,
       },
       duration: 10,
-      tickDt: 0.1,
     });
     expect(out.progress).toBe(0.3);
     expect(out.progressPct).toBe(30.0);
@@ -24,29 +23,10 @@ describe("resolveRunProgress", () => {
     expect(out.estimated).toBe(false);
   });
 
-  it("falls back to tick_count estimate when backend fields are absent", () => {
-    const out = resolveRunProgress({
-      status: {
-        running: true,
-        paused: false,
-        tick_count: 5,
-      },
-      duration: 10,
-      tickDt: 1,
-    });
-    expect(out.progress).toBe(0.5);
-    expect(out.progressPct).toBe(50);
-    expect(out.progressLabel).toBe("50.0%");
-    expect(out.simTime).toBe(5);
-    expect(out.simRemaining).toBe(5);
-    expect(out.estimated).toBe(true);
-  });
-
   it("clamps invalid percent ranges", () => {
     const high = resolveRunProgress({
       status: { running: true, paused: false, progress_pct: 120 },
       duration: 10,
-      tickDt: 1,
     });
     expect(high.progress).toBe(1);
     expect(high.progressPct).toBe(100);
@@ -54,7 +34,6 @@ describe("resolveRunProgress", () => {
     const low = resolveRunProgress({
       status: { running: true, paused: false, progress_pct: -4 },
       duration: 10,
-      tickDt: 1,
     });
     expect(low.progress).toBe(0);
     expect(low.progressPct).toBe(0);
@@ -64,7 +43,6 @@ describe("resolveRunProgress", () => {
     const out = resolveRunProgress({
       status: { running: false, paused: false },
       duration: Number.NaN,
-      tickDt: Number.NaN,
     });
     expect(out.progress).toBeNull();
     expect(out.progressPct).toBeNull();

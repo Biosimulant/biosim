@@ -178,7 +178,7 @@ class TestRunEndpoint:
     def test_run_success(self):
         app, ui = _make_app()
         client = TestClient(app)
-        r = client.post("/ui/api/run", json={"duration": 0.05, "tick_dt": 0.01})
+        r = client.post("/ui/api/run", json={"duration": 0.05})
         assert r.status_code == 202
         assert r.json()["ok"] is True
         # Wait for completion
@@ -189,10 +189,10 @@ class TestRunEndpoint:
         world.add_biomodule("m", SimpleModule(slow=True))
         app, ui = _make_app(world=world)
         client = TestClient(app)
-        r1 = client.post("/ui/api/run", json={"duration": 100.0, "tick_dt": 0.01})
+        r1 = client.post("/ui/api/run", json={"duration": 100.0})
         assert r1.status_code == 202
         time.sleep(0.1)
-        r2 = client.post("/ui/api/run", json={"duration": 100.0, "tick_dt": 0.01})
+        r2 = client.post("/ui/api/run", json={"duration": 100.0})
         assert r2.status_code == 409
         ui._runner.request_stop()
         ui._runner.join(timeout=5.0)
@@ -209,19 +209,13 @@ class TestRunEndpoint:
         r = client.post("/ui/api/run", json={"duration": -1})
         assert r.status_code == 400
 
-    def test_run_bad_tick_dt(self):
+    def test_run_rejects_tick_dt(self):
         app, ui = _make_app()
         client = TestClient(app)
-        r = client.post("/ui/api/run", json={"duration": 1.0, "tick_dt": "bad"})
+        r = client.post("/ui/api/run", json={"duration": 1.0, "tick_dt": 0.1})
         assert r.status_code == 400
 
-    def test_run_negative_tick_dt(self):
-        app, ui = _make_app()
-        client = TestClient(app)
-        r = client.post("/ui/api/run", json={"duration": 1.0, "tick_dt": -0.1})
-        assert r.status_code == 400
-
-    def test_run_no_tick_dt(self):
+    def test_run_duration_only(self):
         app, ui = _make_app()
         client = TestClient(app)
         r = client.post("/ui/api/run", json={"duration": 0.05})
@@ -259,7 +253,7 @@ class TestStatusEndpoints:
     def test_status_includes_progress_after_run(self):
         app, ui = _make_app()
         client = TestClient(app)
-        run_response = client.post("/ui/api/run", json={"duration": 0.05, "tick_dt": 0.01})
+        run_response = client.post("/ui/api/run", json={"duration": 0.05})
         assert run_response.status_code == 202
         ui._runner.join(timeout=5.0)
 
@@ -295,7 +289,7 @@ class TestPauseResumeEndpoints:
         app, ui = _make_app(world=world)
         client = TestClient(app)
         # Start a run
-        client.post("/ui/api/run", json={"duration": 100.0, "tick_dt": 0.01})
+        client.post("/ui/api/run", json={"duration": 100.0})
         time.sleep(0.15)
         # Pause
         r = client.post("/ui/api/pause")
@@ -325,7 +319,7 @@ class TestEventsEndpoint:
         app, ui = _make_app()
         client = TestClient(app)
         # Run a quick simulation to generate events
-        client.post("/ui/api/run", json={"duration": 0.05, "tick_dt": 0.01})
+        client.post("/ui/api/run", json={"duration": 0.05})
         ui._runner.join(timeout=5.0)
         r = client.get("/ui/api/events")
         data = r.json()
@@ -334,7 +328,7 @@ class TestEventsEndpoint:
     def test_events_since_id(self):
         app, ui = _make_app()
         client = TestClient(app)
-        client.post("/ui/api/run", json={"duration": 0.05, "tick_dt": 0.01})
+        client.post("/ui/api/run", json={"duration": 0.05})
         ui._runner.join(timeout=5.0)
         r = client.get("/ui/api/events?since_id=1&limit=5")
         data = r.json()
@@ -354,7 +348,7 @@ class TestVisualsEndpoint:
         app, ui = _make_app(world=world)
         client = TestClient(app)
         # Run to generate outputs
-        client.post("/ui/api/run", json={"duration": 0.2, "tick_dt": 0.1})
+        client.post("/ui/api/run", json={"duration": 0.2})
         ui._runner.join(timeout=5.0)
         r = client.get("/ui/api/visuals")
         data = r.json()
@@ -371,7 +365,7 @@ class TestVisualsEndpoint:
         app, ui = _make_app(world=world)
         client = TestClient(app)
 
-        client.post("/ui/api/run", json={"duration": 0.1, "tick_dt": 0.1})
+        client.post("/ui/api/run", json={"duration": 0.1})
         ui._runner.join(timeout=5.0)
 
         visuals_response = client.get("/ui/api/visuals")
@@ -432,8 +426,8 @@ class TestListenerAndSSE:
     def test_listener_records_events(self):
         world = _make_world()
         ui = Interface(world)
-        # Simulate a tick event
-        ui._listener(WorldEvent.TICK, {"t": 0.1, "module": "m"})
+        # Simulate a step event
+        ui._listener(WorldEvent.STEP, {"t": 0.1, "module": "m"})
         assert len(ui._events) == 1
         assert ui._last_step is not None
 
@@ -470,9 +464,9 @@ class TestListenerAndSSE:
             "status",
             return_value={"running": True, "paused": False, "progress": 0.1, "progress_pct": 10.0},
         ):
-            ui._listener(WorldEvent.TICK, {"t": 0.1, "progress": 0.1, "progress_pct": 10.0})
+            ui._listener(WorldEvent.STEP, {"t": 0.1, "progress": 0.1, "progress_pct": 10.0})
         msg = q.get_nowait()
-        assert msg["type"] == "tick"
+        assert msg["type"] == "step"
         assert msg["data"]["status"]["progress_pct"] == pytest.approx(10.0)
         assert msg["data"]["event"]["payload"]["progress_pct"] == pytest.approx(10.0)
         ui._unsubscribe_sse(q)
@@ -598,7 +592,7 @@ class TestEventsInternals:
         world = _make_world()
         ui = Interface(world)
         ui._listener(WorldEvent.STARTED, {})
-        ui._listener(WorldEvent.TICK, {"t": 0.1})
+        ui._listener(WorldEvent.STEP, {"t": 0.1})
         ui._listener(WorldEvent.FINISHED, {})
         result = ui._events_since(1, 200)
         # Should get events with id > 1

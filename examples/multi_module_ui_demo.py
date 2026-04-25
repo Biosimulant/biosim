@@ -144,7 +144,6 @@ def main():
         title="Multi-Module Demo",
         controls=[
             biosim.simui.Number("duration", 10.0),
-            biosim.simui.Number("tick_dt", 0.1),
             biosim.simui.Button("Run"),
         ],
     )

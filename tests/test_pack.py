@@ -138,7 +138,6 @@ models:
 runtime:
   communication_step: 0.1
   duration: 0.2
-  tick_dt: 0.1
   initial_inputs: {}
 wiring:
   - from: counter.count
@@ -164,7 +163,6 @@ models:
 runtime:
   communication_step: 0.1
   duration: 0.2
-  tick_dt: 0.1
   initial_inputs: {}
 wiring: []
 """.strip()
@@ -196,7 +194,6 @@ io:
 runtime:
   communication_step: 0.1
   duration: 0.2
-  tick_dt: 0.1
   initial_inputs: {}
 wiring: []
 """.strip()
@@ -228,7 +225,6 @@ children:
 runtime:
   communication_step: 0.1
   duration: 0.2
-  tick_dt: 0.1
   initial_inputs: {}
 wiring:
   - from: nested.count
@@ -402,7 +398,6 @@ models:
     alias: counter
 runtime:
   duration: 0.2
-  tick_dt: 0.1
   initial_inputs: {}
 wiring: []
 """.strip()

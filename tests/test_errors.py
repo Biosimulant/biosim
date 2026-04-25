@@ -21,7 +21,7 @@ def test_error_event_and_finished_emitted(biosim):
 
     world.on(listener)
     with pytest.raises(RuntimeError):
-        world.run(duration=0.1, tick_dt=0.1)
+        world.run(duration=0.1)
 
     assert biosim.WorldEvent.ERROR in seen
     assert biosim.WorldEvent.FINISHED in seen

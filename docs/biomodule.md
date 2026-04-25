@@ -1,6 +1,6 @@
 # API: `BioModule`
 
-`BioModule` is the runnable unit in the 1.5 kernel. Modules no longer participate in a per-module due-time scheduler. Instead, the world advances every module across the same communication window and commits outputs atomically at the boundary.
+`BioModule` is the runnable unit in the communication-step kernel. Modules no longer participate in a per-module due-time scheduler. Instead, the world advances every module across the same communication window and commits outputs atomically at the boundary.
 
 ## Required runtime contract
 

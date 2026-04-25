@@ -70,7 +70,7 @@ def test_wiring_builder_connects_by_names_and_topics(biosim):
     wb.connect("eye.visual_stream", ["lgn.retina"])  # Eye -> LGN
     wb.connect("lgn.thalamus", ["sc.vision"]).apply()  # LGN -> SC
 
-    world.run(duration=0.3, tick_dt=0.1)
+    world.run(duration=0.3)
 
     assert calls["lgn"] >= 1
     assert calls["sc"] >= 1

@@ -799,7 +799,7 @@ def _run_model_loaded_package(loaded: _LoadedPackage, *, install_deps: bool = Tr
     module.setup(meta["setup"])
     communication_step = meta["communication_step"]
     if communication_step is None:
-        raise PackageError("Model package biosim.communication_step is required in the 1.5 kernel")
+        raise PackageError("Model package biosim.communication_step is required")
     module.advance_window(0.0, float(communication_step))
     outputs = module.get_outputs()
     return {
@@ -911,7 +911,7 @@ def _run_space_loaded_package(loaded: _LoadedPackage, *, install_deps: bool = Tr
 
     communication_step = runtime.get("communication_step")
     if communication_step is None:
-        raise PackageError("Space manifest runtime.communication_step is required in the 1.5 kernel")
+        raise PackageError("Space manifest runtime.communication_step is required")
     world = BioWorld(communication_step=float(communication_step))
     builder = WiringBuilder(world)
     resolved_models: list[dict[str, Any]] = []
@@ -933,7 +933,7 @@ def _run_space_loaded_package(loaded: _LoadedPackage, *, install_deps: bool = Tr
         parameters = entry.get("parameters") if isinstance(entry.get("parameters"), Mapping) else {}
         module, meta = _instantiate_model_from_dir(model_path, manifest=manifest, parameters=parameters)
         if entry.get("min_dt") is not None or entry.get("priority") is not None:
-            raise PackageError("Space model entries cannot declare min_dt or priority in the 1.5 kernel")
+            raise PackageError("Space model entries cannot declare min_dt or priority")
         builder.add(alias, module)
         if meta["setup"]:
             setup_config[alias] = dict(meta["setup"])
@@ -962,10 +962,8 @@ def _run_space_loaded_package(loaded: _LoadedPackage, *, install_deps: bool = Tr
 
     effective_runtime = parsed_space.get("runtime") if isinstance(parsed_space.get("runtime"), Mapping) else runtime
     duration = float(effective_runtime.get("duration", 1.0))
-    tick_dt = effective_runtime.get("tick_dt")
-    tick = float(tick_dt) if tick_dt is not None else None
     world.setup(setup_config)
-    world.run(duration=duration, tick_dt=tick)
+    world.run(duration=duration)
     return {
         "package": loaded.package_yaml["package"],
         "version": loaded.package_yaml["version"],
@@ -1101,6 +1099,16 @@ def _validate_space_manifest(manifest: Mapping[str, Any]) -> None:
     runtime = manifest.get("runtime")
     if not isinstance(runtime, Mapping):
         raise PackageError("Space manifest must contain a runtime mapping")
+    if "tick_dt" in runtime:
+        raise PackageError("Space manifest runtime.tick_dt is not supported")
+    communication_step = runtime.get("communication_step")
+    if communication_step is None:
+        raise PackageError("Space manifest must contain runtime.communication_step")
+    try:
+        if float(communication_step) <= 0:
+            raise PackageError("Space manifest runtime.communication_step must be positive")
+    except (TypeError, ValueError) as exc:
+        raise PackageError("Space manifest runtime.communication_step must be numeric") from exc
 
 
 __all__ = [

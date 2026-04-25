@@ -84,13 +84,13 @@ describe("createSimuiApi", () => {
 
     await api.visuals();
     await api.snapshot();
-    await api.run(12, 0.5, { seed: 1 });
+    await api.run(12, { seed: 1 });
     await api.pause();
     await api.resume();
     await api.reset();
 
     expect((fetch as any).mock.calls[2][1]).toMatchObject({ method: "POST" });
-    expect((fetch as any).mock.calls[2][1].body).toBe(JSON.stringify({ duration: 12, tick_dt: 0.5, seed: 1 }));
+    expect((fetch as any).mock.calls[2][1].body).toBe(JSON.stringify({ duration: 12, seed: 1 }));
   });
 
   it("exercises editor API endpoints", async () => {

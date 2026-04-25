@@ -1,6 +1,6 @@
-# Kernel 1.5
+# Communication-Step Kernel
 
-Kernel 1.5 moves BioSim from a per-module due-time scheduler to a communication-step co-simulation model.
+The communication-step kernel moves BioSim from a per-module due-time scheduler to a communication-step co-simulation model.
 
 ## What changed
 
@@ -24,7 +24,7 @@ This means closed loops are modeled as sampled-data coupling at communication bo
 
 ## Typed signals
 
-Kernel 1.5 defines a closed signal family:
+The communication-step kernel defines a closed signal family:
 
 - `ScalarSignal`
 - `ArraySignal`

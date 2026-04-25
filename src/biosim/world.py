@@ -18,7 +18,7 @@ class WorldEvent(Enum):
     """Runtime events emitted by the BioWorld orchestrator."""
 
     STARTED = "started"
-    TICK = "tick"
+    STEP = "step"
     FINISHED = "finished"
     ERROR = "error"
     PAUSED = "paused"
@@ -54,15 +54,13 @@ class Connection:
 class BioWorld:
     """Communication-step orchestration kernel for runnable biomodules."""
 
-    def __init__(self, *, communication_step: float, time_unit: str = "seconds") -> None:
+    def __init__(self, *, communication_step: float) -> None:
         if communication_step <= 0:
             raise ValueError("communication_step must be positive")
         self.communication_step = float(communication_step)
-        self.time_unit = time_unit
         self._modules: Dict[str, ModuleEntry] = {}
         self._connections_by_target: Dict[str, List[Connection]] = {}
         self._signal_store: Dict[str, Dict[str, BioSignal]] = {}
-        self._signal_history: Dict[str, Dict[str, List[BioSignal]]] = {}
         self._current_time: float = 0.0
         self._is_setup: bool = False
         self._listeners: List[Listener] = []
@@ -196,7 +194,6 @@ class BioWorld:
         config = config or {}
         self._setup_config = {name: dict(module_cfg or {}) for name, module_cfg in config.items()}
         self._signal_store = {}
-        self._signal_history = {}
         self._current_time = 0.0
         for connections in self._connections_by_target.values():
             for conn in connections:
@@ -240,12 +237,6 @@ class BioWorld:
         if not outputs:
             return
         self._signal_store[module_name] = dict(outputs)
-        history = self._signal_history.setdefault(module_name, {})
-        for port, signal in outputs.items():
-            samples = history.setdefault(port, [])
-            samples.append(signal)
-            if len(samples) > 2:
-                del samples[:-2]
 
     def _warn_if_input_stale(self, conn: Connection, source_signal: BioSignal, target_spec: SignalSpec, now: float) -> None:
         if source_signal.kind == "event":
@@ -280,7 +271,7 @@ class BioWorld:
             target_spec.max_age,
         )
 
-    def _collect_inputs(self, target_name: str, start: float, end: float) -> Dict[str, BioSignal]:
+    def _collect_inputs(self, target_name: str, start: float) -> Dict[str, BioSignal]:
         inputs: Dict[str, BioSignal] = {}
         entry = self._modules[target_name]
         for conn in self._connections_by_target.get(target_name, []):
@@ -298,7 +289,7 @@ class BioWorld:
         return inputs
 
     # --- Run loop -----------------------------------------------------
-    def run(self, duration: float, *, tick_dt: Optional[float] = None) -> None:
+    def run(self, duration: float) -> None:
         if not self._is_setup:
             self.setup()
         if duration <= 0:
@@ -306,7 +297,6 @@ class BioWorld:
 
         eps = 1e-12
         end_time = self._current_time + duration
-        next_tick_time = self._current_time if tick_dt is None else self._current_time + tick_dt
         self._active_run_start = self._current_time
         self._active_run_end = end_time
 
@@ -327,7 +317,7 @@ class BioWorld:
                 window_start = self._current_time
                 window_end = min(window_start + self.communication_step, end_time)
                 window_inputs = {
-                    name: self._collect_inputs(name, window_start, window_end)
+                    name: self._collect_inputs(name, window_start)
                     for name in self._modules.keys()
                 }
 
@@ -348,20 +338,15 @@ class BioWorld:
 
                 self._current_time = window_end
 
-                if tick_dt is None:
-                    self._emit(
-                        WorldEvent.TICK,
-                        {
-                            "t": self._current_time,
-                            "window_start": window_start,
-                            "window_end": window_end,
-                            **self._progress_payload(self._current_time),
-                        },
-                    )
-                else:
-                    while next_tick_time <= self._current_time + eps:
-                        self._emit(WorldEvent.TICK, {"t": next_tick_time, **self._progress_payload(next_tick_time)})
-                        next_tick_time += tick_dt
+                self._emit(
+                    WorldEvent.STEP,
+                    {
+                        "t": self._current_time,
+                        "window_start": window_start,
+                        "window_end": window_end,
+                        **self._progress_payload(self._current_time),
+                    },
+                )
 
         except SimulationStop:
             self._emit(WorldEvent.STOPPED, {"t": self._current_time, **self._progress_payload(self._current_time)})
@@ -392,7 +377,6 @@ class BioWorld:
     # --- Snapshot / restore ------------------------------------------
     def snapshot(self) -> Dict[str, Any]:
         return {
-            "time_unit": self.time_unit,
             "communication_step": self.communication_step,
             "current_time": self._current_time,
             "is_setup": self._is_setup,
@@ -400,13 +384,6 @@ class BioWorld:
             "signal_store": {
                 module_name: {port: signal.to_dict() for port, signal in outputs.items()}
                 for module_name, outputs in self._signal_store.items()
-            },
-            "signal_history": {
-                module_name: {
-                    port: [signal.to_dict() for signal in history]
-                    for port, history in port_map.items()
-                }
-                for module_name, port_map in self._signal_history.items()
             },
             "connections": {
                 target: [
@@ -429,6 +406,8 @@ class BioWorld:
         }
 
     def restore(self, snapshot: Mapping[str, Any]) -> None:
+        if "time_unit" in snapshot or "signal_history" in snapshot:
+            raise ValueError("snapshot uses removed world fields")
         if not self._is_setup:
             setup_config = snapshot.get("setup_config")
             self.setup(copy.deepcopy(setup_config) if isinstance(setup_config, Mapping) else None)
@@ -453,14 +432,6 @@ class BioWorld:
             }
         self._signal_store = signal_store
 
-        signal_history: Dict[str, Dict[str, List[BioSignal]]] = {}
-        for module_name, port_map in snapshot.get("signal_history", {}).items():
-            signal_history[module_name] = {
-                port: [BioSignal.from_dict(signal_dict) for signal_dict in samples]
-                for port, samples in port_map.items()
-            }
-        self._signal_history = signal_history
-
         snapshot_connections = snapshot.get("connections", {})
         if not isinstance(snapshot_connections, Mapping):
             raise ValueError("snapshot connections must be a mapping")
@@ -474,7 +445,7 @@ class BioWorld:
 
     def branch(self) -> "BioWorld":
         snapshot = self.snapshot()
-        branched = BioWorld(communication_step=self.communication_step, time_unit=self.time_unit)
+        branched = BioWorld(communication_step=self.communication_step)
         for name, entry in self._modules.items():
             try:
                 module_copy = copy.deepcopy(entry.module)

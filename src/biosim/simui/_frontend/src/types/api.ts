@@ -56,7 +56,7 @@ export type UiSpec = {
 export type RunStatus = {
   running: boolean
   paused: boolean
-  tick_count?: number
+  step_count?: number
   phase?: string
   phase_message?: string
   error?: { message: string }
@@ -68,7 +68,7 @@ export type Snapshot = {
   events: EventRecord[]
 }
 
-export type TickData = {
+export type StepData = {
   status: RunStatus
   visuals: ModuleVisuals[]
   event: EventRecord

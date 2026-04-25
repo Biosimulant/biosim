@@ -42,11 +42,13 @@ class OnnxClassifierModule(BioModule):
         model_output_name: Optional[str] = None,
         base_dir: Optional[str] = None,
         input_vector_length: Optional[int] = None,
+        integration_step: float = 0.001,
         session_factory: Optional[Callable[[str], Any]] = None,
         providers: Optional[Sequence[str]] = None,
         probabilities_description: str = "Classifier probabilities over the declared ONNX class labels",
         predicted_description: str = "Most likely ONNX-predicted state",
     ) -> None:
+        self.integration_step = float(integration_step)
         self.model_path = model_path
         self.class_labels = list(class_labels or ["class_0"])
         self.input_port = input_port
@@ -61,7 +63,7 @@ class OnnxClassifierModule(BioModule):
         self.probabilities_description = probabilities_description
         self.predicted_description = predicted_description
         self._session: Any = None
-        self._latest_vector: List[float] = []
+        self._latest_vector: List[float] = self._initial_vector()
         self._latest_probs: List[float] = [1.0] + [0.0] * (len(self.class_labels) - 1)
         self._latest_label: str = self.class_labels[0]
         self._outputs: Dict[str, Any] = {}
@@ -92,10 +94,15 @@ class OnnxClassifierModule(BioModule):
         }
 
     def reset(self) -> None:
-        self._latest_vector = []
+        self._latest_vector = self._initial_vector()
         self._latest_probs = [1.0] + [0.0] * (len(self.class_labels) - 1)
         self._latest_label = self.class_labels[0]
         self._outputs = {}
+
+    def _initial_vector(self) -> List[float]:
+        if self.input_vector_length is None:
+            return []
+        return [0.0] * self.input_vector_length
 
     def _resolved_model_path(self) -> str:
         path = Path(self.model_path)
@@ -183,13 +190,18 @@ class OnnxClassifierModule(BioModule):
         return {
             "input_port": self.input_port,
             "model_path": self.model_path,
+            "integration_step": self.integration_step,
             "latest_vector": list(self._latest_vector),
             "latest_probs": list(self._latest_probs),
             "latest_label": self._latest_label,
         }
 
     def restore(self, snapshot: Mapping[str, Any]) -> None:
-        self._latest_vector = list(snapshot.get("latest_vector", []))
+        self.integration_step = float(snapshot.get("integration_step", self.integration_step))
+        if "latest_vector" in snapshot:
+            self._latest_vector = self._normalize_input_value(snapshot["latest_vector"])
+        else:
+            self._latest_vector = self._initial_vector()
         self._latest_probs = list(snapshot.get("latest_probs", self._latest_probs))
         self._latest_label = str(snapshot.get("latest_label", self._latest_label))
 

@@ -79,16 +79,16 @@ def create_world(config: Dict[str, Any] | None = None, communication_step: float
     runtime = config.get("runtime") if isinstance(config.get("runtime"), dict) else {}
     step = communication_step if communication_step is not None else runtime.get("communication_step")
     if step is None:
-        raise ValueError("runtime.communication_step is required for the 1.5 kernel")
+        raise ValueError("runtime.communication_step is required")
     return biosim.BioWorld(communication_step=float(step))
 
 
-def run_headless(world: "BioWorld", duration: float, tick_dt: float | None) -> None:
+def run_headless(world: "BioWorld", duration: float) -> None:
     """Run simulation without UI and print results."""
     print(f"Running simulation: duration={duration}")
     print("-" * 40)
 
-    world.run(duration=duration, tick_dt=tick_dt)
+    world.run(duration=duration)
 
     print("Simulation complete.")
     print("-" * 40)
@@ -112,7 +112,6 @@ def run_simui(
     *,
     config_path: Path,
     duration: float,
-    tick_dt: float | None,
     port: int,
     host: str,
     open_browser: bool,
@@ -131,7 +130,6 @@ def run_simui(
 
     controls = [
         Number("duration", duration, label="Duration", minimum=0.01, maximum=100000.0, step=0.1),
-        Number("tick_dt", tick_dt or 0.1, label="Tick dt", minimum=0.001, maximum=10.0, step=0.01),
         Button("Run"),
     ]
 
@@ -189,12 +187,6 @@ Examples:
         help="Simulation duration in BioWorld time units (default: 10.0)",
     )
     parser.add_argument(
-        "--tick",
-        type=float,
-        default=0.1,
-        help="Tick interval for UI/events (default: 0.1)",
-    )
-    parser.add_argument(
         "--communication-step",
         type=float,
         default=None,
@@ -240,21 +232,18 @@ Examples:
     print(f"Loaded config: {args.config}")
     print(f"Modules: {module_count}")
 
-    tick_dt = args.tick if args.tick > 0 else None
-
     if args.simui:
         run_simui(
             world,
             config,
             config_path=args.config.resolve(),
             duration=args.duration,
-            tick_dt=tick_dt,
             port=args.port,
             host=args.host,
             open_browser=args.open_browser,
         )
     else:
-        run_headless(world, duration=args.duration, tick_dt=tick_dt)
+        run_headless(world, duration=args.duration)
 
 
 def _main_pack(argv: list[str]) -> None:

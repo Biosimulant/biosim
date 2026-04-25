@@ -1,5 +1,5 @@
 export type SSEMessage = {
-  type: 'snapshot' | 'event' | 'status' | 'tick' | 'heartbeat'
+  type: 'snapshot' | 'event' | 'status' | 'step' | 'heartbeat'
   data: unknown
 }
 
@@ -142,8 +142,8 @@ export function makeApi(baseUrl: string) {
     }).toString()}`),
     visuals: () => get('/api/visuals'),
     snapshot: () => get('/api/snapshot'),
-    run: (duration: number, tick_dt?: number, extra?: Record<string, unknown>) =>
-      post('/api/run', { duration, tick_dt, ...(extra || {}) }),
+    run: (duration: number, extra?: Record<string, unknown>) =>
+      post('/api/run', { duration, ...(extra || {}) }),
     pause: () => post('/api/pause', {}),
     resume: () => post('/api/resume', {}),
     reset: () => post('/api/reset', {}),

@@ -1,6 +1,6 @@
-# Plugin Development (1.5)
+# Plugin Development
 
-Plugins and first-party modules should target the 1.5 kernel contract directly.
+Plugins and first-party modules should target the communication-step kernel contract directly.
 
 ## Expectations
 

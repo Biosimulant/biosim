@@ -41,7 +41,7 @@ to = ["lgn.retina", "sc.vision"]
 
     world = biosim.BioWorld(communication_step=0.1)
     biosim.load_wiring_toml(world, path)
-    world.run(duration=0.1, tick_dt=0.1)
+    world.run(duration=0.1)
 
 
 def test_build_from_spec_with_preadded_modules(biosim):
@@ -59,4 +59,4 @@ def test_build_from_spec_with_preadded_modules(biosim):
         ],
     }
     biosim.build_from_spec(world, spec)
-    world.run(duration=0.1, tick_dt=0.1)
+    world.run(duration=0.1)

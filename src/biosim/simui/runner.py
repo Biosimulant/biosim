@@ -11,7 +11,7 @@ class RunStatus:
     running: bool = False
     started_at: Optional[float] = None
     finished_at: Optional[float] = None
-    tick_count: int = 0
+    step_count: int = 0
     error: Optional[str] = None
     paused: bool = False
     sim_time: Optional[float] = None
@@ -37,7 +37,6 @@ class SimulationManager:
         self,
         *,
         duration: float,
-        tick_dt: Optional[float],
         on_start: Optional[Callable[[], None]] = None,
     ) -> bool:
         """Attempt to start a background run. Returns False if already running."""
@@ -46,9 +45,9 @@ class SimulationManager:
                 return False
             if on_start is not None:
                 on_start()
-            self._status = RunStatus(running=True, started_at=time.time(), tick_count=0, error=None)
+            self._status = RunStatus(running=True, started_at=time.time(), step_count=0, error=None)
             self._stop_requested = False
-            self._thread = threading.Thread(target=self._worker, args=(duration, tick_dt), daemon=True)
+            self._thread = threading.Thread(target=self._worker, args=(duration,), daemon=True)
             self._thread.start()
             return True
 
@@ -59,7 +58,7 @@ class SimulationManager:
             "paused": st.paused,
             "started_at": _ts(st.started_at),
             "finished_at": _ts(st.finished_at),
-            "tick_count": st.tick_count,
+            "step_count": st.step_count,
             "error": {"message": st.error} if st.error else None,
         }
         if st.sim_time is not None:
@@ -118,14 +117,14 @@ class SimulationManager:
                 self._status = RunStatus()
 
     # Internal -------------------------------------------------------------
-    def _worker(self, duration: float, tick_dt: Optional[float]) -> None:
+    def _worker(self, duration: float) -> None:
         try:
             from biosim.world import WorldEvent  # lazy to avoid circulars
 
             def _counter(ev, payload):
                 with self._lock:
-                    if ev == WorldEvent.TICK:
-                        self._status.tick_count += 1
+                    if ev == WorldEvent.STEP:
+                        self._status.step_count += 1
                     if ev == WorldEvent.PAUSED:
                         self._status.paused = True
                     elif ev == WorldEvent.RESUMED:
@@ -134,7 +133,7 @@ class SimulationManager:
 
             self._world.on(_counter)
             try:
-                self._world.run(duration=duration, tick_dt=tick_dt)
+                self._world.run(duration=duration)
             finally:
                 self._world.off(_counter)
         except Exception as exc:  # pragma: no cover

@@ -38,8 +38,7 @@ function SidebarActions({
   const numberControls = (state.spec?.controls || []).filter(isNumberControl)
   const controlDefault = (name: string): number | undefined => numberControls.find((c) => c.name === name)?.default
   const duration = toFiniteNumber(state.controls.duration ?? controlDefault('duration'))
-  const tickDt = toFiniteNumber(state.controls.tick_dt ?? controlDefault('tick_dt'))
-  const progress = resolveRunProgress({ status: st, duration, tickDt })
+  const progress = resolveRunProgress({ status: st, duration })
 
   let statusSummary = 'Idle'
   if (st?.error) statusSummary = progress.progressPct !== null ? `Error · ${progress.progressLabel}` : 'Error'
@@ -95,10 +94,9 @@ function Controls() {
 
   const controlDefault = (name: string): number | undefined => numberControls.find((c) => c.name === name)?.default
   const duration = toFiniteNumber(state.controls.duration ?? controlDefault('duration'))
-  const tickDt = toFiniteNumber(state.controls.tick_dt ?? controlDefault('tick_dt'))
-  const progress = resolveRunProgress({ status: st, duration, tickDt })
+  const progress = resolveRunProgress({ status: st, duration })
 
-  const runtimeNames = new Set(['duration', 'tick_dt'])
+  const runtimeNames = new Set(['duration'])
   const runtimeControls = numberControls.filter((c) => runtimeNames.has(c.name))
   const otherNumberControls = numberControls.filter((c) => !runtimeNames.has(c.name))
   const moduleNameSet = new Set(moduleNames)

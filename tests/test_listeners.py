@@ -23,5 +23,5 @@ def test_listener_on_off(biosim):
 
     world.on(listener)
     world.off(listener)
-    world.run(duration=0.1, tick_dt=0.1)
+    world.run(duration=0.1)
     assert called["n"] == 0

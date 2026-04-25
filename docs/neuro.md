@@ -71,7 +71,7 @@ python -c "
 import biosim
 w = biosim.BioWorld(communication_step=0.001)
 biosim.load_wiring(w, 'spaces/neuro-single-neuron/wiring.yaml')
-w.run(duration=0.5, tick_dt=0.0001)
+w.run(duration=0.5, communication_step=0.0001)
 print('Simulation complete')
 for v in w.collect_visuals():
     print(f'  {v[\"module\"]}: {[x[\"render\"] for x in v[\"visuals\"]]}')"
@@ -286,7 +286,7 @@ Metrics computed:
 
 ## Signal Conventions
 
-The neuro packs use typed 1.5 signals with explicit `SignalSpec` declarations on every port.
+The neuro packs use typed signals with explicit `SignalSpec` declarations on every port.
 
 ### Spike signals (`EventSignal`)
 Emitted by populations and input generators. The `value` field contains the neuron indices that spiked during the current communication window:
@@ -472,7 +472,7 @@ Load and run:
 import biosim
 world = biosim.BioWorld()
 biosim.load_wiring(world, "spaces/neuro-single-neuron/wiring.yaml")
-world.run(duration=0.3, tick_dt=0.0001)
+world.run(duration=0.3, communication_step=0.0001)
 ```
 
 ## See Also

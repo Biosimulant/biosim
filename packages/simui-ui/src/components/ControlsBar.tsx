@@ -14,7 +14,7 @@ export interface ControlsBarProps {
 
 /**
  * Horizontal control strip for embedding in the platform's bottom bar.
- * Shows runtime controls (duration, tick_dt), status, and action buttons in a single row.
+ * Shows runtime controls, status, and action buttons in a single row.
  */
 export default function ControlsBar({
   onRun,
@@ -38,7 +38,7 @@ export default function ControlsBar({
   const resetEnabled = controlsEnabled && (capabilities?.reset ?? true);
 
   const numberControls = (state.spec?.controls || []).filter(isNumberControl);
-  const runtimeNames = new Set(["duration", "tick_dt"]);
+  const runtimeNames = new Set(["duration"]);
   const runtimeControls = numberControls.filter((c) => runtimeNames.has(c.name));
 
   const updateControl = useCallback(
@@ -56,8 +56,7 @@ export default function ControlsBar({
     numberControls.find((c) => c.name === name)?.default;
 
   const duration = toFiniteNumber(state.controls.duration ?? controlDefault("duration"));
-  const tickDt = toFiniteNumber(state.controls.tick_dt ?? controlDefault("tick_dt"));
-  const progress = resolveRunProgress({ status: st, duration, tickDt });
+  const progress = resolveRunProgress({ status: st, duration });
 
   const statusLabel = useMemo(() => {
     if (!st) return "Unknown";
@@ -104,7 +103,7 @@ export default function ControlsBar({
           <span className="controls-bar-simtime">{formatDuration(progress.simTime)}</span>
         )}
         {st?.running && progress.progressPct !== null && (
-          <div className="controls-bar-progress" title={progress.estimated ? "Estimated from ticks" : "Simulation-time progress"}>
+          <div className="controls-bar-progress" title="Simulation-time progress">
             <span className="controls-bar-progress-label">{progress.progressLabel}</span>
             <div className="sim-progress-track controls-bar-progress-track" aria-hidden="true">
               <div className="sim-progress-fill" style={{ width: `${progress.progressPct}%` }} />

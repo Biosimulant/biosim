@@ -10,7 +10,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 
 
 class BioModule(ABC):
-    """Runnable module interface for the 1.5 communication-step kernel."""
+    """Runnable module interface for the communication-step kernel."""
 
     def setup(self, config: Optional[Dict[str, Any]] = None) -> None:
         """Initialize the module for a run."""

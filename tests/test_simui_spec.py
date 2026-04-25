@@ -74,5 +74,5 @@ def test_run_endpoint_accepts_duration(biosim, fastapi_client):
     app = FastAPI()
     ui.mount(app, "/ui")
     client = TestClient(app)
-    r = client.post("/ui/api/run", json={"duration": 0.2, "tick_dt": 0.1})
+    r = client.post("/ui/api/run", json={"duration": 0.2})
     assert r.status_code in (202, 409)

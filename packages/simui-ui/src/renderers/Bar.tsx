@@ -33,7 +33,7 @@ export default function Bar({ data, isFullscreen }: { data: { items?: Item[] }; 
         <line x1={ML} y1={MT} x2={ML} y2={H - MB} className="axis" />
         {yTicks(4).map((ty) => (
           <g key={`ty-${ty}`}>
-            <line x1={ML - 4} y1={sy(ty)} x2={ML} y2={sy(ty)} className="tick" />
+            <line x1={ML - 4} y1={sy(ty)} x2={ML} y2={sy(ty)} className="step" />
             <text x={ML - 6} y={sy(ty) + 3} className="ticklbl" textAnchor="end">{ty.toFixed(0)}</text>
           </g>
         ))}

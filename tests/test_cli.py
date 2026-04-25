@@ -117,7 +117,7 @@ class TestRunHeadless:
                 return {}
 
         world.add_biomodule("m", M())
-        run_headless(world, duration=0.2, tick_dt=0.1)
+        run_headless(world, duration=0.2)
         captured = capsys.readouterr()
         assert "Running simulation" in captured.out
         assert "Simulation complete" in captured.out
@@ -140,7 +140,7 @@ class TestRunHeadless:
                 return {"render": "bar", "data": {"items": [{"label": "a", "value": 1}]}}
 
         world.add_biomodule("vis", VisModule())
-        run_headless(world, duration=0.1, tick_dt=0.1)
+        run_headless(world, duration=0.1)
         captured = capsys.readouterr()
         assert "Collected visuals" in captured.out
         assert "vis" in captured.out
@@ -158,7 +158,6 @@ class TestRunSimui:
                     {},
                     config_path=Path("/tmp/test.yaml"),
                     duration=1.0,
-                    tick_dt=0.1,
                     port=8765,
                     host="127.0.0.1",
                     open_browser=False,
@@ -176,7 +175,6 @@ class TestRunSimui:
                     {"meta": {"title": "Test Sim", "description": "Desc"}},
                     config_path=Path("/tmp/test.yaml"),
                     duration=5.0,
-                    tick_dt=0.1,
                     port=9999,
                     host="0.0.0.0",
                     open_browser=True,
@@ -208,11 +206,10 @@ wiring:
   - from: "eye.visual_stream"
     to: ["lgn.retina"]
 """)
-        with patch("sys.argv", ["biosim", str(cfg), "--duration", "0.2", "--tick", "0.1"]):
+        with patch("sys.argv", ["biosim", str(cfg), "--duration", "0.2"]):
             main()
 
-    def test_tick_zero(self, tmp_path):
-        """--tick 0 should result in tick_dt=None."""
+    def test_headless_run_without_tick_arg(self, tmp_path):
         from examples.wiring_builder_demo import Eye
 
         cfg = tmp_path / "wiring.yaml"
@@ -223,8 +220,7 @@ modules:
 runtime:
   communication_step: 0.1
 """)
-        with patch("sys.argv", ["biosim", str(cfg), "--duration", "0.1", "--tick", "0"]):
-            # tick <= 0 -> tick_dt = None
+        with patch("sys.argv", ["biosim", str(cfg), "--duration", "0.1"]):
             main()
 
     def test_simui_mode(self, tmp_path):

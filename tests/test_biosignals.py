@@ -68,7 +68,7 @@ def test_biosignal_routing_eye_to_lgn_to_sc(biosim):
     world.connect("eye.vision", "lgn.vision")
     world.connect("lgn.thalamus", "sc.thalamus")
 
-    world.run(duration=0.3, tick_dt=0.1)
+    world.run(duration=0.3)
 
     assert calls["lgn"] >= 1
     assert calls["sc"] >= 1
@@ -119,7 +119,7 @@ def test_biosignal_is_not_broadcast_without_connection(biosim):
     world.add_biomodule("c", C())
     world.connect("a.sig", "b.sig")
 
-    world.run(duration=0.2, tick_dt=0.1)
+    world.run(duration=0.2)
 
     assert received["b"] >= 1
     assert received["c"] == 0

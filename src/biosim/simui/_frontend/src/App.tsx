@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiProvider, useApi } from './app/providers'
 import { UiProvider, useUi, isNumberControl } from './app/ui'
 import { ComposeProvider, useCompose } from './app/compose'
-import type { EventRecord, RunStatus, Snapshot, TickData, UiSpec } from './types/api'
+import type { EventRecord, RunStatus, Snapshot, StepData, UiSpec } from './types/api'
 import type { SSEMessage, SSESubscription } from './lib/api'
 import Sidebar from './components/Sidebar'
 import ComposeCanvas from './components/ComposeCanvas'
@@ -37,13 +37,13 @@ function UnifiedView() {
         if (Array.isArray(snap?.events)) uiActions.setEvents(snap.events)
         break
       }
-      case 'tick': {
-        const tick = msg.data as TickData
-        if (tick?.status) uiActions.setStatus(tick.status)
-        if (Array.isArray(tick?.visuals)) uiActions.setVisuals(tick.visuals)
-        if (tick?.event) uiActions.appendEvent(tick.event)
+      case 'step': {
+        const step = msg.data as StepData
+        if (step?.status) uiActions.setStatus(step.status)
+        if (Array.isArray(step?.visuals)) uiActions.setVisuals(step.visuals)
+        if (step?.event) uiActions.appendEvent(step.event)
         // Auto-open right panel on first results
-        if (!rightPanelOpen && Array.isArray(tick?.visuals) && tick.visuals.length > 0) {
+        if (!rightPanelOpen && Array.isArray(step?.visuals) && step.visuals.length > 0) {
           setRightPanelOpen(true)
         }
         break
@@ -95,11 +95,10 @@ function UnifiedView() {
       if (Number.isFinite(value)) payload[c.name] = value
     }
     const duration = Number(payload.duration)
-    const tickDt = payload.tick_dt
     uiActions.setVisuals([])
     uiActions.setEvents([])
     setRightPanelOpen(true)
-    await api.run(duration, tickDt, payload)
+    await api.run(duration, payload)
   }, [api, uiState.controls, uiState.spec, uiActions])
 
   const pause = useCallback(async () => { await api.pause() }, [api])

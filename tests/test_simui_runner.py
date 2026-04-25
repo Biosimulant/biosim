@@ -32,7 +32,7 @@ class TestRunStatus:
         assert s.running is False
         assert s.started_at is None
         assert s.finished_at is None
-        assert s.tick_count == 0
+        assert s.step_count == 0
         assert s.error is None
         assert s.paused is False
         assert s.sim_time is None
@@ -57,13 +57,13 @@ class TestSimulationManager:
     def test_start_and_join(self):
         world = _make_world_with_module()
         mgr = SimulationManager(world)
-        started = mgr.start_run(duration=0.1, tick_dt=0.01)
+        started = mgr.start_run(duration=0.1)
         assert started is True
         mgr.join(timeout=5.0)
         st = mgr.status()
         assert st["running"] is False
         assert st["finished_at"] is not None
-        assert st["tick_count"] > 0
+        assert st["step_count"] > 0
         assert st["sim_start"] == pytest.approx(0.0)
         assert st["sim_end"] == pytest.approx(0.1)
         assert st["sim_time"] == pytest.approx(0.1)
@@ -74,9 +74,9 @@ class TestSimulationManager:
     def test_double_start_returns_false(self):
         world = _make_world_with_module(slow=True)
         mgr = SimulationManager(world)
-        assert mgr.start_run(duration=100.0, tick_dt=0.01) is True
+        assert mgr.start_run(duration=100.0) is True
         time.sleep(0.05)
-        assert mgr.start_run(duration=100.0, tick_dt=0.01) is False
+        assert mgr.start_run(duration=100.0) is False
         mgr.request_stop()
         mgr.join(timeout=5.0)
 
@@ -84,7 +84,7 @@ class TestSimulationManager:
         world = _make_world_with_module()
         mgr = SimulationManager(world)
         called = []
-        mgr.start_run(duration=0.05, tick_dt=0.01, on_start=lambda: called.append(True))
+        mgr.start_run(duration=0.05, on_start=lambda: called.append(True))
         mgr.join(timeout=5.0)
         assert called == [True]
 
@@ -100,7 +100,7 @@ class TestSimulationManager:
     def test_request_stop(self):
         world = _make_world_with_module(slow=True)
         mgr = SimulationManager(world)
-        mgr.start_run(duration=100.0, tick_dt=0.01)
+        mgr.start_run(duration=100.0)
         time.sleep(0.1)
         mgr.request_stop()
         mgr.join(timeout=5.0)
@@ -111,7 +111,7 @@ class TestSimulationManager:
     def test_pause_resume(self):
         world = _make_world_with_module(slow=True)
         mgr = SimulationManager(world)
-        mgr.start_run(duration=100.0, tick_dt=0.01)
+        mgr.start_run(duration=100.0)
         time.sleep(0.1)
         mgr.pause()
         time.sleep(0.05)
@@ -130,18 +130,18 @@ class TestSimulationManager:
     def test_reset_when_not_running(self):
         world = _make_world_with_module()
         mgr = SimulationManager(world)
-        mgr.start_run(duration=0.05, tick_dt=0.01)
+        mgr.start_run(duration=0.05)
         mgr.join(timeout=5.0)
         mgr.reset()
         st = mgr.status()
         assert st["running"] is False
-        assert st["tick_count"] == 0
+        assert st["step_count"] == 0
         assert "progress_pct" not in st
 
     def test_reset_while_running(self):
         world = _make_world_with_module()
         mgr = SimulationManager(world)
-        mgr.start_run(duration=100.0, tick_dt=0.01)
+        mgr.start_run(duration=100.0)
         time.sleep(0.02)
         mgr.reset()
         mgr.join(timeout=5.0)
@@ -157,7 +157,7 @@ class TestSimulationManager:
         """request_stop should not crash if world.request_stop fails."""
         world = _make_world_with_module(slow=True)
         mgr = SimulationManager(world)
-        mgr.start_run(duration=100.0, tick_dt=0.01)
+        mgr.start_run(duration=100.0)
         time.sleep(0.05)
         with patch.object(world, "request_stop", side_effect=RuntimeError("oops")):
             mgr.request_stop()
@@ -167,7 +167,7 @@ class TestSimulationManager:
         """pause should not crash if world.request_pause fails."""
         world = _make_world_with_module(slow=True)
         mgr = SimulationManager(world)
-        mgr.start_run(duration=100.0, tick_dt=0.01)
+        mgr.start_run(duration=100.0)
         time.sleep(0.1)
         with patch.object(world, "request_pause", side_effect=RuntimeError("oops")):
             mgr.pause()
@@ -178,7 +178,7 @@ class TestSimulationManager:
         """resume should not crash if world.request_resume fails."""
         world = _make_world_with_module(slow=True)
         mgr = SimulationManager(world)
-        mgr.start_run(duration=100.0, tick_dt=0.01)
+        mgr.start_run(duration=100.0)
         time.sleep(0.1)
         mgr.pause()
         time.sleep(0.05)
@@ -191,7 +191,7 @@ class TestSimulationManager:
         """reset while running should stop, join thread, then reset status."""
         world = _make_world_with_module(slow=True)
         mgr = SimulationManager(world)
-        mgr.start_run(duration=100.0, tick_dt=0.01)
+        mgr.start_run(duration=100.0)
         time.sleep(0.1)
         mgr.reset()
         assert mgr.status()["running"] is False

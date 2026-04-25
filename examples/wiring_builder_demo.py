@@ -74,7 +74,7 @@ def main() -> None:
     wb.add("eye", eye).add("lgn", lgn).add("sc", sc)
     wb.connect("eye.visual_stream", ["lgn.retina", "sc.vision"]).apply()
 
-    world.run(duration=0.3, tick_dt=0.1)
+    world.run(duration=0.3)
 
 
 if __name__ == "__main__":
