@@ -1,23 +1,23 @@
 # Packaging
 
-`biosim` supports single-file package archives for both models and spaces.
+`biosim` supports single-file package archives for both models and labs.
 
 Package unit:
 - one model package wraps one `model.yaml` into a `.bsimodel`
-- one space package wraps one `space.yaml` into a self-contained `.bsispace`
+- one lab package wraps one `lab.yaml` into a self-contained `.bsilab`
 
 Typical use cases:
-- move a runnable model or space without shipping a whole repository
+- move a runnable model or lab without shipping a whole repository
 - validate package structure before upload
 - cache and fetch package-backed models locally
-- export a self-contained space whose full source tree is embedded in the archive
+- export a self-contained lab whose full source tree is embedded in the archive
 
 ## CLI
 
-Build a package from a model or space directory:
+Build a package from a model or lab directory:
 
 ```bash
-python -m biosim pack build path/to/model-or-space
+python -m biosim pack build path/to/model-or-lab
 ```
 
 Validate a package file:
@@ -54,13 +54,13 @@ my-model/
 └── README.md
 ```
 
-Space package source:
+Lab package source:
 
 ```text
-my-space/
+my-lab/
 ├── models/
-├── spaces/
-├── space.yaml
+├── labs/
+├── lab.yaml
 ├── tests/
 └── README.md
 ```
@@ -78,15 +78,15 @@ Model package payload usually includes:
 - `payload/artifacts/**`
 - `payload/data/**`
 
-Space package payload usually includes:
-- `payload/space.yaml`
+Lab package payload usually includes:
+- `payload/lab.yaml`
 - embedded model folders such as `payload/models/**`
-- embedded child-space folders such as `payload/spaces/**`
-- any additional helper files required by the space
+- embedded child-lab folders such as `payload/labs/**`
+- any additional helper files required by the lab
 
 ## Package Identity
 
-If `model.yaml` or `space.yaml` declares:
+If `model.yaml` or `lab.yaml` declares:
 
 ```yaml
 package: biosimulant/example-counter
@@ -113,11 +113,11 @@ python -m biosim pack build path/to/model --package biosimulant/example-counter 
 - checksums match
 - `package.yaml` points to a real manifest
 - model manifests contain `biosim.entrypoint`
-- space manifests contain valid `models`, `wiring`, and `runtime`
+- lab manifests contain valid `models`, `wiring`, and `runtime`
 - model dependencies use exact `==` pins only
-- space manifests use `path`-based nested dependencies only
-- every nested model and child space path stays inside the archive payload tree
-- every embedded model or child space manifest is valid
+- lab manifests use `path`-based nested dependencies only
+- every nested model and child lab path stays inside the archive payload tree
+- every embedded model or child lab manifest is valid
 
 The command is meant to be operator-friendly:
 - success prints a concise summary with package name, version, and type
@@ -143,7 +143,7 @@ Then publish or fetch packages programmatically through the Python API, and use:
 python -m biosim pack fetch owner/model-name@1.0.0
 ```
 
-## Spaces
+## Labs
 
 ```yaml
 models:
@@ -151,12 +151,12 @@ models:
     alias: counter
 ```
 
-`biosim pack build path/to/space` always emits a self-contained `.bsispace`. The packaged
+`biosim pack build path/to/lab` always emits a self-contained `.bsilab`. The packaged
 payload preserves the runnable source tree exactly as it exists on disk under `payload/`.
 
 Nested `models[]` and `children[]` must use relative `path` refs only. Nested executable
-`package`, `version`, `model_id`, `space_id`, `hub_model_id`, and `hub_space_id` are invalid.
+`package`, `version`, `model_id`, `lab_id`, `hub_model_id`, and `hub_lab_id` are invalid.
 
-If a space depends on another model or child space, that dependency must already exist inside
-the space directory before packaging. Packaging does not rewrite the manifest and does not bundle
-nested `.bsimodel` or `.bsispace` archives.
+If a lab depends on another model or child lab, that dependency must already exist inside
+the lab directory before packaging. Packaging does not rewrite the manifest and does not bundle
+nested `.bsimodel` or `.bsilab` archives.

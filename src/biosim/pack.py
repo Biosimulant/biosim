@@ -21,8 +21,8 @@ from .wiring import WiringBuilder
 from .world import BioWorld
 
 PACKAGE_EXTENSION = ".bsimpkg"
-PACKAGE_EXTENSIONS = (".bsimpkg", ".bsimodel", ".bsispace")
-_TYPE_EXTENSION = {"model": ".bsimodel", "space": ".bsispace"}
+PACKAGE_EXTENSIONS = (".bsimpkg", ".bsimodel", ".bsilab")
+_TYPE_EXTENSION = {"model": ".bsimodel", "lab": ".bsilab"}
 PACKAGE_SCHEMA_VERSION = "1.0"
 DEFAULT_PACKAGE_VERSION = "0.1.0"
 DEFAULT_PACKAGE_NAMESPACE = "local"
@@ -194,27 +194,27 @@ def _collect_model_entries(source_dir: Path) -> tuple[dict[str, Any], dict[str, 
     return manifest, entries
 
 
-def _collect_space_entries(source_dir: Path) -> tuple[dict[str, Any], dict[str, bytes]]:
-    manifest_path = source_dir / "space.yaml"
+def _collect_lab_entries(source_dir: Path) -> tuple[dict[str, Any], dict[str, bytes]]:
+    manifest_path = source_dir / "lab.yaml"
     if not manifest_path.exists():
-        raise PackageError(f"Space package source is missing {manifest_path}")
+        raise PackageError(f"Lab package source is missing {manifest_path}")
     manifest, manifest_bytes = _normalized_manifest_bytes(manifest_path)
-    _validate_space_manifest(manifest)
+    _validate_lab_manifest(manifest)
 
-    entries: dict[str, bytes] = {"payload/space.yaml": manifest_bytes}
+    entries: dict[str, bytes] = {"payload/lab.yaml": manifest_bytes}
     for path in sorted(source_dir.rglob("*")):
         if not path.is_file():
             continue
         rel = path.relative_to(source_dir).as_posix()
-        if rel in {"space.yaml", "space.yml", "package.yaml"}:
+        if rel in {"lab.yaml", "lab.yml", "package.yaml"}:
             continue
-        if _should_ignore_space_source_file(path.relative_to(source_dir)):
+        if _should_ignore_lab_source_file(path.relative_to(source_dir)):
             continue
         entries[f"payload/{rel}"] = path.read_bytes()
     return manifest, entries
 
 
-_IGNORED_SPACE_SOURCE_DIRS = frozenset(
+_IGNORED_LAB_SOURCE_DIRS = frozenset(
     {
         "__pycache__",
         ".pytest_cache",
@@ -224,18 +224,18 @@ _IGNORED_SPACE_SOURCE_DIRS = frozenset(
         "dist",
     }
 )
-_IGNORED_SPACE_SOURCE_FILES = frozenset({".DS_Store"})
-_IGNORED_SPACE_SOURCE_SUFFIXES = (".pyc", ".pyo")
+_IGNORED_LAB_SOURCE_FILES = frozenset({".DS_Store"})
+_IGNORED_LAB_SOURCE_SUFFIXES = (".pyc", ".pyo")
 
 
-def _should_ignore_space_source_file(relative_path: Path) -> bool:
+def _should_ignore_lab_source_file(relative_path: Path) -> bool:
     for part in relative_path.parts[:-1]:
-        if part in _IGNORED_SPACE_SOURCE_DIRS:
+        if part in _IGNORED_LAB_SOURCE_DIRS:
             return True
     name = relative_path.name
-    if name in _IGNORED_SPACE_SOURCE_FILES:
+    if name in _IGNORED_LAB_SOURCE_FILES:
         return True
-    return name.endswith(_IGNORED_SPACE_SOURCE_SUFFIXES)
+    return name.endswith(_IGNORED_LAB_SOURCE_SUFFIXES)
 
 
 def _collect_tree(root: Path, name: str) -> dict[str, bytes]:
@@ -259,7 +259,7 @@ def _collect_glob_files(root: Path, patterns: Iterable[str]) -> dict[str, bytes]
         for path in sorted(root.glob(pattern)):
             if not path.is_file():
                 continue
-            if path.name in {"model.yaml", "space.yaml", "package.yaml"}:
+            if path.name in {"model.yaml", "lab.yaml", "package.yaml"}:
                 continue
             out[f"payload/{path.name}"] = path.read_bytes()
     return out
@@ -344,8 +344,8 @@ def build_package(
     if (source_path / "model.yaml").exists():
         package_type = "model"
         manifest, entries = _collect_model_entries(source_path)
-    elif (source_path / "space.yaml").exists():
-        return export_space_package(
+    elif (source_path / "lab.yaml").exists():
+        return export_lab_package(
             source_path,
             output_path=output_path,
             package_name=package_name,
@@ -354,7 +354,7 @@ def build_package(
             source=source,
         )
     else:
-        raise PackageError(f"Could not find model.yaml or space.yaml in {source_path}")
+        raise PackageError(f"Could not find model.yaml or lab.yaml in {source_path}")
 
     package_name = package_name or _manifest_declared_package(manifest) or _default_package_name(source_path)
     version = _validate_version(_manifest_declared_version(manifest) or version)
@@ -382,7 +382,7 @@ def build_package(
     return target
 
 
-def export_space_package(
+def export_lab_package(
     source_dir: str | Path,
     *,
     output_path: str | Path | None = None,
@@ -392,17 +392,17 @@ def export_space_package(
     source: Mapping[str, Any] | None = None,
 ) -> Path:
     source_path = Path(source_dir).expanduser().resolve()
-    manifest, entries = _collect_space_entries(source_path)
+    manifest, entries = _collect_lab_entries(source_path)
     package_name = package_name or _manifest_declared_package(manifest) or _default_package_name(source_path)
     version = _validate_version(_manifest_declared_version(manifest) or version)
     logical_sha256 = _logical_hash(entries)
     package_yaml = _build_package_yaml(
-        package_type="space",
+        package_type="lab",
         package_name=package_name,
         version=version,
         visibility=visibility,
         manifest=manifest,
-        entry_manifest="payload/space.yaml",
+        entry_manifest="payload/lab.yaml",
         source=source,
         logical_sha256=logical_sha256,
     )
@@ -410,7 +410,7 @@ def export_space_package(
     entries["integrity/sha256sums.txt"] = _checksums_text(entries).encode("utf-8")
 
     if output_path is None:
-        file_name = f"{_package_slug(package_name)}-{version}.bsispace"
+        file_name = f"{_package_slug(package_name)}-{version}.bsilab"
         output_path = source_path / "dist" / file_name
     target = Path(output_path).expanduser().resolve()
     _write_zip(target, entries)
@@ -492,9 +492,9 @@ def validate_package(path: str | Path) -> PackageValidationResult:
             if package_type == "model":
                 _validate_model_manifest(manifest)
                 _validate_dependencies(manifest)
-            elif package_type == "space":
-                _validate_space_manifest(manifest)
-                _validate_embedded_space_package(entries, manifest, entry_manifest)
+            elif package_type == "lab":
+                _validate_lab_manifest(manifest)
+                _validate_embedded_lab_package(entries, manifest, entry_manifest)
             else:
                 raise PackageError(f"Unsupported package_type: {package_type}")
 
@@ -644,13 +644,13 @@ def _find_manifest_in_dir(directory: Path, candidates: tuple[str, ...]) -> Path:
     )
 
 
-def _load_space_manifest_from_dir(directory: Path) -> dict[str, Any]:
-    manifest_path = _find_manifest_in_dir(directory, ("space.yaml", "space.yml"))
+def _load_lab_manifest_from_dir(directory: Path) -> dict[str, Any]:
+    manifest_path = _find_manifest_in_dir(directory, ("lab.yaml", "lab.yml"))
     manifest = _safe_yaml_load(manifest_path.read_bytes())
     try:
-        _validate_space_manifest(manifest)
+        _validate_lab_manifest(manifest)
     except PackageError as exc:
-        raise PackageError(f"Invalid embedded space manifest at {manifest_path}: {exc}") from exc
+        raise PackageError(f"Invalid embedded lab manifest at {manifest_path}: {exc}") from exc
     return manifest
 
 
@@ -665,9 +665,9 @@ def _load_model_manifest_from_dir(directory: Path) -> dict[str, Any]:
     return manifest
 
 
-def _resolve_embedded_dir(payload_root: Path, current_space_dir: Path, dependency_path: str) -> Path:
+def _resolve_embedded_dir(payload_root: Path, current_lab_dir: Path, dependency_path: str) -> Path:
     normalized = _normalize_embedded_path(dependency_path)
-    resolved = (current_space_dir / normalized).resolve()
+    resolved = (current_lab_dir / normalized).resolve()
     root = payload_root.resolve()
     if resolved != root and root not in resolved.parents:
         raise PackageError(f"Embedded dependency escapes package root: {dependency_path}")
@@ -711,13 +711,13 @@ def _instantiate_model_from_dir(
     }
 
 
-def _validate_embedded_space_package(
+def _validate_embedded_lab_package(
     entries: Mapping[str, bytes],
     parsed_manifest: Mapping[str, Any],
     entry_manifest: str,
 ) -> None:
     package_root = posixpath.dirname(entry_manifest)
-    _validate_embedded_space_package_dir(
+    _validate_embedded_lab_package_dir(
         entries=entries,
         parsed_manifest=parsed_manifest,
         package_root=package_root,
@@ -726,7 +726,7 @@ def _validate_embedded_space_package(
     )
 
 
-def _validate_embedded_space_package_dir(
+def _validate_embedded_lab_package_dir(
     *,
     entries: Mapping[str, bytes],
     parsed_manifest: Mapping[str, Any],
@@ -735,7 +735,7 @@ def _validate_embedded_space_package_dir(
     visited: set[str],
 ) -> None:
     if current_dir in visited:
-        raise PackageError(f"Circular embedded child space reference detected at {current_dir}")
+        raise PackageError(f"Circular embedded child lab reference detected at {current_dir}")
     visited = visited | {current_dir}
 
     models = parsed_manifest.get("models")
@@ -777,13 +777,13 @@ def _validate_embedded_space_package_dir(
             current_dir=current_dir,
             dependency_path=embedded_path,
         )
-        manifest_path = _find_archive_manifest(entries, child_dir, ("space.yaml", "space.yml"))
+        manifest_path = _find_archive_manifest(entries, child_dir, ("lab.yaml", "lab.yml"))
         try:
             parsed_child = _safe_yaml_load(entries[manifest_path])
-            _validate_space_manifest(parsed_child)
+            _validate_lab_manifest(parsed_child)
         except PackageError as exc:
-            raise PackageError(f"Invalid embedded child space manifest at {manifest_path}: {exc}") from exc
-        _validate_embedded_space_package_dir(
+            raise PackageError(f"Invalid embedded child lab manifest at {manifest_path}: {exc}") from exc
+        _validate_embedded_lab_package_dir(
             entries=entries,
             parsed_manifest=parsed_child,
             package_root=package_root,
@@ -810,28 +810,28 @@ def _run_model_loaded_package(loaded: _LoadedPackage, *, install_deps: bool = Tr
     }
 
 
-def _flatten_embedded_space_dir(
+def _flatten_embedded_lab_dir(
     *,
     payload_root: Path,
-    current_space_dir: Path,
+    current_lab_dir: Path,
     prefix: str = "",
     visited: set[Path] | None = None,
     depth: int = 0,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
     if depth > 5:
-        raise PackageError("Space nesting exceeds maximum depth of 5")
+        raise PackageError("Lab nesting exceeds maximum depth of 5")
 
-    current_key = current_space_dir.resolve()
+    current_key = current_lab_dir.resolve()
     visited_paths = set(visited or set())
     if current_key in visited_paths:
-        raise PackageError(f"Circular embedded child space reference detected at {current_space_dir}")
+        raise PackageError(f"Circular embedded child lab reference detected at {current_lab_dir}")
     visited_paths.add(current_key)
 
-    parsed_space = _load_space_manifest_from_dir(current_space_dir)
-    models = parsed_space.get("models")
-    wiring = parsed_space.get("wiring")
+    parsed_lab = _load_lab_manifest_from_dir(current_lab_dir)
+    models = parsed_lab.get("models")
+    wiring = parsed_lab.get("wiring")
     if not isinstance(models, list) or not isinstance(wiring, list):
-        raise PackageError("Space manifest must contain models and wiring")
+        raise PackageError("Lab manifest must contain models and wiring")
 
     flat_models: list[dict[str, Any]] = []
     flat_wiring: list[dict[str, Any]] = []
@@ -839,14 +839,14 @@ def _flatten_embedded_space_dir(
 
     for entry in models:
         if not isinstance(entry, Mapping):
-            raise PackageError("Space model entries must be mappings")
+            raise PackageError("Lab model entries must be mappings")
         alias = entry.get("alias")
         embedded_path = entry.get("path")
         if not isinstance(alias, str) or not alias.strip():
-            raise PackageError("Space model entries require a non-empty alias")
+            raise PackageError("Lab model entries require a non-empty alias")
         if not isinstance(embedded_path, str) or not embedded_path.strip():
-            raise PackageError("Space model entries require a path reference")
-        model_dir = _resolve_embedded_dir(payload_root, current_space_dir, embedded_path)
+            raise PackageError("Lab model entries require a path reference")
+        model_dir = _resolve_embedded_dir(payload_root, current_lab_dir, embedded_path)
         _load_model_manifest_from_dir(model_dir)
         model_entry: dict[str, Any] = {
             "alias": _scoped_ref(prefix, alias),
@@ -858,21 +858,21 @@ def _flatten_embedded_space_dir(
                 model_entry[key] = value
         flat_models.append(model_entry)
 
-    children = parsed_space.get("children")
+    children = parsed_lab.get("children")
     if isinstance(children, list):
         for entry in children:
             if not isinstance(entry, Mapping):
-                raise PackageError("Space child entries must be mappings")
+                raise PackageError("Lab child entries must be mappings")
             alias = entry.get("alias")
             embedded_path = entry.get("path")
             if not isinstance(alias, str) or not alias.strip():
-                raise PackageError("Space child entries require alias")
+                raise PackageError("Lab child entries require alias")
             if not isinstance(embedded_path, str) or not embedded_path.strip():
-                raise PackageError("Space child entries require a path reference")
-            child_dir = _resolve_embedded_dir(payload_root, current_space_dir, embedded_path)
-            child_models, child_wiring, child_manifest = _flatten_embedded_space_dir(
+                raise PackageError("Lab child entries require a path reference")
+            child_dir = _resolve_embedded_dir(payload_root, current_lab_dir, embedded_path)
+            child_models, child_wiring, child_manifest = _flatten_embedded_lab_dir(
                 payload_root=payload_root,
-                current_space_dir=child_dir,
+                current_lab_dir=child_dir,
                 prefix=_scoped_ref(prefix, f"{alias}."),
                 visited=visited_paths,
                 depth=depth + 1,
@@ -897,21 +897,21 @@ def _flatten_embedded_space_dir(
             normalized_targets.append(port_remap.get(scoped_to, scoped_to))
         flat_wiring.append({"from": port_remap.get(scoped_from, scoped_from), "to": normalized_targets})
 
-    return flat_models, flat_wiring, parsed_space
+    return flat_models, flat_wiring, parsed_lab
 
 
-def _run_space_loaded_package(loaded: _LoadedPackage, *, install_deps: bool = True) -> dict[str, Any]:
+def _run_lab_loaded_package(loaded: _LoadedPackage, *, install_deps: bool = True) -> dict[str, Any]:
     runtime = loaded.manifest.get("runtime")
     if not isinstance(runtime, Mapping):
-        raise PackageError("Space manifest must contain models, wiring, and runtime")
-    models, wiring, parsed_space = _flatten_embedded_space_dir(
+        raise PackageError("Lab manifest must contain models, wiring, and runtime")
+    models, wiring, parsed_lab = _flatten_embedded_lab_dir(
         payload_root=loaded.payload_root,
-        current_space_dir=loaded.payload_root,
+        current_lab_dir=loaded.payload_root,
     )
 
     communication_step = runtime.get("communication_step")
     if communication_step is None:
-        raise PackageError("Space manifest runtime.communication_step is required")
+        raise PackageError("Lab manifest runtime.communication_step is required")
     world = BioWorld(communication_step=float(communication_step))
     builder = WiringBuilder(world)
     resolved_models: list[dict[str, Any]] = []
@@ -919,13 +919,13 @@ def _run_space_loaded_package(loaded: _LoadedPackage, *, install_deps: bool = Tr
 
     for entry in models:
         if not isinstance(entry, Mapping):
-            raise PackageError("Space model entries must be mappings")
+            raise PackageError("Lab model entries must be mappings")
         alias = entry.get("alias")
         if not isinstance(alias, str) or not alias.strip():
-            raise PackageError("Space model entries require a non-empty alias")
+            raise PackageError("Lab model entries require a non-empty alias")
         model_dir = entry.get("model_dir")
         if not isinstance(model_dir, str) or not model_dir:
-            raise PackageError("Space model entries require a resolved model_dir")
+            raise PackageError("Lab model entries require a resolved model_dir")
         model_path = Path(model_dir)
         manifest = _load_model_manifest_from_dir(model_path)
         if install_deps:
@@ -933,7 +933,7 @@ def _run_space_loaded_package(loaded: _LoadedPackage, *, install_deps: bool = Tr
         parameters = entry.get("parameters") if isinstance(entry.get("parameters"), Mapping) else {}
         module, meta = _instantiate_model_from_dir(model_path, manifest=manifest, parameters=parameters)
         if entry.get("min_dt") is not None or entry.get("priority") is not None:
-            raise PackageError("Space model entries cannot declare min_dt or priority")
+            raise PackageError("Lab model entries cannot declare min_dt or priority")
         builder.add(alias, module)
         if meta["setup"]:
             setup_config[alias] = dict(meta["setup"])
@@ -960,7 +960,7 @@ def _run_space_loaded_package(loaded: _LoadedPackage, *, install_deps: bool = Tr
         builder.connect(src, dst)
     builder.apply()
 
-    effective_runtime = parsed_space.get("runtime") if isinstance(parsed_space.get("runtime"), Mapping) else runtime
+    effective_runtime = parsed_lab.get("runtime") if isinstance(parsed_lab.get("runtime"), Mapping) else runtime
     duration = float(effective_runtime.get("duration", 1.0))
     world.setup(setup_config)
     world.run(duration=duration)
@@ -1025,8 +1025,8 @@ def run_package(path: str | Path, *, install_deps: bool = True) -> dict[str, Any
     loaded = _loaded_package_from_path(Path(path).expanduser().resolve())
     if loaded.package_type == "model":
         return _run_model_loaded_package(loaded, install_deps=install_deps)
-    if loaded.package_type == "space":
-        return _run_space_loaded_package(loaded, install_deps=install_deps)
+    if loaded.package_type == "lab":
+        return _run_lab_loaded_package(loaded, install_deps=install_deps)
     raise PackageError(f"Unsupported package type: {loaded.package_type}")
 
 
@@ -1039,7 +1039,7 @@ def _validate_model_manifest(manifest: Mapping[str, Any]) -> None:
         raise PackageError("Model manifest must contain biosim.entrypoint")
 
 
-def _validate_space_manifest(manifest: Mapping[str, Any]) -> None:
+def _validate_lab_manifest(manifest: Mapping[str, Any]) -> None:
     models = manifest.get("models")
     children = manifest.get("children")
     has_children = isinstance(children, list) and len(children) > 0
@@ -1047,68 +1047,68 @@ def _validate_space_manifest(manifest: Mapping[str, Any]) -> None:
         if has_children:
             models = []
         else:
-            raise PackageError("Space manifest must contain a non-empty models list")
+            raise PackageError("Lab manifest must contain a non-empty models list")
     if not models and not has_children:
-        raise PackageError("Space manifest must contain a non-empty models list or children list")
+        raise PackageError("Lab manifest must contain a non-empty models list or children list")
     aliases: set[str] = set()
     for entry in models:
         if not isinstance(entry, Mapping):
-            raise PackageError("Space model entries must be mappings")
+            raise PackageError("Lab model entries must be mappings")
         alias = entry.get("alias")
         if not isinstance(alias, str) or not alias.strip():
-            raise PackageError("Space model entries must define alias")
+            raise PackageError("Lab model entries must define alias")
         if alias in aliases:
-            raise PackageError(f"Duplicate space model alias: {alias}")
+            raise PackageError(f"Duplicate lab model alias: {alias}")
         aliases.add(alias)
         if entry.get("repo") is not None or entry.get("manifest_path") is not None:
-            raise PackageError(f"Space model '{alias}' must not use repo or manifest_path")
+            raise PackageError(f"Lab model '{alias}' must not use repo or manifest_path")
         if entry.get("package") is not None or entry.get("version") is not None:
-            raise PackageError(f"Space model '{alias}' must use path references only")
+            raise PackageError(f"Lab model '{alias}' must use path references only")
         has_path_ref = isinstance(entry.get("path"), str)
         if not has_path_ref:
-            raise PackageError(f"Space model '{alias}' must use a path reference")
+            raise PackageError(f"Lab model '{alias}' must use a path reference")
 
     child_aliases: set[str] = set()
     if children is not None:
         if not isinstance(children, list):
-            raise PackageError("Space children entries must be a list")
+            raise PackageError("Lab children entries must be a list")
         for entry in children:
             if not isinstance(entry, Mapping):
-                raise PackageError("Space child entries must be mappings")
+                raise PackageError("Lab child entries must be mappings")
             alias = entry.get("alias")
             if not isinstance(alias, str) or not alias.strip():
-                raise PackageError("Space child entries must define alias")
+                raise PackageError("Lab child entries must define alias")
             if alias in child_aliases:
-                raise PackageError(f"Duplicate space child alias: {alias}")
+                raise PackageError(f"Duplicate lab child alias: {alias}")
             child_aliases.add(alias)
             if entry.get("repo") is not None or entry.get("manifest_path") is not None:
-                raise PackageError(f"Space child '{alias}' must not use repo or manifest_path")
+                raise PackageError(f"Lab child '{alias}' must not use repo or manifest_path")
             if (
-                entry.get("space_id") is not None
+                entry.get("lab_id") is not None
                 or entry.get("package") is not None
                 or entry.get("version") is not None
             ):
-                raise PackageError(f"Space child '{alias}' must use path references only")
+                raise PackageError(f"Lab child '{alias}' must use path references only")
             has_path_ref = isinstance(entry.get("path"), str)
             if not has_path_ref:
-                raise PackageError(f"Space child '{alias}' must use a path reference")
+                raise PackageError(f"Lab child '{alias}' must use a path reference")
 
     wiring = manifest.get("wiring")
     if not isinstance(wiring, list):
-        raise PackageError("Space manifest must contain a wiring list")
+        raise PackageError("Lab manifest must contain a wiring list")
     runtime = manifest.get("runtime")
     if not isinstance(runtime, Mapping):
-        raise PackageError("Space manifest must contain a runtime mapping")
+        raise PackageError("Lab manifest must contain a runtime mapping")
     if "tick_dt" in runtime:
-        raise PackageError("Space manifest runtime.tick_dt is not supported")
+        raise PackageError("Lab manifest runtime.tick_dt is not supported")
     communication_step = runtime.get("communication_step")
     if communication_step is None:
-        raise PackageError("Space manifest must contain runtime.communication_step")
+        raise PackageError("Lab manifest must contain runtime.communication_step")
     try:
         if float(communication_step) <= 0:
-            raise PackageError("Space manifest runtime.communication_step must be positive")
+            raise PackageError("Lab manifest runtime.communication_step must be positive")
     except (TypeError, ValueError) as exc:
-        raise PackageError("Space manifest runtime.communication_step must be numeric") from exc
+        raise PackageError("Lab manifest runtime.communication_step must be numeric") from exc
 
 
 __all__ = [
@@ -1117,7 +1117,7 @@ __all__ = [
     "PackageError",
     "PackageValidationResult",
     "build_package",
-    "export_space_package",
+    "export_lab_package",
     "fetch_package",
     "publish_package",
     "run_package",

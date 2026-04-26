@@ -363,10 +363,10 @@ export default function WiringPanel() {
           return
         }
         const target = (st as any)?.target
-        const spaceId = target?.spaceId
-        const spaceCommit = target?.spaceCommit
-        if (typeof spaceId === 'string' && spaceId) {
-          setStorageKey(`simui:wiring:draft:space:${spaceId}:${spaceCommit || 'head'}`)
+        const labId = target?.labId
+        const labCommit = target?.labCommit
+        if (typeof labId === 'string' && labId) {
+          setStorageKey(`simui:wiring:draft:space:${labId}:${labCommit || 'head'}`)
           return
         }
         const modelId = target?.modelId

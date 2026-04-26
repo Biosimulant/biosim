@@ -50,28 +50,28 @@ pip install "biosim[ml]"
 
 See the release guide: [`docs/releasing.md`](docs/releasing.md).
 
-## Packaging Models And Spaces
+## Packaging Models And Labs
 
-`biosim` can package one model or one space into a single archive for portability, upload, caching, and validation.
+`biosim` can package one model or one lab into a single archive for portability, upload, caching, and validation.
 
 Common commands:
 
 ```bash
-# Build a package from a directory that contains model.yaml or space.yaml
-python -m biosim pack build path/to/model-or-space
+# Build a package from a directory that contains model.yaml or lab.yaml
+python -m biosim pack build path/to/model-or-lab
 
 # Validate an existing package file
 python -m biosim pack validate dist/local__counter-1.0.0.bsimpkg
 
-# Build a self-contained space package (.bsispace)
-python -m biosim pack build path/to/space
+# Build a self-contained lab package (.bsilab)
+python -m biosim pack build path/to/lab
 ```
 
 Notes:
-- `build` prefers `package:` and `version:` from `model.yaml` or `space.yaml` when present.
+- `build` prefers `package:` and `version:` from `model.yaml` or `lab.yaml` when present.
 - model dependencies in manifests must use exact `==` pins.
-- space builds are always self-contained and preserve the full runnable source tree inside the `.bsispace`.
-- nested space dependencies must use relative `path` refs and must already exist inside the packaged space directory.
+- lab builds are always self-contained and preserve the full runnable source tree inside the `.bsilab`.
+- nested lab dependencies must use relative `path` refs and must already exist inside the packaged lab directory.
 - `validate` prints human-readable success or failure output by default; add `--json` for machine-readable output.
 
 See [`docs/packaging.md`](docs/packaging.md) for the full package layout, recommended authoring flow, and CLI examples.

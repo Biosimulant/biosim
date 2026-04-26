@@ -8,7 +8,7 @@ import pytest
 from biosim.pack import (
     PackageError,
     build_package,
-    export_space_package,
+    export_lab_package,
     publish_package,
     run_package,
     unpack_package,
@@ -113,7 +113,7 @@ class Accumulator(BioModule):
     return path
 
 
-def _write_space(path: Path) -> Path:
+def _write_lab(path: Path) -> Path:
     path.mkdir(parents=True, exist_ok=True)
     _write_counter_model(
         path / "models" / "counter",
@@ -125,11 +125,11 @@ def _write_space(path: Path) -> Path:
         package_name="local/accumulator",
         version="1.0.0",
     )
-    (path / "space.yaml").write_text(
+    (path / "lab.yaml").write_text(
         """
 schema_version: "2.0"
-title: "Test: Space"
-description: "Self-contained source-tree space"
+title: "Test: Lab"
+description: "Self-contained source-tree lab"
 models:
   - path: models/counter
     alias: counter
@@ -149,14 +149,14 @@ wiring:
     return path
 
 
-def _write_path_manifest_space(path: Path) -> Path:
+def _write_path_manifest_lab(path: Path) -> Path:
     path.mkdir(parents=True, exist_ok=True)
     _write_counter_model(path / "models" / "counter")
-    (path / "space.yaml").write_text(
+    (path / "lab.yaml").write_text(
         """
 schema_version: "2.0"
-title: "Test: Source Space"
-description: "Source-style space refs"
+title: "Test: Source Lab"
+description: "Source-style lab refs"
 models:
   - path: models/counter
     alias: counter
@@ -172,18 +172,18 @@ wiring: []
     return path
 
 
-def _write_child_output_space(path: Path) -> Path:
+def _write_child_output_lab(path: Path) -> Path:
     path.mkdir(parents=True, exist_ok=True)
     _write_counter_model(
         path / "models" / "counter",
         package_name="local/counter",
         version="1.0.0",
     )
-    (path / "space.yaml").write_text(
+    (path / "lab.yaml").write_text(
         """
 schema_version: "2.0"
-title: "Test: Child Space"
-description: "Embedded child space"
+title: "Test: Child Lab"
+description: "Embedded child lab"
 models:
   - path: models/counter
     alias: counter
@@ -203,24 +203,24 @@ wiring: []
     return path
 
 
-def _write_parent_space_with_child(path: Path) -> Path:
+def _write_parent_lab_with_child(path: Path) -> Path:
     path.mkdir(parents=True, exist_ok=True)
     _write_accumulator_model(
         path / "models" / "accumulator",
         package_name="local/accumulator",
         version="1.0.0",
     )
-    _write_child_output_space(path / "spaces" / "child-space")
-    (path / "space.yaml").write_text(
+    _write_child_output_lab(path / "labs" / "child-lab")
+    (path / "lab.yaml").write_text(
         """
 schema_version: "2.0"
-title: "Test: Parent Space"
-description: "Embedded child-space refs"
+title: "Test: Parent Lab"
+description: "Embedded child-lab refs"
 models:
   - path: models/accumulator
     alias: accumulator
 children:
-  - path: spaces/child-space
+  - path: labs/child-lab
     alias: nested
 runtime:
   communication_step: 0.1
@@ -272,58 +272,58 @@ def test_model_package_run_smoke(tmp_path: Path):
     assert "count" in result["outputs"]
 
 
-def test_space_build_embeds_models_and_runs_without_registry(tmp_path: Path):
-    space_pkg = build_package(_write_space(tmp_path / "space"), package_name="local/source-space", version="1.0.0")
-    validation = validate_package(space_pkg)
+def test_lab_build_embeds_models_and_runs_without_registry(tmp_path: Path):
+    lab_pkg = build_package(_write_lab(tmp_path / "lab"), package_name="local/source-lab", version="1.0.0")
+    validation = validate_package(lab_pkg)
     assert validation.valid
-    unpacked = unpack_package(space_pkg, dest=tmp_path / "unpacked-space")
+    unpacked = unpack_package(lab_pkg, dest=tmp_path / "unpacked-lab")
     assert (unpacked / "payload" / "models" / "counter" / "model.yaml").exists()
     assert (unpacked / "payload" / "models" / "accumulator" / "model.yaml").exists()
-    result = run_package(space_pkg, install_deps=False)
-    assert result["package"] == "local/source-space"
+    result = run_package(lab_pkg, install_deps=False)
+    assert result["package"] == "local/source-lab"
     assert result["modules"] == [
         {"alias": "counter", "path": "models/counter", "package": "local/counter", "version": "1.0.0"},
         {"alias": "accumulator", "path": "models/accumulator", "package": "local/accumulator", "version": "1.0.0"},
     ]
 
 
-def test_export_space_alias_embeds_models(tmp_path: Path):
-    exported = export_space_package(_write_space(tmp_path / "space"), package_name="local/source-space", version="1.0.0")
+def test_export_lab_alias_embeds_models(tmp_path: Path):
+    exported = export_lab_package(_write_lab(tmp_path / "lab"), package_name="local/source-lab", version="1.0.0")
     validation = validate_package(exported)
     assert validation.valid
     result = run_package(exported, install_deps=False)
-    assert result["package"] == "local/source-space"
+    assert result["package"] == "local/source-lab"
 
 
-def test_space_build_ignores_generated_files(tmp_path: Path):
-    space_dir = _write_space(tmp_path / "space")
-    (space_dir / ".DS_Store").write_text("junk", encoding="utf-8")
-    (space_dir / "dist").mkdir(exist_ok=True)
-    (space_dir / "dist" / "old.bsispace").write_text("junk", encoding="utf-8")
-    pycache_dir = space_dir / "models" / "counter" / "__pycache__"
+def test_lab_build_ignores_generated_files(tmp_path: Path):
+    lab_dir = _write_lab(tmp_path / "lab")
+    (lab_dir / ".DS_Store").write_text("junk", encoding="utf-8")
+    (lab_dir / "dist").mkdir(exist_ok=True)
+    (lab_dir / "dist" / "old.bsilab").write_text("junk", encoding="utf-8")
+    pycache_dir = lab_dir / "models" / "counter" / "__pycache__"
     pycache_dir.mkdir(exist_ok=True)
     (pycache_dir / "counter.cpython-311.pyc").write_bytes(b"junk")
 
-    package_path = build_package(space_dir, package_name="local/source-space", version="1.0.0")
-    unpacked = unpack_package(package_path, dest=tmp_path / "space-unpacked")
+    package_path = build_package(lab_dir, package_name="local/source-lab", version="1.0.0")
+    unpacked = unpack_package(package_path, dest=tmp_path / "lab-unpacked")
 
     assert not (unpacked / "payload" / ".DS_Store").exists()
     assert not (unpacked / "payload" / "dist").exists()
     assert not (unpacked / "payload" / "models" / "counter" / "__pycache__").exists()
 
 
-def test_build_space_from_source_path_refs(tmp_path: Path):
-    space_dir = _write_path_manifest_space(tmp_path / "source-space")
+def test_build_lab_from_source_path_refs(tmp_path: Path):
+    lab_dir = _write_path_manifest_lab(tmp_path / "source-lab")
 
-    package_path = build_package(space_dir, package_name="local/source-space", version="1.0.0")
+    package_path = build_package(lab_dir, package_name="local/source-lab", version="1.0.0")
 
     validation = validate_package(package_path)
     assert validation.valid
 
-    unpacked = unpack_package(package_path, dest=tmp_path / "source-space-unpacked")
+    unpacked = unpack_package(package_path, dest=tmp_path / "source-lab-unpacked")
     assert (unpacked / "payload" / "models" / "counter" / "model.yaml").exists()
     result = run_package(package_path, install_deps=False)
-    assert result["package"] == "local/source-space"
+    assert result["package"] == "local/source-lab"
     assert result["modules"] == [
         {
             "alias": "counter",
@@ -332,23 +332,23 @@ def test_build_space_from_source_path_refs(tmp_path: Path):
     ]
 
 
-def test_build_space_from_source_path_refs_does_not_require_nested_package_identity(tmp_path: Path):
-    space_dir = _write_path_manifest_space(tmp_path / "source-space")
-    package_path = build_package(space_dir, package_name="local/source-space", version="1.0.0")
+def test_build_lab_from_source_path_refs_does_not_require_nested_package_identity(tmp_path: Path):
+    lab_dir = _write_path_manifest_lab(tmp_path / "source-lab")
+    package_path = build_package(lab_dir, package_name="local/source-lab", version="1.0.0")
     validation = validate_package(package_path)
     assert validation.valid
 
 
-def test_space_build_preserves_source_provenance(tmp_path: Path):
-    source = {"path": "spaces/demo/space.yaml", "commit": "abc123"}
-    space_pkg = build_package(
-        _write_space(tmp_path / "space"),
-        package_name="local/provenance-space",
+def test_lab_build_preserves_source_provenance(tmp_path: Path):
+    source = {"path": "labs/demo/lab.yaml", "commit": "abc123"}
+    lab_pkg = build_package(
+        _write_lab(tmp_path / "lab"),
+        package_name="local/provenance-lab",
         version="1.0.0",
         source=source,
     )
 
-    validation = validate_package(space_pkg)
+    validation = validate_package(lab_pkg)
     assert validation.valid
     assert validation.metadata["source"] == source
     assert validation.metadata["provenance"] == source
@@ -366,32 +366,32 @@ def test_build_rejects_legacy_source_provenance(tmp_path: Path):
         )
 
 
-def test_space_build_embeds_child_spaces_and_runs_without_registry(tmp_path: Path):
+def test_lab_build_embeds_child_spaces_and_runs_without_registry(tmp_path: Path):
     parent_pkg = build_package(
-        _write_parent_space_with_child(tmp_path / "parent-space"),
-        package_name="local/parent-space",
+        _write_parent_lab_with_child(tmp_path / "parent-lab"),
+        package_name="local/parent-lab",
         version="1.0.0",
     )
 
     validation = validate_package(parent_pkg)
     assert validation.valid
-    unpacked = unpack_package(parent_pkg, dest=tmp_path / "parent-space-unpacked")
-    assert (unpacked / "payload" / "spaces" / "child-space" / "space.yaml").exists()
+    unpacked = unpack_package(parent_pkg, dest=tmp_path / "parent-lab-unpacked")
+    assert (unpacked / "payload" / "labs" / "child-lab" / "lab.yaml").exists()
     result = run_package(parent_pkg, install_deps=False)
-    assert result["package"] == "local/parent-space"
+    assert result["package"] == "local/parent-lab"
     assert result["modules"] == [
         {"alias": "accumulator", "path": "models/accumulator", "package": "local/accumulator", "version": "1.0.0"},
-        {"alias": "nested.counter", "path": "spaces/child-space/models/counter", "package": "local/counter", "version": "1.0.0"},
+        {"alias": "nested.counter", "path": "labs/child-lab/models/counter", "package": "local/counter", "version": "1.0.0"},
     ]
 
 
-def test_space_build_rejects_nested_package_refs(tmp_path: Path):
-    path = tmp_path / "legacy-space"
+def test_lab_build_rejects_nested_package_refs(tmp_path: Path):
+    path = tmp_path / "legacy-lab"
     path.mkdir(parents=True, exist_ok=True)
-    (path / "space.yaml").write_text(
+    (path / "lab.yaml").write_text(
         """
 schema_version: "2.0"
-title: "Legacy Space"
+title: "Legacy Lab"
 models:
   - package: local/counter
     version: 1.0.0
@@ -406,7 +406,7 @@ wiring: []
     )
 
     with pytest.raises(PackageError, match="must use path references only"):
-        build_package(path, package_name="local/legacy-space", version="1.0.0")
+        build_package(path, package_name="local/legacy-lab", version="1.0.0")
 
 
 def test_invalid_dependency_pin_fails(tmp_path: Path):

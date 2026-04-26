@@ -76,9 +76,9 @@ function SimulationView({
       const target = (st as any)?.target;
       const run = (st as any)?.run;
       const modelId = target?.modelId ?? run?.model_id ?? run?.modelId;
-      const spaceId = target?.spaceId ?? run?.project_id ?? run?.spaceId;
+      const labId = target?.labId ?? run?.lab_id ?? run?.labId;
       if (modelId) return `simui-controls:model:${modelId}`;
-      if (spaceId) return `simui-controls:space:${spaceId}`;
+      if (labId) return `simui-controls:lab:${labId}`;
     } catch {
       // Ignore and fallback to generic key.
     }

@@ -48,7 +48,6 @@ export type {
   UiCapabilities,
   RunStatus,
   Snapshot,
-  TickData,
 } from "./types/api";
 
 export type { ChatMessageRole, ChatMessage, ChatThread, ChatAdapter } from "./types/chat";

@@ -10,7 +10,7 @@ export type ChatMessage = {
 
 export type ChatThread = {
   id: string;
-  spaceId: string;
+  labId: string;
   title?: string | null;
   messages: ChatMessage[];
 };

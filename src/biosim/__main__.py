@@ -259,7 +259,7 @@ def _main_pack(argv: list[str]) -> None:
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    build_parser = subparsers.add_parser("build", help="Build a model or self-contained space package")
+    build_parser = subparsers.add_parser("build", help="Build a model or self-contained lab package")
     build_parser.add_argument("source", type=Path)
     build_parser.add_argument("--out", type=Path, default=None)
     build_parser.add_argument("--package", dest="package_name", type=str, default=None)
@@ -272,7 +272,7 @@ def _main_pack(argv: list[str]) -> None:
     fetch_parser = subparsers.add_parser("fetch", help="Fetch a package into the local cache")
     fetch_parser.add_argument("reference", type=str, help="Reference in package@version form")
 
-    run_parser = subparsers.add_parser("run", help="Run a model or space package")
+    run_parser = subparsers.add_parser("run", help="Run a model or lab package")
     run_parser.add_argument("package_file", type=Path)
     run_parser.add_argument("--no-install-deps", action="store_true")
 

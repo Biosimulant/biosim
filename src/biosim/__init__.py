@@ -31,7 +31,7 @@ from .wiring import (
 )
 from .pack import (
     build_package,
-    export_space_package,
+    export_lab_package,
     fetch_package,
     publish_package,
     run_package,
@@ -65,7 +65,7 @@ __all__ = [
     "load_wiring_toml",
     "load_wiring_yaml",
     "build_package",
-    "export_space_package",
+    "export_lab_package",
     "fetch_package",
     "publish_package",
     "run_package",

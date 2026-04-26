@@ -42,7 +42,7 @@ pip install -e ../biosim'[ui]'      # Optional: for SimUI
 
 ### Running Labs
 
-Pre-composed simulation labs are in `models/spaces/`:
+Pre-composed simulation labs are in `models/labs/`:
 
 **Single neuron lab:**
 ```bash
@@ -421,7 +421,7 @@ The neuro packs use the SimUI VisualSpec contract. VisualSpecs may include an op
 Demonstrates how Izhikevich parameters affect spiking behavior. Uses models from the `models` repo wired together:
 
 ```yaml
-# spaces/neuro-single-neuron/space.yaml (abbreviated)
+# spaces/neuro-single-neuron/lab.yaml (abbreviated)
 models:
   - alias: current
     manifest_path: models/neuro-step-current/model.yaml
@@ -446,7 +446,7 @@ wiring:
 
 Balanced excitation/inhibition with Poisson drive.
 
-See `models/spaces/neuro-microcircuit/space.yaml` for the composed lab manifest.
+See `models/labs/neuro-microcircuit/lab.yaml` for the composed lab manifest.
 
 Key observations:
 - **Balanced E/I**: Asynchronous irregular (AI) spiking
@@ -457,11 +457,11 @@ Key observations:
 
 Classic conductance-based model with detailed ion channel dynamics.
 
-See `models/spaces/neuro-hodgkin-huxley-neuron/space.yaml` for the composed lab manifest.
+See `models/labs/neuro-hodgkin-huxley-neuron/lab.yaml` for the composed lab manifest.
 
 ## Config Files
 
-Example wiring specs are in `models/spaces/` (lab manifests):
+Example wiring specs are in `models/labs/` (lab manifests):
 
 - `spaces/neuro-single-neuron/` - Single Izhikevich neuron + step current + monitors
 - `spaces/neuro-microcircuit/` - 50-neuron E/I network with Poisson drive
