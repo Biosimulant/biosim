@@ -46,22 +46,22 @@ Pre-composed simulation labs are in `models/labs/`:
 
 **Single neuron lab:**
 ```bash
-python -m biosim spaces/neuro-single-neuron/wiring.yaml
+python -m biosim labs/neuro-single-neuron/wiring.yaml
 ```
 
 **E/I microcircuit lab (50 neurons):**
 ```bash
-python -m biosim spaces/neuro-microcircuit/wiring.yaml
+python -m biosim labs/neuro-microcircuit/wiring.yaml
 ```
 
 **Hodgkin-Huxley single neuron:**
 ```bash
-python -m biosim spaces/neuro-hodgkin-huxley-neuron/wiring.yaml
+python -m biosim labs/neuro-hodgkin-huxley-neuron/wiring.yaml
 ```
 
 **Local SimUI (optional):**
 ```bash
-python spaces/neuro-microcircuit/simui_local.py
+python labs/neuro-microcircuit/simui_local.py
 # Then open http://localhost:7860/ui/
 ```
 
@@ -70,7 +70,7 @@ python spaces/neuro-microcircuit/simui_local.py
 python -c "
 import biosim
 w = biosim.BioWorld(communication_step=0.001)
-biosim.load_wiring(w, 'spaces/neuro-single-neuron/wiring.yaml')
+biosim.load_wiring(w, 'labs/neuro-single-neuron/wiring.yaml')
 w.run(duration=0.5, communication_step=0.0001)
 print('Simulation complete')
 for v in w.collect_visuals():
@@ -421,7 +421,7 @@ The neuro packs use the SimUI VisualSpec contract. VisualSpecs may include an op
 Demonstrates how Izhikevich parameters affect spiking behavior. Uses models from the `models` repo wired together:
 
 ```yaml
-# spaces/neuro-single-neuron/lab.yaml (abbreviated)
+# labs/neuro-single-neuron/lab.yaml (abbreviated)
 models:
   - alias: current
     manifest_path: models/neuro-step-current/model.yaml
@@ -463,15 +463,15 @@ See `models/labs/neuro-hodgkin-huxley-neuron/lab.yaml` for the composed lab mani
 
 Example wiring specs are in `models/labs/` (lab manifests):
 
-- `spaces/neuro-single-neuron/` - Single Izhikevich neuron + step current + monitors
-- `spaces/neuro-microcircuit/` - 50-neuron E/I network with Poisson drive
-- `spaces/neuro-hodgkin-huxley-neuron/` - Single HH neuron + monitors
+- `labs/neuro-single-neuron/` - Single Izhikevich neuron + step current + monitors
+- `labs/neuro-microcircuit/` - 50-neuron E/I network with Poisson drive
+- `labs/neuro-hodgkin-huxley-neuron/` - Single HH neuron + monitors
 
 Load and run:
 ```python
 import biosim
 world = biosim.BioWorld()
-biosim.load_wiring(world, "spaces/neuro-single-neuron/wiring.yaml")
+biosim.load_wiring(world, "labs/neuro-single-neuron/wiring.yaml")
 world.run(duration=0.3, communication_step=0.0001)
 ```
 
