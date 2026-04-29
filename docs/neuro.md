@@ -71,7 +71,7 @@ python -c "
 import biosim
 w = biosim.BioWorld(communication_step=0.001)
 biosim.load_wiring(w, 'labs/neuro-single-neuron/wiring.yaml')
-w.run(duration=0.5, communication_step=0.0001)
+w.run(duration=0.5)
 print('Simulation complete')
 for v in w.collect_visuals():
     print(f'  {v[\"module\"]}: {[x[\"render\"] for x in v[\"visuals\"]]}')"
@@ -470,9 +470,9 @@ Example wiring specs are in `models/labs/` (lab manifests):
 Load and run:
 ```python
 import biosim
-world = biosim.BioWorld()
+world = biosim.BioWorld(communication_step=0.0001)
 biosim.load_wiring(world, "labs/neuro-single-neuron/wiring.yaml")
-world.run(duration=0.3, communication_step=0.0001)
+world.run(duration=0.3)
 ```
 
 ## See Also

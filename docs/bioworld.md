@@ -17,7 +17,7 @@ class BioWorld:
 - Inputs for a window are collected from the committed signal store at the start boundary.
 - Every module advances independently across the same window via `advance_window(start, end)`.
 - Outputs are committed atomically at the end boundary.
-- Tied-time behavior is order-independent by design; the kernel has no priority scheduling contract.
+- Tied-time behavior is order-independent by design; the kernel has no execution-order scheduling contract.
 
 ## Key methods
 

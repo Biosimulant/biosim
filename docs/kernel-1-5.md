@@ -48,4 +48,4 @@ The kernel only validates compatibility. It does not convert units or reinterpre
 
 ## Snapshot and branch
 
-`BioWorld.snapshot()` captures world time, committed signals, short signal history, connection delivery state, and module snapshots. `branch()` deep-copies the current world and restores that snapshot into a new instance so both worlds can diverge independently from the same communication boundary.
+`BioWorld.snapshot()` captures world time, committed signals, connection delivery state, module snapshots, and setup config. `branch()` deep-copies the current world and restores that snapshot into a new instance so both worlds can diverge independently from the same communication boundary.
