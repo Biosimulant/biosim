@@ -266,7 +266,7 @@ def _main_pack(argv: list[str]) -> None:
     build_parser.add_argument("--version", type=str, default="0.1.0")
     build_parser.add_argument("--visibility", type=str, default="private")
 
-    validate_parser = subparsers.add_parser("validate", help="Validate a .bsimpkg")
+    validate_parser = subparsers.add_parser("validate", help="Validate a model or lab package")
     validate_parser.add_argument("package_file", type=Path)
 
     fetch_parser = subparsers.add_parser("fetch", help="Fetch a package into the local cache")

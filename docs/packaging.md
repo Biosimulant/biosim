@@ -23,7 +23,7 @@ python -m biosim pack build path/to/model-or-lab
 Validate a package file:
 
 ```bash
-python -m biosim pack validate path/to/package.bsimpkg
+python -m biosim pack validate path/to/model.bsimodel
 ```
 
 Fetch a package from the configured local registry into cache:
@@ -35,7 +35,7 @@ python -m biosim pack fetch owner/model-name@1.0.0
 Run a package locally:
 
 ```bash
-python -m biosim pack run path/to/package.bsimpkg
+python -m biosim pack run path/to/model.bsimodel
 ```
 
 Use `--json` with any `biosim pack` command when you need machine-readable output.

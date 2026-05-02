@@ -61,7 +61,7 @@ Common commands:
 python -m biosim pack build path/to/model-or-lab
 
 # Validate an existing package file
-python -m biosim pack validate dist/local__counter-1.0.0.bsimpkg
+python -m biosim pack validate dist/local__counter-1.0.0.bsimodel
 
 # Build a self-contained lab package (.bsilab)
 python -m biosim pack build path/to/lab
