@@ -16,7 +16,9 @@ from biosim.pack import (
 )
 
 
-def _write_counter_model(path: Path, *, package_name: str | None = None, version: str | None = None) -> Path:
+def _write_counter_model(
+    path: Path, *, package_name: str | None = None, version: str | None = None
+) -> Path:
     path.mkdir(parents=True, exist_ok=True)
     model_yaml = [
         'schema_version: "2.0"',
@@ -54,14 +56,15 @@ class Counter(BioModule):
 
     def get_outputs(self):
         return {"count": ScalarSignal(source="counter", name="count", value=self.value, emitted_at=0.1, spec=self.outputs()["count"])}
-""".strip()
-        + "\n",
+""".strip() + "\n",
         encoding="utf-8",
     )
     return path
 
 
-def _write_accumulator_model(path: Path, *, package_name: str | None = None, version: str | None = None) -> Path:
+def _write_accumulator_model(
+    path: Path, *, package_name: str | None = None, version: str | None = None
+) -> Path:
     path.mkdir(parents=True, exist_ok=True)
     model_yaml = [
         'schema_version: "2.0"',
@@ -106,8 +109,7 @@ class Accumulator(BioModule):
 
     def get_outputs(self):
         return {"total": ScalarSignal(source="acc", name="total", value=self.total, emitted_at=0.1, spec=self.outputs()["total"])}
-""".strip()
-        + "\n",
+""".strip() + "\n",
         encoding="utf-8",
     )
     return path
@@ -142,8 +144,7 @@ runtime:
 wiring:
   - from: counter.count
     to: [accumulator.value]
-""".strip()
-        + "\n",
+""".strip() + "\n",
         encoding="utf-8",
     )
     return path
@@ -165,8 +166,7 @@ runtime:
   duration: 0.2
   initial_inputs: {}
 wiring: []
-""".strip()
-        + "\n",
+""".strip() + "\n",
         encoding="utf-8",
     )
     return path
@@ -196,8 +196,7 @@ runtime:
   duration: 0.2
   initial_inputs: {}
 wiring: []
-""".strip()
-        + "\n",
+""".strip() + "\n",
         encoding="utf-8",
     )
     return path
@@ -229,8 +228,7 @@ runtime:
 wiring:
   - from: nested.count
     to: [accumulator.value]
-""".strip()
-        + "\n",
+""".strip() + "\n",
         encoding="utf-8",
     )
     return path
@@ -238,7 +236,9 @@ wiring:
 
 def test_build_validate_and_unpack_model_package(tmp_path: Path):
     model_dir = _write_counter_model(tmp_path / "counter")
-    package_path = build_package(model_dir, package_name="local/counter", version="1.0.0")
+    package_path = build_package(
+        model_dir, package_name="local/counter", version="1.0.0"
+    )
 
     validation = validate_package(package_path)
     assert validation.valid
@@ -266,14 +266,81 @@ def test_build_uses_manifest_declared_package_and_version(tmp_path: Path):
 
 def test_model_package_run_smoke(tmp_path: Path):
     model_dir = _write_counter_model(tmp_path / "counter")
-    package_path = build_package(model_dir, package_name="local/counter", version="1.0.0")
+    package_path = build_package(
+        model_dir, package_name="local/counter", version="1.0.0"
+    )
     result = run_package(package_path, install_deps=False)
     assert result["package"] == "local/counter"
     assert "count" in result["outputs"]
 
 
+def test_model_package_run_coerces_runtime_initial_inputs(tmp_path: Path):
+    model_dir = tmp_path / "input-model"
+    model_dir.mkdir()
+    (model_dir / "model.yaml").write_text(
+        """
+schema_version: "2.0"
+title: "Input Model"
+description: "Input coercion model"
+standard: other
+tags: [test]
+authors: ["Tests"]
+biosim:
+  entrypoint: "src.input_model:InputModel"
+  communication_step: 0.1
+runtime:
+  initial_inputs:
+    value: 4.0
+""".strip() + "\n",
+        encoding="utf-8",
+    )
+    src_dir = model_dir / "src"
+    src_dir.mkdir()
+    (src_dir / "input_model.py").write_text(
+        """
+from biosim import BioModule, SignalSpec, ScalarSignal
+
+
+class InputModel(BioModule):
+    def __init__(self):
+        self.value = 0.0
+        self.received_signal_type = None
+
+    def inputs(self):
+        return {"value": SignalSpec.scalar(dtype="float64")}
+
+    def outputs(self):
+        return {"value": SignalSpec.scalar(dtype="float64")}
+
+    def set_inputs(self, signals):
+        signal = signals["value"]
+        self.received_signal_type = signal.__class__.__name__
+        self.value = float(signal.value)
+
+    def advance_window(self, _start, _end):
+        return
+
+    def get_outputs(self):
+        return {"value": ScalarSignal(source="input", name="value", value=self.value, emitted_at=0.1, spec=self.outputs()["value"])}
+
+    def snapshot(self):
+        return {"value": self.value, "received_signal_type": self.received_signal_type}
+""".strip() + "\n",
+        encoding="utf-8",
+    )
+
+    package_path = build_package(
+        model_dir, package_name="local/input-model", version="1.0.0"
+    )
+    result = run_package(package_path, install_deps=False)
+
+    assert result["state"] == {"value": 4.0, "received_signal_type": "ScalarSignal"}
+
+
 def test_lab_build_embeds_models_and_runs_without_registry(tmp_path: Path):
-    lab_pkg = build_package(_write_lab(tmp_path / "lab"), package_name="local/source-lab", version="1.0.0")
+    lab_pkg = build_package(
+        _write_lab(tmp_path / "lab"), package_name="local/source-lab", version="1.0.0"
+    )
     validation = validate_package(lab_pkg)
     assert validation.valid
     unpacked = unpack_package(lab_pkg, dest=tmp_path / "unpacked-lab")
@@ -282,13 +349,25 @@ def test_lab_build_embeds_models_and_runs_without_registry(tmp_path: Path):
     result = run_package(lab_pkg, install_deps=False)
     assert result["package"] == "local/source-lab"
     assert result["modules"] == [
-        {"alias": "counter", "path": "models/counter", "package": "local/counter", "version": "1.0.0"},
-        {"alias": "accumulator", "path": "models/accumulator", "package": "local/accumulator", "version": "1.0.0"},
+        {
+            "alias": "counter",
+            "path": "models/counter",
+            "package": "local/counter",
+            "version": "1.0.0",
+        },
+        {
+            "alias": "accumulator",
+            "path": "models/accumulator",
+            "package": "local/accumulator",
+            "version": "1.0.0",
+        },
     ]
 
 
 def test_export_lab_alias_embeds_models(tmp_path: Path):
-    exported = export_lab_package(_write_lab(tmp_path / "lab"), package_name="local/source-lab", version="1.0.0")
+    exported = export_lab_package(
+        _write_lab(tmp_path / "lab"), package_name="local/source-lab", version="1.0.0"
+    )
     validation = validate_package(exported)
     assert validation.valid
     result = run_package(exported, install_deps=False)
@@ -304,7 +383,9 @@ def test_lab_build_ignores_generated_files(tmp_path: Path):
     pycache_dir.mkdir(exist_ok=True)
     (pycache_dir / "counter.cpython-311.pyc").write_bytes(b"junk")
 
-    package_path = build_package(lab_dir, package_name="local/source-lab", version="1.0.0")
+    package_path = build_package(
+        lab_dir, package_name="local/source-lab", version="1.0.0"
+    )
     unpacked = unpack_package(package_path, dest=tmp_path / "lab-unpacked")
 
     assert not (unpacked / "payload" / ".DS_Store").exists()
@@ -315,7 +396,9 @@ def test_lab_build_ignores_generated_files(tmp_path: Path):
 def test_build_lab_from_source_path_refs(tmp_path: Path):
     lab_dir = _write_path_manifest_lab(tmp_path / "source-lab")
 
-    package_path = build_package(lab_dir, package_name="local/source-lab", version="1.0.0")
+    package_path = build_package(
+        lab_dir, package_name="local/source-lab", version="1.0.0"
+    )
 
     validation = validate_package(package_path)
     assert validation.valid
@@ -332,9 +415,13 @@ def test_build_lab_from_source_path_refs(tmp_path: Path):
     ]
 
 
-def test_build_lab_from_source_path_refs_does_not_require_nested_package_identity(tmp_path: Path):
+def test_build_lab_from_source_path_refs_does_not_require_nested_package_identity(
+    tmp_path: Path,
+):
     lab_dir = _write_path_manifest_lab(tmp_path / "source-lab")
-    package_path = build_package(lab_dir, package_name="local/source-lab", version="1.0.0")
+    package_path = build_package(
+        lab_dir, package_name="local/source-lab", version="1.0.0"
+    )
     validation = validate_package(package_path)
     assert validation.valid
 
@@ -355,14 +442,19 @@ def test_lab_build_preserves_source_provenance(tmp_path: Path):
 
 
 def test_build_rejects_legacy_source_provenance(tmp_path: Path):
-    model_dir = _write_counter_model(tmp_path / "counter", package_name="local/counter", version="1.0.0")
+    model_dir = _write_counter_model(
+        tmp_path / "counter", package_name="local/counter", version="1.0.0"
+    )
 
     with pytest.raises(PackageError, match="must not include legacy source keys"):
         build_package(
             model_dir,
             package_name="local/counter",
             version="1.0.0",
-            source={"repo": "Biosimulant/models-demo", "manifest_path": "models/counter/model.yaml"},
+            source={
+                "repo": "Biosimulant/models-demo",
+                "manifest_path": "models/counter/model.yaml",
+            },
         )
 
 
@@ -380,9 +472,50 @@ def test_lab_build_embeds_child_spaces_and_runs_without_registry(tmp_path: Path)
     result = run_package(parent_pkg, install_deps=False)
     assert result["package"] == "local/parent-lab"
     assert result["modules"] == [
-        {"alias": "accumulator", "path": "models/accumulator", "package": "local/accumulator", "version": "1.0.0"},
-        {"alias": "nested.counter", "path": "labs/child-lab/models/counter", "package": "local/counter", "version": "1.0.0"},
+        {
+            "alias": "accumulator",
+            "path": "models/accumulator",
+            "package": "local/accumulator",
+            "version": "1.0.0",
+        },
+        {
+            "alias": "nested.counter",
+            "path": "labs/child-lab/models/counter",
+            "package": "local/counter",
+            "version": "1.0.0",
+        },
     ]
+
+
+def test_lab_package_run_coerces_alias_initial_inputs(tmp_path: Path):
+    lab_dir = _write_path_manifest_lab(tmp_path / "source-lab")
+    _write_accumulator_model(lab_dir / "models" / "accumulator")
+    (lab_dir / "lab.yaml").write_text(
+        """
+schema_version: "2.0"
+title: "Input Lab"
+description: "Lab initial inputs"
+models:
+  - path: models/accumulator
+    alias: accumulator
+runtime:
+  communication_step: 0.1
+  duration: 0.1
+  initial_inputs:
+    accumulator:
+      value: 7.0
+wiring: []
+""".strip() + "\n",
+        encoding="utf-8",
+    )
+
+    package_path = build_package(
+        lab_dir, package_name="local/input-lab", version="1.0.0"
+    )
+    result = run_package(package_path, install_deps=False)
+
+    assert result["package"] == "local/input-lab"
+    assert result["modules"] == [{"alias": "accumulator", "path": "models/accumulator"}]
 
 
 def test_lab_build_rejects_nested_package_refs(tmp_path: Path):
@@ -400,8 +533,7 @@ runtime:
   duration: 0.2
   initial_inputs: {}
 wiring: []
-""".strip()
-        + "\n",
+""".strip() + "\n",
         encoding="utf-8",
     )
 
@@ -427,8 +559,7 @@ runtime:
   dependencies:
     packages:
       - numpy>=1.0
-""".strip()
-        + "\n",
+""".strip() + "\n",
         encoding="utf-8",
     )
     src_dir = model_dir / "src"
@@ -441,8 +572,7 @@ from biosim import BioModule
 class Bad(BioModule):
     def advance_window(self, _start, t): return
     def get_outputs(self): return {}
-""".strip()
-        + "\n",
+""".strip() + "\n",
         encoding="utf-8",
     )
     with pytest.raises(PackageError):

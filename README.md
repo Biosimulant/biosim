@@ -76,6 +76,10 @@ Notes:
 
 See [`docs/packaging.md`](docs/packaging.md) for the full package layout, recommended authoring flow, and CLI examples.
 
+## Provisional Runtime Helpers
+
+`biosim.runtime` is the provisional public home for package interpretation helpers shared by the open-source CLI and Biosimulant platform executors. It owns entrypoint loading, typed `runtime.initial_inputs` coercion, communication-step resolution, and source-neutral lab flattening. Import these helpers from `biosim.runtime`; they are not exported from top-level `biosim` while the API settles.
+
 ## Examples
 
 - See `examples/` for quick-start scripts. Try:

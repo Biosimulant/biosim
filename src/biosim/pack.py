@@ -11,12 +11,22 @@ import tempfile
 from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from importlib import import_module
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 from .modules import BioModule
+from .runtime import (
+    LabTree,
+    LabTreeChild,
+    LabTreeModel,
+    LabTreeWire,
+    coerce_typed_inputs,
+    extract_communication_step,
+    flatten_lab_tree,
+    lab_io_from_mapping,
+    load_entrypoint,
+)
 from .wiring import WiringBuilder
 from .world import BioWorld
 
@@ -30,7 +40,9 @@ DEFAULT_REGISTRY_ENV = "BIOSIM_PACKAGE_REGISTRY_DIR"
 DEFAULT_CACHE_ENV = "BIOSIM_PACKAGE_CACHE_DIR"
 DEFAULT_CACHE_HOME = Path.home() / ".cache" / "biosim" / "packages"
 FIXED_ZIP_TIME = (2020, 1, 1, 0, 0, 0)
-_FORBIDDEN_LEGACY_SOURCE_KEYS = frozenset({"repo", "manifest_path", "upstream_repo", "upstream_manifest_path"})
+_FORBIDDEN_LEGACY_SOURCE_KEYS = frozenset(
+    {"repo", "manifest_path", "upstream_repo", "upstream_manifest_path"}
+)
 
 
 class PackageError(ValueError):
@@ -59,7 +71,9 @@ def _require_yaml():
     try:
         import yaml  # type: ignore
     except ImportError as exc:  # pragma: no cover
-        raise ImportError("Package support requires PyYAML. Install with: pip install pyyaml") from exc
+        raise ImportError(
+            "Package support requires PyYAML. Install with: pip install pyyaml"
+        ) from exc
     return yaml
 
 
@@ -116,7 +130,11 @@ def _is_exact_pin(dep: str) -> bool:
     if "==" not in dep:
         return False
     left, right = dep.split("==", 1)
-    return bool(left.strip()) and bool(right.strip()) and all(op not in dep for op in (">=", "<=", "~=", "!=", ">", "<"))
+    return (
+        bool(left.strip())
+        and bool(right.strip())
+        and all(op not in dep for op in (">=", "<=", "~=", "!=", ">", "<"))
+    )
 
 
 def _validate_dependencies(manifest: Mapping[str, Any]) -> None:
@@ -135,7 +153,9 @@ def _validate_dependencies(manifest: Mapping[str, Any]) -> None:
 
 
 def _manifest_fingerprint(manifest: Mapping[str, Any]) -> str:
-    payload = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    payload = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode(
+        "utf-8"
+    )
     return hashlib.sha256(payload).hexdigest()
 
 
@@ -270,13 +290,19 @@ def _sanitize_package_source(source: Mapping[str, Any] | None) -> dict[str, Any]
         return {}
     if not isinstance(source, Mapping):
         raise PackageError("Package source metadata must be a mapping")
-    forbidden = sorted(key for key in _FORBIDDEN_LEGACY_SOURCE_KEYS if key in source and source.get(key) is not None)
+    forbidden = sorted(
+        key
+        for key in _FORBIDDEN_LEGACY_SOURCE_KEYS
+        if key in source and source.get(key) is not None
+    )
     if forbidden:
         raise PackageError(
             "Package source metadata must not include legacy source keys "
             f"({', '.join(forbidden)}). Use path/package/version provenance instead."
         )
-    return {str(key): deepcopy(value) for key, value in source.items() if value is not None}
+    return {
+        str(key): deepcopy(value) for key, value in source.items() if value is not None
+    }
 
 
 def _build_package_yaml(
@@ -312,8 +338,16 @@ def _build_package_yaml(
     if provenance:
         package_yaml["provenance"] = provenance
     if package_type == "model":
-        runtime = manifest.get("runtime") if isinstance(manifest.get("runtime"), Mapping) else {}
-        package_yaml["runtime"] = {"dependencies": dict(runtime.get("dependencies") or {})} if isinstance(runtime, Mapping) else {"dependencies": {}}
+        runtime = (
+            manifest.get("runtime")
+            if isinstance(manifest.get("runtime"), Mapping)
+            else {}
+        )
+        package_yaml["runtime"] = (
+            {"dependencies": dict(runtime.get("dependencies") or {})}
+            if isinstance(runtime, Mapping)
+            else {"dependencies": {}}
+        )
         package_yaml["manifest_fingerprint"] = _manifest_fingerprint(manifest)
     return package_yaml
 
@@ -356,7 +390,11 @@ def build_package(
     else:
         raise PackageError(f"Could not find model.yaml or lab.yaml in {source_path}")
 
-    package_name = package_name or _manifest_declared_package(manifest) or _default_package_name(source_path)
+    package_name = (
+        package_name
+        or _manifest_declared_package(manifest)
+        or _default_package_name(source_path)
+    )
     version = _validate_version(_manifest_declared_version(manifest) or version)
 
     logical_sha256 = _logical_hash(entries)
@@ -393,7 +431,11 @@ def export_lab_package(
 ) -> Path:
     source_path = Path(source_dir).expanduser().resolve()
     manifest, entries = _collect_lab_entries(source_path)
-    package_name = package_name or _manifest_declared_package(manifest) or _default_package_name(source_path)
+    package_name = (
+        package_name
+        or _manifest_declared_package(manifest)
+        or _default_package_name(source_path)
+    )
     version = _validate_version(_manifest_declared_version(manifest) or version)
     logical_sha256 = _logical_hash(entries)
     package_yaml = _build_package_yaml(
@@ -423,23 +465,33 @@ def _validate_paths(names: Iterable[str]) -> None:
             raise PackageError(f"Invalid archive path: {name}")
 
 
-def _resolve_embedded_archive_dir(*, package_root: str, current_dir: str, dependency_path: str) -> str:
+def _resolve_embedded_archive_dir(
+    *, package_root: str, current_dir: str, dependency_path: str
+) -> str:
     relative = _normalize_embedded_path(dependency_path)
     resolved = posixpath.normpath(posixpath.join(current_dir, relative))
     if package_root:
         if resolved != package_root and not resolved.startswith(f"{package_root}/"):
-            raise PackageError(f"Embedded dependency escapes package root: {dependency_path}")
+            raise PackageError(
+                f"Embedded dependency escapes package root: {dependency_path}"
+            )
     elif resolved.startswith("../") or resolved == "..":
-        raise PackageError(f"Embedded dependency escapes package root: {dependency_path}")
+        raise PackageError(
+            f"Embedded dependency escapes package root: {dependency_path}"
+        )
     return resolved
 
 
-def _find_archive_manifest(entries: Mapping[str, bytes], directory: str, candidates: tuple[str, ...]) -> str:
+def _find_archive_manifest(
+    entries: Mapping[str, bytes], directory: str, candidates: tuple[str, ...]
+) -> str:
     for candidate in candidates:
         archive_path = posixpath.join(directory, candidate) if directory else candidate
         if archive_path in entries:
             return archive_path
-    raise PackageError(f"Expected one of {', '.join(candidates)} inside {directory or '<root>'}")
+    raise PackageError(
+        f"Expected one of {', '.join(candidates)} inside {directory or '<root>'}"
+    )
 
 
 def _normalize_embedded_path(path: str) -> str:
@@ -453,7 +505,9 @@ def validate_package(path: str | Path) -> PackageValidationResult:
     package_path = Path(path).expanduser().resolve()
     result = PackageValidationResult(valid=False)
     if package_path.suffix not in PACKAGE_EXTENSIONS:
-        result.errors.append(f"Package file must use one of {', '.join(PACKAGE_EXTENSIONS)}")
+        result.errors.append(
+            f"Package file must use one of {', '.join(PACKAGE_EXTENSIONS)}"
+        )
         return result
     if not package_path.exists():
         result.errors.append(f"Package file not found: {package_path}")
@@ -472,12 +526,18 @@ def validate_package(path: str | Path) -> PackageValidationResult:
             package_yaml = _safe_yaml_load(entries["package.yaml"])
             entry_manifest = package_yaml.get("entry_manifest")
             if not isinstance(entry_manifest, str) or entry_manifest not in entries:
-                raise PackageError("package.yaml entry_manifest must point to a file in the archive")
+                raise PackageError(
+                    "package.yaml entry_manifest must point to a file in the archive"
+                )
 
-            expected_checksums = _parse_checksums(entries["integrity/sha256sums.txt"].decode("utf-8"))
+            expected_checksums = _parse_checksums(
+                entries["integrity/sha256sums.txt"].decode("utf-8")
+            )
             for name, expected in expected_checksums.items():
                 if name not in entries:
-                    raise PackageError(f"Checksum entry references missing file: {name}")
+                    raise PackageError(
+                        f"Checksum entry references missing file: {name}"
+                    )
                 actual = hashlib.sha256(entries[name]).hexdigest()
                 if actual != expected:
                     raise PackageError(f"Checksum mismatch for {name}")
@@ -485,7 +545,9 @@ def validate_package(path: str | Path) -> PackageValidationResult:
             actual_logical_hash = _logical_hash(entries)
             declared_hash = package_yaml.get("sha256")
             if declared_hash and declared_hash != actual_logical_hash:
-                raise PackageError("Logical package hash does not match package.yaml sha256")
+                raise PackageError(
+                    "Logical package hash does not match package.yaml sha256"
+                )
 
             manifest = _safe_yaml_load(entries[entry_manifest])
             package_type = package_yaml.get("package_type")
@@ -536,13 +598,21 @@ def unpack_package(path: str | Path, *, dest: str | Path | None = None) -> Path:
     return dest_path
 
 
-def publish_package(path: str | Path, *, registry_dir: str | Path | None = None) -> Path:
+def publish_package(
+    path: str | Path, *, registry_dir: str | Path | None = None
+) -> Path:
     validation = validate_package(path)
     if not validation.valid or not validation.metadata:
         raise PackageError("; ".join(validation.errors))
-    registry = Path(registry_dir).expanduser().resolve() if registry_dir else _package_registry_dir()
+    registry = (
+        Path(registry_dir).expanduser().resolve()
+        if registry_dir
+        else _package_registry_dir()
+    )
     if registry is None:
-        raise PackageError(f"Set {DEFAULT_REGISTRY_ENV} or pass registry_dir to publish packages")
+        raise PackageError(
+            f"Set {DEFAULT_REGISTRY_ENV} or pass registry_dir to publish packages"
+        )
     package_name = str(validation.metadata["package"])
     version = str(validation.metadata["version"])
     target_dir = registry.joinpath(*_package_to_parts(package_name), version)
@@ -552,45 +622,61 @@ def publish_package(path: str | Path, *, registry_dir: str | Path | None = None)
     return target
 
 
-def fetch_package(package_name: str, version: str, *, registry_dir: str | Path | None = None, cache_dir: str | Path | None = None) -> Path:
+def fetch_package(
+    package_name: str,
+    version: str,
+    *,
+    registry_dir: str | Path | None = None,
+    cache_dir: str | Path | None = None,
+) -> Path:
     version = _validate_version(version)
-    registry = Path(registry_dir).expanduser().resolve() if registry_dir else _package_registry_dir()
-    cache = Path(cache_dir).expanduser().resolve() if cache_dir else _package_cache_dir()
+    registry = (
+        Path(registry_dir).expanduser().resolve()
+        if registry_dir
+        else _package_registry_dir()
+    )
+    cache = (
+        Path(cache_dir).expanduser().resolve() if cache_dir else _package_cache_dir()
+    )
     cache_target_dir = cache.joinpath(*_package_to_parts(package_name), version)
     cache_target_dir.mkdir(parents=True, exist_ok=True)
-    cache_target = cache_target_dir / f"{_package_slug(package_name)}-{version}{PACKAGE_EXTENSION}"
+    cache_target = (
+        cache_target_dir / f"{_package_slug(package_name)}-{version}{PACKAGE_EXTENSION}"
+    )
     if cache_target.exists():
         return cache_target
     if registry is None:
-        raise PackageError(f"Package {package_name}@{version} is not in cache and no registry is configured")
-    registry_target = registry.joinpath(*_package_to_parts(package_name), version, f"{_package_slug(package_name)}-{version}{PACKAGE_EXTENSION}")
+        raise PackageError(
+            f"Package {package_name}@{version} is not in cache and no registry is configured"
+        )
+    registry_target = registry.joinpath(
+        *_package_to_parts(package_name),
+        version,
+        f"{_package_slug(package_name)}-{version}{PACKAGE_EXTENSION}",
+    )
     if not registry_target.exists():
-        raise PackageError(f"Package {package_name}@{version} was not found in registry {registry}")
+        raise PackageError(
+            f"Package {package_name}@{version} was not found in registry {registry}"
+        )
     shutil.copy2(registry_target, cache_target)
     return cache_target
 
 
-def _load_entrypoint(entrypoint: str):
-    if ":" in entrypoint:
-        module_name, _, attr_name = entrypoint.partition(":")
-    else:
-        module_name, _, attr_name = entrypoint.rpartition(".")
-    if not module_name or not attr_name:
-        raise PackageError(f"Invalid entrypoint: {entrypoint}")
-    module = import_module(module_name)
-    try:
-        return getattr(module, attr_name)
-    except AttributeError as exc:
-        raise PackageError(f"Entrypoint attribute not found: {entrypoint}") from exc
+def _load_entrypoint(entrypoint: str, *, model_path: str | Path | None = None):
+    return load_entrypoint(entrypoint, model_path=model_path, error_cls=PackageError)
 
 
 def _module_paths_for_payload(payload_root: Path) -> list[str]:
     return [str(payload_root)]
 
 
-def _instantiate_model_from_package(loaded: _LoadedPackage, parameters: Mapping[str, Any] | None = None) -> tuple[BioModule, dict[str, Any]]:
+def _instantiate_model_from_package(
+    loaded: _LoadedPackage, parameters: Mapping[str, Any] | None = None
+) -> tuple[BioModule, dict[str, Any]]:
     manifest = loaded.manifest
-    bsim_block = manifest.get("biosim") if isinstance(manifest.get("biosim"), Mapping) else {}
+    bsim_block = (
+        manifest.get("biosim") if isinstance(manifest.get("biosim"), Mapping) else {}
+    )
     entrypoint = bsim_block.get("entrypoint")
     if not isinstance(entrypoint, str):
         raise PackageError("Model manifest is missing biosim.entrypoint")
@@ -606,7 +692,7 @@ def _instantiate_model_from_package(loaded: _LoadedPackage, parameters: Mapping[
         for item in reversed(_module_paths_for_payload(loaded.payload_root)):
             if item not in sys.path:
                 sys.path.insert(0, item)
-        factory = _load_entrypoint(entrypoint)
+        factory = _load_entrypoint(entrypoint, model_path=loaded.payload_root)
         module = factory(**init_kwargs)
     finally:
         sys.path[:] = original_sys_path
@@ -614,11 +700,17 @@ def _instantiate_model_from_package(loaded: _LoadedPackage, parameters: Mapping[
         raise PackageError(f"Entrypoint {entrypoint} did not construct a BioModule")
     return module, {
         "communication_step": bsim_block.get("communication_step"),
-        "setup": dict(bsim_block.get("setup") or {}) if isinstance(bsim_block.get("setup"), Mapping) else {},
+        "setup": (
+            dict(bsim_block.get("setup") or {})
+            if isinstance(bsim_block.get("setup"), Mapping)
+            else {}
+        ),
     }
 
 
-def _loaded_package_from_path(package_path: Path, unpack_root: Path | None = None) -> _LoadedPackage:
+def _loaded_package_from_path(
+    package_path: Path, unpack_root: Path | None = None
+) -> _LoadedPackage:
     unpacked_root = unpack_package(package_path, dest=unpack_root)
     package_yaml = _safe_yaml_load((unpacked_root / "package.yaml").read_bytes())
     entry_manifest = package_yaml["entry_manifest"]
@@ -639,9 +731,7 @@ def _find_manifest_in_dir(directory: Path, candidates: tuple[str, ...]) -> Path:
         manifest_path = directory / candidate
         if manifest_path.is_file():
             return manifest_path
-    raise PackageError(
-        f"Expected one of {', '.join(candidates)} inside {directory}"
-    )
+    raise PackageError(f"Expected one of {', '.join(candidates)} inside {directory}")
 
 
 def _load_lab_manifest_from_dir(directory: Path) -> dict[str, Any]:
@@ -650,27 +740,37 @@ def _load_lab_manifest_from_dir(directory: Path) -> dict[str, Any]:
     try:
         _validate_lab_manifest(manifest)
     except PackageError as exc:
-        raise PackageError(f"Invalid embedded lab manifest at {manifest_path}: {exc}") from exc
+        raise PackageError(
+            f"Invalid embedded lab manifest at {manifest_path}: {exc}"
+        ) from exc
     return manifest
 
 
 def _load_model_manifest_from_dir(directory: Path) -> dict[str, Any]:
-    manifest_path = _find_manifest_in_dir(directory, ("model.yaml", "model.yml", "biosim.yaml", "biosim.yml"))
+    manifest_path = _find_manifest_in_dir(
+        directory, ("model.yaml", "model.yml", "biosim.yaml", "biosim.yml")
+    )
     manifest = _safe_yaml_load(manifest_path.read_bytes())
     try:
         _validate_model_manifest(manifest)
         _validate_dependencies(manifest)
     except PackageError as exc:
-        raise PackageError(f"Invalid embedded model manifest at {manifest_path}: {exc}") from exc
+        raise PackageError(
+            f"Invalid embedded model manifest at {manifest_path}: {exc}"
+        ) from exc
     return manifest
 
 
-def _resolve_embedded_dir(payload_root: Path, current_lab_dir: Path, dependency_path: str) -> Path:
+def _resolve_embedded_dir(
+    payload_root: Path, current_lab_dir: Path, dependency_path: str
+) -> Path:
     normalized = _normalize_embedded_path(dependency_path)
     resolved = (current_lab_dir / normalized).resolve()
     root = payload_root.resolve()
     if resolved != root and root not in resolved.parents:
-        raise PackageError(f"Embedded dependency escapes package root: {dependency_path}")
+        raise PackageError(
+            f"Embedded dependency escapes package root: {dependency_path}"
+        )
     if not resolved.exists():
         raise PackageError(f"Embedded dependency path not found: {dependency_path}")
     return resolved
@@ -683,7 +783,9 @@ def _instantiate_model_from_dir(
     parameters: Mapping[str, Any] | None = None,
 ) -> tuple[BioModule, dict[str, Any]]:
     manifest = dict(manifest or _load_model_manifest_from_dir(model_dir))
-    bsim_block = manifest.get("biosim") if isinstance(manifest.get("biosim"), Mapping) else {}
+    bsim_block = (
+        manifest.get("biosim") if isinstance(manifest.get("biosim"), Mapping) else {}
+    )
     entrypoint = bsim_block.get("entrypoint")
     if not isinstance(entrypoint, str):
         raise PackageError("Model manifest is missing biosim.entrypoint")
@@ -699,7 +801,7 @@ def _instantiate_model_from_dir(
         model_sys_path = str(model_dir.resolve())
         if model_sys_path not in sys.path:
             sys.path.insert(0, model_sys_path)
-        factory = _load_entrypoint(entrypoint)
+        factory = _load_entrypoint(entrypoint, model_path=model_dir.resolve())
         module = factory(**init_kwargs)
     finally:
         sys.path[:] = original_sys_path
@@ -707,7 +809,11 @@ def _instantiate_model_from_dir(
         raise PackageError(f"Entrypoint {entrypoint} did not construct a BioModule")
     return module, {
         "communication_step": bsim_block.get("communication_step"),
-        "setup": dict(bsim_block.get("setup") or {}) if isinstance(bsim_block.get("setup"), Mapping) else {},
+        "setup": (
+            dict(bsim_block.get("setup") or {})
+            if isinstance(bsim_block.get("setup"), Mapping)
+            else {}
+        ),
     }
 
 
@@ -735,7 +841,9 @@ def _validate_embedded_lab_package_dir(
     visited: set[str],
 ) -> None:
     if current_dir in visited:
-        raise PackageError(f"Circular embedded child lab reference detected at {current_dir}")
+        raise PackageError(
+            f"Circular embedded child lab reference detected at {current_dir}"
+        )
     visited = visited | {current_dir}
 
     models = parsed_manifest.get("models")
@@ -761,7 +869,9 @@ def _validate_embedded_lab_package_dir(
                 _validate_model_manifest(parsed_model)
                 _validate_dependencies(parsed_model)
             except PackageError as exc:
-                raise PackageError(f"Invalid embedded model manifest at {manifest_path}: {exc}") from exc
+                raise PackageError(
+                    f"Invalid embedded model manifest at {manifest_path}: {exc}"
+                ) from exc
 
     children = parsed_manifest.get("children")
     if not isinstance(children, list):
@@ -777,12 +887,16 @@ def _validate_embedded_lab_package_dir(
             current_dir=current_dir,
             dependency_path=embedded_path,
         )
-        manifest_path = _find_archive_manifest(entries, child_dir, ("lab.yaml", "lab.yml"))
+        manifest_path = _find_archive_manifest(
+            entries, child_dir, ("lab.yaml", "lab.yml")
+        )
         try:
             parsed_child = _safe_yaml_load(entries[manifest_path])
             _validate_lab_manifest(parsed_child)
         except PackageError as exc:
-            raise PackageError(f"Invalid embedded child lab manifest at {manifest_path}: {exc}") from exc
+            raise PackageError(
+                f"Invalid embedded child lab manifest at {manifest_path}: {exc}"
+            ) from exc
         _validate_embedded_lab_package_dir(
             entries=entries,
             parsed_manifest=parsed_child,
@@ -792,15 +906,38 @@ def _validate_embedded_lab_package_dir(
         )
 
 
-def _run_model_loaded_package(loaded: _LoadedPackage, *, install_deps: bool = True) -> dict[str, Any]:
+def _run_model_loaded_package(
+    loaded: _LoadedPackage, *, install_deps: bool = True
+) -> dict[str, Any]:
     if install_deps:
         _install_declared_dependencies(loaded.manifest)
     module, meta = _instantiate_model_from_package(loaded)
     module.setup(meta["setup"])
-    communication_step = meta["communication_step"]
-    if communication_step is None:
-        raise PackageError("Model package biosim.communication_step is required")
-    module.advance_window(0.0, float(communication_step))
+    runtime = (
+        loaded.manifest.get("runtime")
+        if isinstance(loaded.manifest.get("runtime"), Mapping)
+        else {}
+    )
+    communication_step = extract_communication_step(
+        None, runtime, fallback=meta["communication_step"], error_cls=PackageError
+    )
+    initial_inputs = (
+        runtime.get("initial_inputs")
+        if isinstance(runtime.get("initial_inputs"), Mapping)
+        else {}
+    )
+    if initial_inputs:
+        declared_inputs = module.inputs() if isinstance(module.inputs(), dict) else {}
+        module.set_inputs(
+            coerce_typed_inputs(
+                initial_inputs,
+                declared_inputs,
+                source="run",
+                time_value=0.0,
+                error_cls=PackageError,
+            )
+        )
+    module.advance_window(0.0, communication_step)
     outputs = module.get_outputs()
     return {
         "package": loaded.package_yaml["package"],
@@ -818,13 +955,34 @@ def _flatten_embedded_lab_dir(
     visited: set[Path] | None = None,
     depth: int = 0,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
+    if prefix:
+        raise PackageError("Internal lab tree flattening no longer accepts a prefix")
+    tree, parsed_lab = _embedded_lab_tree_from_dir(
+        payload_root=payload_root,
+        current_lab_dir=current_lab_dir,
+        visited=visited,
+        depth=depth,
+    )
+    flattened = flatten_lab_tree(tree, max_depth=5, error_cls=PackageError)
+    return flattened.models, flattened.wiring, parsed_lab
+
+
+def _embedded_lab_tree_from_dir(
+    *,
+    payload_root: Path,
+    current_lab_dir: Path,
+    visited: set[Path] | None = None,
+    depth: int = 0,
+) -> tuple[LabTree, dict[str, Any]]:
     if depth > 5:
         raise PackageError("Lab nesting exceeds maximum depth of 5")
 
     current_key = current_lab_dir.resolve()
     visited_paths = set(visited or set())
     if current_key in visited_paths:
-        raise PackageError(f"Circular embedded child lab reference detected at {current_lab_dir}")
+        raise PackageError(
+            f"Circular embedded child lab reference detected at {current_lab_dir}"
+        )
     visited_paths.add(current_key)
 
     parsed_lab = _load_lab_manifest_from_dir(current_lab_dir)
@@ -833,9 +991,9 @@ def _flatten_embedded_lab_dir(
     if not isinstance(models, list) or not isinstance(wiring, list):
         raise PackageError("Lab manifest must contain models and wiring")
 
-    flat_models: list[dict[str, Any]] = []
-    flat_wiring: list[dict[str, Any]] = []
-    port_remap: dict[str, str] = {}
+    tree_models: list[LabTreeModel] = []
+    tree_wiring: list[LabTreeWire] = []
+    tree_children: list[LabTreeChild] = []
 
     for entry in models:
         if not isinstance(entry, Mapping):
@@ -848,15 +1006,24 @@ def _flatten_embedded_lab_dir(
             raise PackageError("Lab model entries require a path reference")
         model_dir = _resolve_embedded_dir(payload_root, current_lab_dir, embedded_path)
         _load_model_manifest_from_dir(model_dir)
-        model_entry: dict[str, Any] = {
-            "alias": _scoped_ref(prefix, alias),
-            "model_dir": str(model_dir),
-        }
-        for key in ("parameters", "module_config"):
-            value = entry.get(key)
-            if value is not None:
-                model_entry[key] = value
-        flat_models.append(model_entry)
+        parameters = (
+            entry.get("parameters")
+            if isinstance(entry.get("parameters"), Mapping)
+            else None
+        )
+        module_config = (
+            entry.get("module_config")
+            if isinstance(entry.get("module_config"), Mapping)
+            else None
+        )
+        tree_models.append(
+            LabTreeModel(
+                alias=alias,
+                ref={"model_dir": str(model_dir)},
+                parameters=parameters,
+                module_config=module_config,
+            )
+        )
 
     children = parsed_lab.get("children")
     if isinstance(children, list):
@@ -869,17 +1036,22 @@ def _flatten_embedded_lab_dir(
                 raise PackageError("Lab child entries require alias")
             if not isinstance(embedded_path, str) or not embedded_path.strip():
                 raise PackageError("Lab child entries require a path reference")
-            child_dir = _resolve_embedded_dir(payload_root, current_lab_dir, embedded_path)
-            child_models, child_wiring, child_manifest = _flatten_embedded_lab_dir(
+            child_dir = _resolve_embedded_dir(
+                payload_root, current_lab_dir, embedded_path
+            )
+            child_tree, child_manifest = _embedded_lab_tree_from_dir(
                 payload_root=payload_root,
                 current_lab_dir=child_dir,
-                prefix=_scoped_ref(prefix, f"{alias}."),
                 visited=visited_paths,
                 depth=depth + 1,
             )
-            flat_models.extend(child_models)
-            flat_wiring.extend(child_wiring)
-            port_remap.update(_port_remap_for_child(prefix=prefix, child_alias=alias, child_manifest=child_manifest))
+            tree_children.append(
+                LabTreeChild(
+                    alias=alias,
+                    tree=child_tree,
+                    io=lab_io_from_mapping(child_manifest.get("io")),
+                )
+            )
 
     for entry in wiring:
         if not isinstance(entry, Mapping):
@@ -888,19 +1060,24 @@ def _flatten_embedded_lab_dir(
         to_refs = entry.get("to")
         if not isinstance(from_ref, str) or not isinstance(to_refs, list):
             raise PackageError("Wiring entries require from/to")
-        scoped_from = _scoped_ref(prefix, from_ref)
-        normalized_targets: list[str] = []
-        for ref in to_refs:
-            if not isinstance(ref, str):
-                raise PackageError("Wiring targets must be strings")
-            scoped_to = _scoped_ref(prefix, ref)
-            normalized_targets.append(port_remap.get(scoped_to, scoped_to))
-        flat_wiring.append({"from": port_remap.get(scoped_from, scoped_from), "to": normalized_targets})
+        if not all(isinstance(ref, str) for ref in to_refs):
+            raise PackageError("Wiring targets must be strings")
+        tree_wiring.append(LabTreeWire(from_ref=from_ref, to_refs=list(to_refs)))
 
-    return flat_models, flat_wiring, parsed_lab
+    return (
+        LabTree(
+            models=tree_models,
+            wiring=tree_wiring,
+            children=tree_children,
+            io=lab_io_from_mapping(parsed_lab.get("io")),
+        ),
+        parsed_lab,
+    )
 
 
-def _run_lab_loaded_package(loaded: _LoadedPackage, *, install_deps: bool = True) -> dict[str, Any]:
+def _run_lab_loaded_package(
+    loaded: _LoadedPackage, *, install_deps: bool = True
+) -> dict[str, Any]:
     runtime = loaded.manifest.get("runtime")
     if not isinstance(runtime, Mapping):
         raise PackageError("Lab manifest must contain models, wiring, and runtime")
@@ -909,13 +1086,14 @@ def _run_lab_loaded_package(loaded: _LoadedPackage, *, install_deps: bool = True
         current_lab_dir=loaded.payload_root,
     )
 
-    communication_step = runtime.get("communication_step")
-    if communication_step is None:
-        raise PackageError("Lab manifest runtime.communication_step is required")
-    world = BioWorld(communication_step=float(communication_step))
+    communication_step = extract_communication_step(
+        None, runtime, error_cls=PackageError
+    )
+    world = BioWorld(communication_step=communication_step)
     builder = WiringBuilder(world)
     resolved_models: list[dict[str, Any]] = []
     setup_config: dict[str, dict[str, Any]] = {}
+    modules_by_alias: dict[str, BioModule] = {}
 
     for entry in models:
         if not isinstance(entry, Mapping):
@@ -930,14 +1108,23 @@ def _run_lab_loaded_package(loaded: _LoadedPackage, *, install_deps: bool = True
         manifest = _load_model_manifest_from_dir(model_path)
         if install_deps:
             _install_declared_dependencies(manifest)
-        parameters = entry.get("parameters") if isinstance(entry.get("parameters"), Mapping) else {}
-        module, meta = _instantiate_model_from_dir(model_path, manifest=manifest, parameters=parameters)
+        parameters = (
+            entry.get("parameters")
+            if isinstance(entry.get("parameters"), Mapping)
+            else {}
+        )
+        module, meta = _instantiate_model_from_dir(
+            model_path, manifest=manifest, parameters=parameters
+        )
         if entry.get("min_dt") is not None or entry.get("priority") is not None:
             raise PackageError("Lab model entries cannot declare min_dt or priority")
         builder.add(alias, module)
+        modules_by_alias[alias] = module
         if meta["setup"]:
             setup_config[alias] = dict(meta["setup"])
-        relative_model_dir = model_path.resolve().relative_to(loaded.payload_root.resolve()).as_posix()
+        relative_model_dir = (
+            model_path.resolve().relative_to(loaded.payload_root.resolve()).as_posix()
+        )
         resolved_entry: dict[str, Any] = {
             "alias": alias,
             "path": relative_model_dir,
@@ -960,9 +1147,32 @@ def _run_lab_loaded_package(loaded: _LoadedPackage, *, install_deps: bool = True
         builder.connect(src, dst)
     builder.apply()
 
-    effective_runtime = parsed_lab.get("runtime") if isinstance(parsed_lab.get("runtime"), Mapping) else runtime
+    effective_runtime = (
+        parsed_lab.get("runtime")
+        if isinstance(parsed_lab.get("runtime"), Mapping)
+        else runtime
+    )
     duration = float(effective_runtime.get("duration", 1.0))
     world.setup(setup_config)
+    initial_inputs = (
+        effective_runtime.get("initial_inputs")
+        if isinstance(effective_runtime.get("initial_inputs"), Mapping)
+        else {}
+    )
+    for alias, module in modules_by_alias.items():
+        alias_inputs = _select_alias_override(initial_inputs, alias)
+        if not alias_inputs:
+            continue
+        declared_inputs = module.inputs() if isinstance(module.inputs(), dict) else {}
+        module.set_inputs(
+            coerce_typed_inputs(
+                alias_inputs,
+                declared_inputs,
+                source="run",
+                time_value=0.0,
+                error_cls=PackageError,
+            )
+        )
     world.run(duration=duration)
     return {
         "package": loaded.package_yaml["package"],
@@ -977,7 +1187,29 @@ def _scoped_ref(prefix: str, ref: str) -> str:
     return f"{prefix}{ref}" if prefix else ref
 
 
-def _port_remap_for_child(*, prefix: str, child_alias: str, child_manifest: Mapping[str, Any]) -> dict[str, str]:
+def _select_alias_override(
+    payload: Mapping[str, Any] | None, alias: str
+) -> dict[str, Any]:
+    if not isinstance(payload, Mapping):
+        return {}
+    global_values = {
+        key: value
+        for key, value in payload.items()
+        if key != alias and not isinstance(value, Mapping)
+    }
+    overrides = payload.get(alias)
+    if isinstance(overrides, Mapping):
+        merged = dict(global_values)
+        merged.update(dict(overrides))
+        return merged
+    if global_values:
+        return global_values
+    return {}
+
+
+def _port_remap_for_child(
+    *, prefix: str, child_alias: str, child_manifest: Mapping[str, Any]
+) -> dict[str, str]:
     remap: dict[str, str] = {}
     io_block = child_manifest.get("io")
     if not isinstance(io_block, Mapping):
@@ -1009,7 +1241,9 @@ def _install_declared_dependencies(manifest: Mapping[str, Any]) -> None:
     packages = dependencies.get("packages")
     if not isinstance(packages, list) or not packages:
         return
-    bad = [dep for dep in packages if not isinstance(dep, str) or not _is_exact_pin(dep)]
+    bad = [
+        dep for dep in packages if not isinstance(dep, str) or not _is_exact_pin(dep)
+    ]
     if bad:
         raise PackageError(f"All dependencies must use exact pins: {bad}")
     subprocess.run(
@@ -1049,7 +1283,9 @@ def _validate_lab_manifest(manifest: Mapping[str, Any]) -> None:
         else:
             raise PackageError("Lab manifest must contain a non-empty models list")
     if not models and not has_children:
-        raise PackageError("Lab manifest must contain a non-empty models list or children list")
+        raise PackageError(
+            "Lab manifest must contain a non-empty models list or children list"
+        )
     aliases: set[str] = set()
     for entry in models:
         if not isinstance(entry, Mapping):
@@ -1061,7 +1297,9 @@ def _validate_lab_manifest(manifest: Mapping[str, Any]) -> None:
             raise PackageError(f"Duplicate lab model alias: {alias}")
         aliases.add(alias)
         if entry.get("repo") is not None or entry.get("manifest_path") is not None:
-            raise PackageError(f"Lab model '{alias}' must not use repo or manifest_path")
+            raise PackageError(
+                f"Lab model '{alias}' must not use repo or manifest_path"
+            )
         if entry.get("package") is not None or entry.get("version") is not None:
             raise PackageError(f"Lab model '{alias}' must use path references only")
         has_path_ref = isinstance(entry.get("path"), str)
@@ -1082,7 +1320,9 @@ def _validate_lab_manifest(manifest: Mapping[str, Any]) -> None:
                 raise PackageError(f"Duplicate lab child alias: {alias}")
             child_aliases.add(alias)
             if entry.get("repo") is not None or entry.get("manifest_path") is not None:
-                raise PackageError(f"Lab child '{alias}' must not use repo or manifest_path")
+                raise PackageError(
+                    f"Lab child '{alias}' must not use repo or manifest_path"
+                )
             if (
                 entry.get("lab_id") is not None
                 or entry.get("package") is not None
@@ -1106,9 +1346,13 @@ def _validate_lab_manifest(manifest: Mapping[str, Any]) -> None:
         raise PackageError("Lab manifest must contain runtime.communication_step")
     try:
         if float(communication_step) <= 0:
-            raise PackageError("Lab manifest runtime.communication_step must be positive")
+            raise PackageError(
+                "Lab manifest runtime.communication_step must be positive"
+            )
     except (TypeError, ValueError) as exc:
-        raise PackageError("Lab manifest runtime.communication_step must be numeric") from exc
+        raise PackageError(
+            "Lab manifest runtime.communication_step must be numeric"
+        ) from exc
 
 
 __all__ = [

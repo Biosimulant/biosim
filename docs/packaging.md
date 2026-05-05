@@ -40,6 +40,17 @@ python -m biosim pack run path/to/model.bsimodel
 
 Use `--json` with any `biosim pack` command when you need machine-readable output.
 
+## Runtime Compatibility
+
+Package execution uses the provisional `biosim.runtime` helpers for behavior that must match other Biosimulant runtimes:
+
+- entrypoints are loaded from the model directory with file-spec loading when possible, so multiple models can each use a `src/` namespace-style layout in one process
+- `runtime.initial_inputs` are coerced into typed `BioSignal` objects against each module's declared `inputs()`
+- `communication_step` is resolved using the same precedence chain as platform executors: runtime override, simulation config, base runtime, then explicit fallback
+- nested child labs are flattened with canonical alias scoping and `io.maps_to` remapping
+
+The `biosim.runtime` API is public but provisional for this minor release.
+
 ## Source Layout
 
 Model package source:
@@ -122,6 +133,15 @@ python -m biosim pack build path/to/model --package biosimulant/example-counter 
 The command is meant to be operator-friendly:
 - success prints a concise summary with package name, version, and type
 - failure prints a concise error list and exits non-zero
+
+## Intentional Runtime Differences
+
+The open-source CLI and Biosimulant platform share package interpretation semantics, but they do not share every execution policy:
+
+- `biosim pack run` installs exact-pinned manifest dependencies into the current Python environment when dependency installation is enabled
+- platform and desktop executors install payload dependencies into isolated per-lock-hash environments with allow/deny policy
+- `biosim pack run` returns a compact CLI-oriented summary
+- platform and desktop runs return full per-module outputs, state, visuals, and run metadata for UI consumers
 
 ## Registries And Cache
 
