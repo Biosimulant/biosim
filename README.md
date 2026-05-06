@@ -80,6 +80,20 @@ See [`docs/packaging.md`](docs/packaging.md) for the full package layout, recomm
 
 `biosim.runtime` is the provisional public home for package interpretation helpers shared by the open-source CLI and Biosimulant platform executors. It owns entrypoint loading, typed `runtime.initial_inputs` coercion, communication-step resolution, and source-neutral lab flattening. Import these helpers from `biosim.runtime`; they are not exported from top-level `biosim` while the API settles.
 
+## BioModule Convenience Layers
+
+`BioModule` remains the minimal full-control runtime contract. For common model
+adapters, `biosim` also exports opt-in helpers:
+
+- `SignalEmitterBioModule`: output storage, source-name resolution, and raw
+  value to typed `BioSignal` wrapping.
+- `StatefulBioModule`: fixed-step window advancement, input override storage,
+  bounded history, and output publishing hooks.
+
+Signal helper functions are available from `biosim.signals` and top-level
+`biosim`: `unwrap_payload`, `coerce_float`, `scalar_or_record_input`, and
+`make_signal`.
+
 ## Examples
 
 - See `examples/` for quick-start scripts. Try:

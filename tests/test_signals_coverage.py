@@ -13,6 +13,10 @@ from biosim.signals import (
     RecordSignal,
     ScalarSignal,
     SignalSpec,
+    coerce_float,
+    make_signal,
+    scalar_or_record_input,
+    unwrap_payload,
     validate_connection_specs,
     validate_port_spec_direction,
 )
@@ -153,3 +157,64 @@ def test_array_signal_as_array() -> None:
     )
     arr = signal.as_array()
     assert list(arr) == [1, 2, 3]
+
+
+def test_unwrap_payload_preserves_one_layer_default() -> None:
+    assert unwrap_payload({"payload": {"payload": 3}}) == {"payload": 3}
+    assert unwrap_payload({"payload": {"payload": 3}}, max_depth=2) == 3
+    assert unwrap_payload({"payload": 1, "unit": "count"}) == {"payload": 1, "unit": "count"}
+
+
+def test_coerce_float_handles_signal_and_record_carriers() -> None:
+    signal = RecordSignal(
+        source="src",
+        name="x",
+        value={"payload": {"count": "4.5"}},
+        emitted_at=0.0,
+        spec=SignalSpec.record(schema={"payload": "json"}),
+    )
+
+    assert coerce_float(signal) == pytest.approx(4.5)
+    assert coerce_float({"value": "2.25"}) == pytest.approx(2.25)
+    assert coerce_float(float("nan")) is None
+    assert coerce_float("not-a-number") is None
+
+
+def test_scalar_or_record_input_declares_common_profiles() -> None:
+    spec = scalar_or_record_input("count", "A count input.")
+
+    assert spec.signal_type == "scalar"
+    assert spec.description == "A count input."
+    assert spec.accepted_profiles is not None
+    assert spec.accepted_profiles[0].accepted_units == ("count",)
+    assert spec.accepted_profiles[1].schema == {"payload": "json"}
+
+
+def test_make_signal_constructs_matching_signal_types() -> None:
+    scalar = make_signal(
+        SignalSpec.scalar(dtype="float64"),
+        source="src",
+        name="x",
+        value=1.0,
+        emitted_at=0.0,
+    )
+    record = make_signal(
+        SignalSpec.record(schema={"payload": "json"}),
+        source="src",
+        name="r",
+        value=[1, 2],
+        emitted_at=0.0,
+    )
+    event = make_signal(
+        SignalSpec.event(schema={"payload": "json"}),
+        source="src",
+        name="e",
+        value="go",
+        emitted_at=0.0,
+    )
+
+    assert isinstance(scalar, ScalarSignal)
+    assert isinstance(record, RecordSignal)
+    assert record.value == {"payload": [1, 2]}
+    assert isinstance(event, EventSignal)
+    assert event.value == {"payload": "go"}

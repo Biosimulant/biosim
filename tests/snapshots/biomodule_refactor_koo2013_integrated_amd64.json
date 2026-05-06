@@ -1,0 +1,1769 @@
+{
+  "snapshots": [
+    {
+      "duration": 10.0,
+      "inputs": {
+        "koo2013_integrated_shear_stress_no_production": {
+          "integration_step": {
+            "accepted_profiles": [
+              {
+                "accepted_units": [
+                  "s"
+                ],
+                "description": "Output sampling step for the tellurium simulator.",
+                "dtype": "float64",
+                "schema": null,
+                "shape": null,
+                "signal_type": "scalar"
+              },
+              {
+                "accepted_units": null,
+                "description": "Output sampling step for the tellurium simulator.",
+                "dtype": null,
+                "schema": {
+                  "payload": "json"
+                },
+                "shape": null,
+                "signal_type": "record"
+              }
+            ],
+            "description": "Output sampling step for the tellurium simulator.",
+            "dtype": "float64",
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": null,
+            "shape": null,
+            "signal_type": "scalar",
+            "stale_policy": "warn"
+          },
+          "stimulus_intensity": {
+            "accepted_profiles": [
+              {
+                "accepted_units": [
+                  "1/s"
+                ],
+                "description": "Mechanotransduction stimulus intensity. In this published BioModels SBML (BIOMD0000000468) the 'Shear Stress' species is decorative \u2014 it is not kinetically wired. Instead, the modeller encoded the stimulus through the rate constant k1 of the IP3-producing reaction (re5), which drives the full chain through Ca2+, eNOS, and NO production. The SBML's calibrated baseline is 0.0012; values above that mimic stronger shear stress.",
+                "dtype": "float64",
+                "schema": null,
+                "shape": null,
+                "signal_type": "scalar"
+              },
+              {
+                "accepted_units": null,
+                "description": "Mechanotransduction stimulus intensity. In this published BioModels SBML (BIOMD0000000468) the 'Shear Stress' species is decorative \u2014 it is not kinetically wired. Instead, the modeller encoded the stimulus through the rate constant k1 of the IP3-producing reaction (re5), which drives the full chain through Ca2+, eNOS, and NO production. The SBML's calibrated baseline is 0.0012; values above that mimic stronger shear stress.",
+                "dtype": null,
+                "schema": {
+                  "payload": "json"
+                },
+                "shape": null,
+                "signal_type": "record"
+              }
+            ],
+            "description": "Mechanotransduction stimulus intensity. In this published BioModels SBML (BIOMD0000000468) the 'Shear Stress' species is decorative \u2014 it is not kinetically wired. Instead, the modeller encoded the stimulus through the rate constant k1 of the IP3-producing reaction (re5), which drives the full chain through Ca2+, eNOS, and NO production. The SBML's calibrated baseline is 0.0012; values above that mimic stronger shear stress.",
+            "dtype": "float64",
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": null,
+            "shape": null,
+            "signal_type": "scalar",
+            "stale_policy": "warn"
+          }
+        },
+        "visualisation": {
+          "koo2013_integrated_shear_stress_no_production_active_eNOS": {
+            "accepted_profiles": [
+              {
+                "accepted_units": null,
+                "description": null,
+                "dtype": "float64",
+                "schema": null,
+                "shape": null,
+                "signal_type": "scalar"
+              }
+            ],
+            "description": "koo2013_integrated_shear_stress_no_production active_eNOS headline signal for the visualisation model.",
+            "dtype": "float64",
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": null,
+            "shape": null,
+            "signal_type": "scalar",
+            "stale_policy": "warn"
+          },
+          "koo2013_integrated_shear_stress_no_production_cytosolic_calcium": {
+            "accepted_profiles": [
+              {
+                "accepted_units": null,
+                "description": null,
+                "dtype": "float64",
+                "schema": null,
+                "shape": null,
+                "signal_type": "scalar"
+              }
+            ],
+            "description": "koo2013_integrated_shear_stress_no_production cytosolic_calcium headline signal for the visualisation model.",
+            "dtype": "float64",
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": null,
+            "shape": null,
+            "signal_type": "scalar",
+            "stale_policy": "warn"
+          },
+          "koo2013_integrated_shear_stress_no_production_nitric_oxide": {
+            "accepted_profiles": [
+              {
+                "accepted_units": null,
+                "description": null,
+                "dtype": "float64",
+                "schema": null,
+                "shape": null,
+                "signal_type": "scalar"
+              }
+            ],
+            "description": "koo2013_integrated_shear_stress_no_production nitric_oxide headline signal for the visualisation model.",
+            "dtype": "float64",
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": null,
+            "shape": null,
+            "signal_type": "scalar",
+            "stale_policy": "warn"
+          },
+          "koo2013_integrated_shear_stress_no_production_state": {
+            "accepted_profiles": [
+              {
+                "accepted_units": null,
+                "description": null,
+                "dtype": null,
+                "schema": {
+                  "s1": "float",
+                  "s100": "float",
+                  "s101": "float",
+                  "s102": "float",
+                  "s103": "float",
+                  "s104": "float",
+                  "s105": "float",
+                  "s106": "float",
+                  "s107": "float",
+                  "s108": "float",
+                  "s110": "float",
+                  "s111": "float",
+                  "s112": "float",
+                  "s113": "float",
+                  "s114": "float",
+                  "s115": "float",
+                  "s119": "float",
+                  "s12": "float",
+                  "s14": "float",
+                  "s15": "float",
+                  "s16": "float",
+                  "s17": "float",
+                  "s18": "float",
+                  "s19": "float",
+                  "s2": "float",
+                  "s20": "float",
+                  "s22": "float",
+                  "s23": "float",
+                  "s24": "float",
+                  "s25": "float",
+                  "s26": "float",
+                  "s27": "float",
+                  "s28": "float",
+                  "s3": "float",
+                  "s38": "float",
+                  "s39": "float",
+                  "s4": "float",
+                  "s42": "float",
+                  "s43": "float",
+                  "s44": "float",
+                  "s45": "float",
+                  "s47": "float",
+                  "s48": "float",
+                  "s49": "float",
+                  "s50": "float",
+                  "s51": "float",
+                  "s52": "float",
+                  "s57": "float",
+                  "s58": "float",
+                  "s6": "float",
+                  "s60": "float",
+                  "s61": "float",
+                  "s62": "float",
+                  "s64": "float",
+                  "s65": "float",
+                  "s66": "float",
+                  "s91": "float",
+                  "s92": "float",
+                  "s93": "float",
+                  "s94": "float",
+                  "s95": "float",
+                  "s96": "float",
+                  "s97": "float",
+                  "s98": "float",
+                  "s99": "float"
+                },
+                "shape": null,
+                "signal_type": "record"
+              }
+            ],
+            "description": "koo2013_integrated_shear_stress_no_production state feed for the visualisation model.",
+            "dtype": null,
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": {
+              "s1": "float",
+              "s100": "float",
+              "s101": "float",
+              "s102": "float",
+              "s103": "float",
+              "s104": "float",
+              "s105": "float",
+              "s106": "float",
+              "s107": "float",
+              "s108": "float",
+              "s110": "float",
+              "s111": "float",
+              "s112": "float",
+              "s113": "float",
+              "s114": "float",
+              "s115": "float",
+              "s119": "float",
+              "s12": "float",
+              "s14": "float",
+              "s15": "float",
+              "s16": "float",
+              "s17": "float",
+              "s18": "float",
+              "s19": "float",
+              "s2": "float",
+              "s20": "float",
+              "s22": "float",
+              "s23": "float",
+              "s24": "float",
+              "s25": "float",
+              "s26": "float",
+              "s27": "float",
+              "s28": "float",
+              "s3": "float",
+              "s38": "float",
+              "s39": "float",
+              "s4": "float",
+              "s42": "float",
+              "s43": "float",
+              "s44": "float",
+              "s45": "float",
+              "s47": "float",
+              "s48": "float",
+              "s49": "float",
+              "s50": "float",
+              "s51": "float",
+              "s52": "float",
+              "s57": "float",
+              "s58": "float",
+              "s6": "float",
+              "s60": "float",
+              "s61": "float",
+              "s62": "float",
+              "s64": "float",
+              "s65": "float",
+              "s66": "float",
+              "s91": "float",
+              "s92": "float",
+              "s93": "float",
+              "s94": "float",
+              "s95": "float",
+              "s96": "float",
+              "s97": "float",
+              "s98": "float",
+              "s99": "float"
+            },
+            "shape": null,
+            "signal_type": "record",
+            "stale_policy": "warn"
+          },
+          "koo2013_integrated_shear_stress_no_production_summary": {
+            "accepted_profiles": [
+              {
+                "accepted_units": null,
+                "description": null,
+                "dtype": null,
+                "schema": {
+                  "duration_simulated": "float",
+                  "largest_change_magnitude": "float",
+                  "largest_change_observable": "str",
+                  "observable_count": "int",
+                  "peak_observable": "str",
+                  "peak_value": "float"
+                },
+                "shape": null,
+                "signal_type": "record"
+              }
+            ],
+            "description": "koo2013_integrated_shear_stress_no_production summary feed for the visualisation model.",
+            "dtype": null,
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": {
+              "duration_simulated": "float",
+              "largest_change_magnitude": "float",
+              "largest_change_observable": "str",
+              "observable_count": "int",
+              "peak_observable": "str",
+              "peak_value": "float"
+            },
+            "shape": null,
+            "signal_type": "record",
+            "stale_policy": "warn"
+          }
+        }
+      },
+      "kind": "lab",
+      "modules": [
+        "koo2013_integrated_shear_stress_no_production",
+        "visualisation"
+      ],
+      "outputs": {
+        "koo2013_integrated_shear_stress_no_production": {
+          "active_eNOS": {
+            "accepted_profiles": null,
+            "description": "Active eNOS-CaM-Ca4 complex. Units: substance.",
+            "dtype": "float64",
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": null,
+            "shape": null,
+            "signal_type": "scalar",
+            "stale_policy": "warn"
+          },
+          "cytosolic_calcium": {
+            "accepted_profiles": null,
+            "description": "Cytosolic Ca2+ amount. Units: substance.",
+            "dtype": "float64",
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": null,
+            "shape": null,
+            "signal_type": "scalar",
+            "stale_policy": "warn"
+          },
+          "nitric_oxide": {
+            "accepted_profiles": null,
+            "description": "Nitric oxide (NO) amount. Units: substance.",
+            "dtype": "float64",
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": null,
+            "shape": null,
+            "signal_type": "scalar",
+            "stale_policy": "warn"
+          },
+          "state": {
+            "accepted_profiles": null,
+            "description": "Latest value of every observable (species variables).",
+            "dtype": null,
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": {
+              "s1": "float",
+              "s100": "float",
+              "s101": "float",
+              "s102": "float",
+              "s103": "float",
+              "s104": "float",
+              "s105": "float",
+              "s106": "float",
+              "s107": "float",
+              "s108": "float",
+              "s110": "float",
+              "s111": "float",
+              "s112": "float",
+              "s113": "float",
+              "s114": "float",
+              "s115": "float",
+              "s119": "float",
+              "s12": "float",
+              "s14": "float",
+              "s15": "float",
+              "s16": "float",
+              "s17": "float",
+              "s18": "float",
+              "s19": "float",
+              "s2": "float",
+              "s20": "float",
+              "s22": "float",
+              "s23": "float",
+              "s24": "float",
+              "s25": "float",
+              "s26": "float",
+              "s27": "float",
+              "s28": "float",
+              "s3": "float",
+              "s38": "float",
+              "s39": "float",
+              "s4": "float",
+              "s42": "float",
+              "s43": "float",
+              "s44": "float",
+              "s45": "float",
+              "s47": "float",
+              "s48": "float",
+              "s49": "float",
+              "s50": "float",
+              "s51": "float",
+              "s52": "float",
+              "s57": "float",
+              "s58": "float",
+              "s6": "float",
+              "s60": "float",
+              "s61": "float",
+              "s62": "float",
+              "s64": "float",
+              "s65": "float",
+              "s66": "float",
+              "s91": "float",
+              "s92": "float",
+              "s93": "float",
+              "s94": "float",
+              "s95": "float",
+              "s96": "float",
+              "s97": "float",
+              "s98": "float",
+              "s99": "float"
+            },
+            "shape": null,
+            "signal_type": "record",
+            "stale_policy": "warn"
+          },
+          "summary": {
+            "accepted_profiles": null,
+            "description": "Final, peak, and minimum value per observable plus simulated duration.",
+            "dtype": null,
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": {
+              "duration_simulated": "float",
+              "largest_change_magnitude": "float",
+              "largest_change_observable": "str",
+              "observable_count": "int",
+              "peak_observable": "str",
+              "peak_value": "float"
+            },
+            "shape": null,
+            "signal_type": "record",
+            "stale_policy": "warn"
+          }
+        },
+        "visualisation": {}
+      },
+      "signals": {
+        "koo2013_integrated_shear_stress_no_production": {
+          "active_eNOS": {
+            "emitted_at": 10.0,
+            "name": "active_eNOS",
+            "source": "koo2013_integrated_shear_stress_no_production",
+            "spec": {
+              "accepted_profiles": null,
+              "description": "Active eNOS-CaM-Ca4 complex. Units: substance.",
+              "dtype": "float64",
+              "emitted_unit": null,
+              "interpolation": "zoh",
+              "kind": "state",
+              "max_age": null,
+              "schema": null,
+              "shape": null,
+              "signal_type": "scalar",
+              "stale_policy": "warn"
+            },
+            "type": "scalar",
+            "value": 0.03871806963534058
+          },
+          "cytosolic_calcium": {
+            "emitted_at": 10.0,
+            "name": "cytosolic_calcium",
+            "source": "koo2013_integrated_shear_stress_no_production",
+            "spec": {
+              "accepted_profiles": null,
+              "description": "Cytosolic Ca2+ amount. Units: substance.",
+              "dtype": "float64",
+              "emitted_unit": null,
+              "interpolation": "zoh",
+              "kind": "state",
+              "max_age": null,
+              "schema": null,
+              "shape": null,
+              "signal_type": "scalar",
+              "stale_policy": "warn"
+            },
+            "type": "scalar",
+            "value": 112.08861907440922
+          },
+          "nitric_oxide": {
+            "emitted_at": 10.0,
+            "name": "nitric_oxide",
+            "source": "koo2013_integrated_shear_stress_no_production",
+            "spec": {
+              "accepted_profiles": null,
+              "description": "Nitric oxide (NO) amount. Units: substance.",
+              "dtype": "float64",
+              "emitted_unit": null,
+              "interpolation": "zoh",
+              "kind": "state",
+              "max_age": null,
+              "schema": null,
+              "shape": null,
+              "signal_type": "scalar",
+              "stale_policy": "warn"
+            },
+            "type": "scalar",
+            "value": 99.97411520433624
+          },
+          "state": {
+            "emitted_at": 10.0,
+            "name": "state",
+            "source": "koo2013_integrated_shear_stress_no_production",
+            "spec": {
+              "accepted_profiles": null,
+              "description": "Latest value of every observable (species variables).",
+              "dtype": null,
+              "emitted_unit": null,
+              "interpolation": "zoh",
+              "kind": "state",
+              "max_age": null,
+              "schema": {
+                "s1": "float",
+                "s100": "float",
+                "s101": "float",
+                "s102": "float",
+                "s103": "float",
+                "s104": "float",
+                "s105": "float",
+                "s106": "float",
+                "s107": "float",
+                "s108": "float",
+                "s110": "float",
+                "s111": "float",
+                "s112": "float",
+                "s113": "float",
+                "s114": "float",
+                "s115": "float",
+                "s119": "float",
+                "s12": "float",
+                "s14": "float",
+                "s15": "float",
+                "s16": "float",
+                "s17": "float",
+                "s18": "float",
+                "s19": "float",
+                "s2": "float",
+                "s20": "float",
+                "s22": "float",
+                "s23": "float",
+                "s24": "float",
+                "s25": "float",
+                "s26": "float",
+                "s27": "float",
+                "s28": "float",
+                "s3": "float",
+                "s38": "float",
+                "s39": "float",
+                "s4": "float",
+                "s42": "float",
+                "s43": "float",
+                "s44": "float",
+                "s45": "float",
+                "s47": "float",
+                "s48": "float",
+                "s49": "float",
+                "s50": "float",
+                "s51": "float",
+                "s52": "float",
+                "s57": "float",
+                "s58": "float",
+                "s6": "float",
+                "s60": "float",
+                "s61": "float",
+                "s62": "float",
+                "s64": "float",
+                "s65": "float",
+                "s66": "float",
+                "s91": "float",
+                "s92": "float",
+                "s93": "float",
+                "s94": "float",
+                "s95": "float",
+                "s96": "float",
+                "s97": "float",
+                "s98": "float",
+                "s99": "float"
+              },
+              "shape": null,
+              "signal_type": "record",
+              "stale_policy": "warn"
+            },
+            "type": "record",
+            "value": {
+              "s1": 1500000.0,
+              "s100": 0.2883662016044138,
+              "s101": 1.5045774712127422,
+              "s102": 0.7793229339840622,
+              "s103": 119.22067706601585,
+              "s104": 0.0030081349724758472,
+              "s105": -0.004592721976594021,
+              "s106": 3.2140000806757243,
+              "s107": 1.5733709560256492e-12,
+              "s108": -0.0009002066261932955,
+              "s110": 2.0180497467165788,
+              "s111": 1.280975560682463,
+              "s112": 53.35608620028341,
+              "s113": 7.413144591308269,
+              "s114": 1.3058798480092757,
+              "s115": 0.09000020593923469,
+              "s119": 0.0,
+              "s12": 5.0,
+              "s14": 0.967919864088051,
+              "s15": 150.0,
+              "s16": 144.27980110735902,
+              "s17": 1.5562075026935123,
+              "s18": 0.1,
+              "s19": 6942.723593604654,
+              "s2": 2830414.803732727,
+              "s20": 53.40196996747181,
+              "s22": 46.59803003252819,
+              "s23": 10.0,
+              "s24": 3.0,
+              "s25": 999.0320801359123,
+              "s26": 1.4859272960431935,
+              "s27": 1.7230437713134221,
+              "s28": 52.51022782528444,
+              "s3": 113.74927311293976,
+              "s38": -10.0,
+              "s39": 10.0,
+              "s4": 4383.70548577859,
+              "s42": 49.99999999999849,
+              "s43": 0.005916061331517069,
+              "s44": 1.1727989743601381e-08,
+              "s45": 0.03897878337230596,
+              "s47": 2.665930102139851,
+              "s48": 337.65100352372275,
+              "s49": 10.004592721976579,
+              "s50": 2.0490992523440847,
+              "s51": 35.8705983926793,
+              "s52": 7646.261170537361,
+              "s57": 199987.81718771654,
+              "s58": 0.9468698902180419,
+              "s6": 3.359189256507595,
+              "s60": 0.008271329727650932,
+              "s61": 10.277194063251768,
+              "s62": 0.10188251785914176,
+              "s64": 201.04681606733828,
+              "s65": 0.6255813955992024,
+              "s66": 0.08091308663193007,
+              "s91": 761.375211117884,
+              "s92": 19.078686239627725,
+              "s93": 0.7350162896755816,
+              "s94": 70.9213137603725,
+              "s95": 16.47870317201634,
+              "s96": 299.705717737064,
+              "s97": 98.4954225287876,
+              "s98": 174.53262849580048,
+              "s99": 299.99699185329985
+            }
+          },
+          "summary": {
+            "emitted_at": 10.0,
+            "name": "summary",
+            "source": "koo2013_integrated_shear_stress_no_production",
+            "spec": {
+              "accepted_profiles": null,
+              "description": "Final, peak, and minimum value per observable plus simulated duration.",
+              "dtype": null,
+              "emitted_unit": null,
+              "interpolation": "zoh",
+              "kind": "state",
+              "max_age": null,
+              "schema": {
+                "duration_simulated": "float",
+                "largest_change_magnitude": "float",
+                "largest_change_observable": "str",
+                "observable_count": "int",
+                "peak_observable": "str",
+                "peak_value": "float"
+              },
+              "shape": null,
+              "signal_type": "record",
+              "stale_policy": "warn"
+            },
+            "type": "record",
+            "value": {
+              "duration_simulated": 10.0,
+              "largest_change_magnitude": 513.7054857785897,
+              "largest_change_observable": "s4",
+              "observable_count": 65,
+              "peak_observable": "s2",
+              "peak_value": 2830414.803732727
+            }
+          }
+        },
+        "visualisation": {}
+      },
+      "source": "models-done/models-biomechanics/labs/koo2013-integrated",
+      "state": {
+        "communication_step": 10.0,
+        "connections": {
+          "visualisation": [
+            {
+              "last_event_time": null,
+              "last_stale_warning_time": null,
+              "source_module": "koo2013_integrated_shear_stress_no_production",
+              "source_signal": "active_eNOS",
+              "target_module": "visualisation",
+              "target_signal": "koo2013_integrated_shear_stress_no_production_active_eNOS"
+            },
+            {
+              "last_event_time": null,
+              "last_stale_warning_time": null,
+              "source_module": "koo2013_integrated_shear_stress_no_production",
+              "source_signal": "cytosolic_calcium",
+              "target_module": "visualisation",
+              "target_signal": "koo2013_integrated_shear_stress_no_production_cytosolic_calcium"
+            },
+            {
+              "last_event_time": null,
+              "last_stale_warning_time": null,
+              "source_module": "koo2013_integrated_shear_stress_no_production",
+              "source_signal": "nitric_oxide",
+              "target_module": "visualisation",
+              "target_signal": "koo2013_integrated_shear_stress_no_production_nitric_oxide"
+            },
+            {
+              "last_event_time": null,
+              "last_stale_warning_time": null,
+              "source_module": "koo2013_integrated_shear_stress_no_production",
+              "source_signal": "state",
+              "target_module": "visualisation",
+              "target_signal": "koo2013_integrated_shear_stress_no_production_state"
+            },
+            {
+              "last_event_time": null,
+              "last_stale_warning_time": null,
+              "source_module": "koo2013_integrated_shear_stress_no_production",
+              "source_signal": "summary",
+              "target_module": "visualisation",
+              "target_signal": "koo2013_integrated_shear_stress_no_production_summary"
+            }
+          ]
+        },
+        "current_time": 10.0,
+        "is_setup": true,
+        "modules": {
+          "koo2013_integrated_shear_stress_no_production": {},
+          "visualisation": {}
+        },
+        "setup_config": {},
+        "signal_store": {
+          "koo2013_integrated_shear_stress_no_production": {
+            "active_eNOS": {
+              "emitted_at": 10.0,
+              "name": "active_eNOS",
+              "source": "koo2013_integrated_shear_stress_no_production",
+              "spec": {
+                "accepted_profiles": null,
+                "description": "Active eNOS-CaM-Ca4 complex. Units: substance.",
+                "dtype": "float64",
+                "emitted_unit": null,
+                "interpolation": "zoh",
+                "kind": "state",
+                "max_age": null,
+                "schema": null,
+                "shape": null,
+                "signal_type": "scalar",
+                "stale_policy": "warn"
+              },
+              "type": "scalar",
+              "value": 0.03871806963534058
+            },
+            "cytosolic_calcium": {
+              "emitted_at": 10.0,
+              "name": "cytosolic_calcium",
+              "source": "koo2013_integrated_shear_stress_no_production",
+              "spec": {
+                "accepted_profiles": null,
+                "description": "Cytosolic Ca2+ amount. Units: substance.",
+                "dtype": "float64",
+                "emitted_unit": null,
+                "interpolation": "zoh",
+                "kind": "state",
+                "max_age": null,
+                "schema": null,
+                "shape": null,
+                "signal_type": "scalar",
+                "stale_policy": "warn"
+              },
+              "type": "scalar",
+              "value": 112.08861907440922
+            },
+            "nitric_oxide": {
+              "emitted_at": 10.0,
+              "name": "nitric_oxide",
+              "source": "koo2013_integrated_shear_stress_no_production",
+              "spec": {
+                "accepted_profiles": null,
+                "description": "Nitric oxide (NO) amount. Units: substance.",
+                "dtype": "float64",
+                "emitted_unit": null,
+                "interpolation": "zoh",
+                "kind": "state",
+                "max_age": null,
+                "schema": null,
+                "shape": null,
+                "signal_type": "scalar",
+                "stale_policy": "warn"
+              },
+              "type": "scalar",
+              "value": 99.97411520433624
+            },
+            "state": {
+              "emitted_at": 10.0,
+              "name": "state",
+              "source": "koo2013_integrated_shear_stress_no_production",
+              "spec": {
+                "accepted_profiles": null,
+                "description": "Latest value of every observable (species variables).",
+                "dtype": null,
+                "emitted_unit": null,
+                "interpolation": "zoh",
+                "kind": "state",
+                "max_age": null,
+                "schema": {
+                  "s1": "float",
+                  "s100": "float",
+                  "s101": "float",
+                  "s102": "float",
+                  "s103": "float",
+                  "s104": "float",
+                  "s105": "float",
+                  "s106": "float",
+                  "s107": "float",
+                  "s108": "float",
+                  "s110": "float",
+                  "s111": "float",
+                  "s112": "float",
+                  "s113": "float",
+                  "s114": "float",
+                  "s115": "float",
+                  "s119": "float",
+                  "s12": "float",
+                  "s14": "float",
+                  "s15": "float",
+                  "s16": "float",
+                  "s17": "float",
+                  "s18": "float",
+                  "s19": "float",
+                  "s2": "float",
+                  "s20": "float",
+                  "s22": "float",
+                  "s23": "float",
+                  "s24": "float",
+                  "s25": "float",
+                  "s26": "float",
+                  "s27": "float",
+                  "s28": "float",
+                  "s3": "float",
+                  "s38": "float",
+                  "s39": "float",
+                  "s4": "float",
+                  "s42": "float",
+                  "s43": "float",
+                  "s44": "float",
+                  "s45": "float",
+                  "s47": "float",
+                  "s48": "float",
+                  "s49": "float",
+                  "s50": "float",
+                  "s51": "float",
+                  "s52": "float",
+                  "s57": "float",
+                  "s58": "float",
+                  "s6": "float",
+                  "s60": "float",
+                  "s61": "float",
+                  "s62": "float",
+                  "s64": "float",
+                  "s65": "float",
+                  "s66": "float",
+                  "s91": "float",
+                  "s92": "float",
+                  "s93": "float",
+                  "s94": "float",
+                  "s95": "float",
+                  "s96": "float",
+                  "s97": "float",
+                  "s98": "float",
+                  "s99": "float"
+                },
+                "shape": null,
+                "signal_type": "record",
+                "stale_policy": "warn"
+              },
+              "type": "record",
+              "value": {
+                "s1": 1500000.0,
+                "s100": 0.2883662016044138,
+                "s101": 1.5045774712127422,
+                "s102": 0.7793229339840622,
+                "s103": 119.22067706601585,
+                "s104": 0.0030081349724758472,
+                "s105": -0.004592721976594021,
+                "s106": 3.2140000806757243,
+                "s107": 1.5733709560256492e-12,
+                "s108": -0.0009002066261932955,
+                "s110": 2.0180497467165788,
+                "s111": 1.280975560682463,
+                "s112": 53.35608620028341,
+                "s113": 7.413144591308269,
+                "s114": 1.3058798480092757,
+                "s115": 0.09000020593923469,
+                "s119": 0.0,
+                "s12": 5.0,
+                "s14": 0.967919864088051,
+                "s15": 150.0,
+                "s16": 144.27980110735902,
+                "s17": 1.5562075026935123,
+                "s18": 0.1,
+                "s19": 6942.723593604654,
+                "s2": 2830414.803732727,
+                "s20": 53.40196996747181,
+                "s22": 46.59803003252819,
+                "s23": 10.0,
+                "s24": 3.0,
+                "s25": 999.0320801359123,
+                "s26": 1.4859272960431935,
+                "s27": 1.7230437713134221,
+                "s28": 52.51022782528444,
+                "s3": 113.74927311293976,
+                "s38": -10.0,
+                "s39": 10.0,
+                "s4": 4383.70548577859,
+                "s42": 49.99999999999849,
+                "s43": 0.005916061331517069,
+                "s44": 1.1727989743601381e-08,
+                "s45": 0.03897878337230596,
+                "s47": 2.665930102139851,
+                "s48": 337.65100352372275,
+                "s49": 10.004592721976579,
+                "s50": 2.0490992523440847,
+                "s51": 35.8705983926793,
+                "s52": 7646.261170537361,
+                "s57": 199987.81718771654,
+                "s58": 0.9468698902180419,
+                "s6": 3.359189256507595,
+                "s60": 0.008271329727650932,
+                "s61": 10.277194063251768,
+                "s62": 0.10188251785914176,
+                "s64": 201.04681606733828,
+                "s65": 0.6255813955992024,
+                "s66": 0.08091308663193007,
+                "s91": 761.375211117884,
+                "s92": 19.078686239627725,
+                "s93": 0.7350162896755816,
+                "s94": 70.9213137603725,
+                "s95": 16.47870317201634,
+                "s96": 299.705717737064,
+                "s97": 98.4954225287876,
+                "s98": 174.53262849580048,
+                "s99": 299.99699185329985
+              }
+            },
+            "summary": {
+              "emitted_at": 10.0,
+              "name": "summary",
+              "source": "koo2013_integrated_shear_stress_no_production",
+              "spec": {
+                "accepted_profiles": null,
+                "description": "Final, peak, and minimum value per observable plus simulated duration.",
+                "dtype": null,
+                "emitted_unit": null,
+                "interpolation": "zoh",
+                "kind": "state",
+                "max_age": null,
+                "schema": {
+                  "duration_simulated": "float",
+                  "largest_change_magnitude": "float",
+                  "largest_change_observable": "str",
+                  "observable_count": "int",
+                  "peak_observable": "str",
+                  "peak_value": "float"
+                },
+                "shape": null,
+                "signal_type": "record",
+                "stale_policy": "warn"
+              },
+              "type": "record",
+              "value": {
+                "duration_simulated": 10.0,
+                "largest_change_magnitude": 513.7054857785897,
+                "largest_change_observable": "s4",
+                "observable_count": 65,
+                "peak_observable": "s2",
+                "peak_value": 2830414.803732727
+              }
+            }
+          }
+        }
+      },
+      "visuals": [
+        {
+          "module": "visualisation",
+          "visuals": [
+            {
+              "data": {
+                "series": [
+                  {
+                    "name": "Step timer",
+                    "points": [
+                      [
+                        0.0,
+                        0.0
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "Simulation time",
+                    "points": [
+                      [
+                        0.0,
+                        0.0
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "Pre-step time",
+                    "points": [
+                      [
+                        0.0,
+                        0.0
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "Simulation time",
+                    "points": [
+                      [
+                        0.0,
+                        0.0
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "Shear stress",
+                    "points": [
+                      [
+                        0.0,
+                        0.0
+                      ]
+                    ]
+                  }
+                ],
+                "title": "Koo2013 Integrated Shear-Stress Induced NO Production - Mechanical inputs and timers",
+                "x_unit": "s"
+              },
+              "description": "How does the shear-stress drive change over time?",
+              "render": "timeseries"
+            },
+            {
+              "data": {
+                "series": [
+                  {
+                    "name": "Extracellular calcium",
+                    "points": [
+                      [
+                        0.0,
+                        1500000.0
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "Stored calcium",
+                    "points": [
+                      [
+                        0.0,
+                        2830000.0
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "Cytosolic calcium",
+                    "points": [
+                      [
+                        0.0,
+                        117.2
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "Buffered calcium",
+                    "points": [
+                      [
+                        0.0,
+                        3870.0
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "IP3",
+                    "points": [
+                      [
+                        0.0,
+                        0.0
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "PIP2",
+                    "points": [
+                      [
+                        0.0,
+                        6967.271
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "Calmodulin Ca4 complex",
+                    "points": [
+                      [
+                        0.0,
+                        2.827
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "Calmodulin Ca2 complex",
+                    "points": [
+                      [
+                        0.0,
+                        347.52
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "Calmodulin",
+                    "points": [
+                      [
+                        0.0,
+                        7635.36
+                      ]
+                    ]
+                  }
+                ],
+                "title": "Koo2013 Integrated Shear-Stress Induced NO Production - Calcium subsystem",
+                "x_unit": "s"
+              },
+              "description": "How do calcium pools, IP3, and calmodulin shift?",
+              "render": "timeseries"
+            },
+            {
+              "data": {
+                "series": [
+                  {
+                    "name": "Shc",
+                    "points": [
+                      [
+                        0.0,
+                        819.25
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "Phosphorylated Src",
+                    "points": [
+                      [
+                        0.0,
+                        18.0
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "Phosphorylated FAK",
+                    "points": [
+                      [
+                        0.0,
+                        0.605
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "Src",
+                    "points": [
+                      [
+                        0.0,
+                        72.0
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "FAK",
+                    "points": [
+                      [
+                        0.0,
+                        57.0
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "Phosphorylated Shc",
+                    "points": [
+                      [
+                        0.0,
+                        157.162
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "Active Ras",
+                    "points": [
+                      [
+                        0.0,
+                        0.616
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "Inactive Ras",
+                    "points": [
+                      [
+                        0.0,
+                        119.384
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "p-FAK:Shc",
+                    "points": [
+                      [
+                        0.0,
+                        0.857
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "Grb2:Sos",
+                    "points": [
+                      [
+                        0.0,
+                        3.23
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "p-FAK:p-Shc",
+                    "points": [
+                      [
+                        0.0,
+                        15.962
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "p-FAK:p-Shc:Grb2:Sos",
+                    "points": [
+                      [
+                        0.0,
+                        5.577
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "p-Shc:Grb2:Sos",
+                    "points": [
+                      [
+                        0.0,
+                        1.193
+                      ]
+                    ]
+                  }
+                ],
+                "title": "Koo2013 Integrated Shear-Stress Induced NO Production - Mechanosensor cascade",
+                "x_unit": "s"
+              },
+              "description": "How does the FAK/Src/Shc/Ras cascade respond?",
+              "render": "timeseries"
+            },
+            {
+              "data": {
+                "series": [
+                  {
+                    "name": "PDK1",
+                    "points": [
+                      [
+                        0.0,
+                        0.246
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "AKT",
+                    "points": [
+                      [
+                        0.0,
+                        167.616
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "PI3P",
+                    "points": [
+                      [
+                        0.0,
+                        0.345
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "Phosphorylated PI3K",
+                    "points": [
+                      [
+                        0.0,
+                        0.03
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "PI3K",
+                    "points": [
+                      [
+                        0.0,
+                        99.97
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "PDK2",
+                    "points": [
+                      [
+                        0.0,
+                        3.0
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "Cytosolic PDK1",
+                    "points": [
+                      [
+                        0.0,
+                        999.754
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "Phosphorylated AKT PI3P complex",
+                    "points": [
+                      [
+                        0.0,
+                        1.457
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "Active AKT PI3P complex",
+                    "points": [
+                      [
+                        0.0,
+                        1.723
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "AKT PI3P complex",
+                    "points": [
+                      [
+                        0.0,
+                        29.203
+                      ]
+                    ]
+                  }
+                ],
+                "title": "Koo2013 Integrated Shear-Stress Induced NO Production - PI3K / AKT signalling",
+                "x_unit": "s"
+              },
+              "description": "How does PI3K signalling activate AKT?",
+              "render": "timeseries"
+            },
+            {
+              "data": {
+                "series": [
+                  {
+                    "name": "AP-1",
+                    "points": [
+                      [
+                        0.0,
+                        50.0
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "Active JNKK",
+                    "points": [
+                      [
+                        0.0,
+                        0.006
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "Active JNK",
+                    "points": [
+                      [
+                        0.0,
+                        0.0
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "KLF2",
+                    "points": [
+                      [
+                        0.0,
+                        10.0
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "JNKK",
+                    "points": [
+                      [
+                        0.0,
+                        299.706
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "MEKK1",
+                    "points": [
+                      [
+                        0.0,
+                        98.514
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "JNK",
+                    "points": [
+                      [
+                        0.0,
+                        299.997
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "Phosphorylated JNKK",
+                    "points": [
+                      [
+                        0.0,
+                        0.288
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "Phosphorylated MEKK1",
+                    "points": [
+                      [
+                        0.0,
+                        1.486
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "Phosphorylated JNK",
+                    "points": [
+                      [
+                        0.0,
+                        0.003
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "KLF2",
+                    "points": [
+                      [
+                        0.0,
+                        0.0
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "Active AP-1",
+                    "points": [
+                      [
+                        0.0,
+                        0.0
+                      ]
+                    ]
+                  }
+                ],
+                "title": "Koo2013 Integrated Shear-Stress Induced NO Production - MAPK cascade",
+                "x_unit": "s"
+              },
+              "description": "How does the MAPK branch activate downstream responses?",
+              "render": "timeseries"
+            },
+            {
+              "data": {
+                "series": [
+                  {
+                    "name": "eNOS-CaM-Ca4",
+                    "points": [
+                      [
+                        0.0,
+                        0.0415
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "eNOS-CaM-Ca2",
+                    "points": [
+                      [
+                        0.0,
+                        2.12
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "eNOS-Cav-1",
+                    "points": [
+                      [
+                        0.0,
+                        34.98
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "Hsp90",
+                    "points": [
+                      [
+                        0.0,
+                        199987.0
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "Hsp90-eNOS-CaM-Ca4",
+                    "points": [
+                      [
+                        0.0,
+                        1.037
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "Hsp90-p-eNOS-CaM-Ca4",
+                    "points": [
+                      [
+                        0.0,
+                        0.0089
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "Hsp90-eNOS-CaM-Ca2",
+                    "points": [
+                      [
+                        0.0,
+                        10.98
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "Hsp90-p-eNOS-CaM-Ca2",
+                    "points": [
+                      [
+                        0.0,
+                        0.106
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "Hsp90-p-eNOS",
+                    "points": [
+                      [
+                        0.0,
+                        0.643
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "Hsp90-eNOS",
+                    "points": [
+                      [
+                        0.0,
+                        0.083
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "eNOS",
+                    "points": [
+                      [
+                        0.0,
+                        3.214
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "eNOS",
+                    "points": [
+                      [
+                        0.0,
+                        0.0
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "eNOS",
+                    "points": [
+                      [
+                        0.0,
+                        0.09
+                      ]
+                    ]
+                  }
+                ],
+                "title": "Koo2013 Integrated Shear-Stress Induced NO Production - eNOS activation chain",
+                "x_unit": "s"
+              },
+              "description": "How does eNOS assemble into its active complexes?",
+              "render": "timeseries"
+            },
+            {
+              "data": {
+                "series": [
+                  {
+                    "name": "Nitric oxide",
+                    "points": [
+                      [
+                        0.0,
+                        0.0
+                      ]
+                    ]
+                  }
+                ],
+                "title": "Koo2013 Integrated Shear-Stress Induced NO Production - Nitric oxide production",
+                "x_unit": "s"
+              },
+              "description": "How quickly does nitric oxide accumulate?",
+              "render": "timeseries"
+            },
+            {
+              "data": {
+                "series": [
+                  {
+                    "name": "PP2A",
+                    "points": [
+                      [
+                        0.0,
+                        150.0
+                      ]
+                    ]
+                  },
+                  {
+                    "name": "PTEN",
+                    "points": [
+                      [
+                        0.0,
+                        0.1
+                      ]
+                    ]
+                  }
+                ],
+                "title": "Koo2013 Integrated Shear-Stress Induced NO Production - Regulatory phosphatases",
+                "x_unit": "s"
+              },
+              "description": "How do the deactivating phosphatases respond?",
+              "render": "timeseries"
+            },
+            {
+              "data": {
+                "categories": [
+                  "Extracellular calcium",
+                  "Stored calcium",
+                  "Cytosolic calcium",
+                  "Buffered calcium",
+                  "IP3",
+                  "Step timer",
+                  "PDK1",
+                  "PP2A"
+                ],
+                "title": "Koo2013 Integrated Shear-Stress Induced NO Production - largest excursions during the run",
+                "values": [
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0
+                ]
+              },
+              "description": "Which observables shifted the most during the run?",
+              "render": "bar"
+            },
+            {
+              "data": {
+                "columns": [
+                  "Question",
+                  "Answer"
+                ],
+                "rows": [
+                  [
+                    "What did this run track?",
+                    "65 observables in Koo2013 Integrated Shear-Stress Induced NO Production"
+                  ],
+                  [
+                    "How long did it run?",
+                    "0 s"
+                  ],
+                  [
+                    "Which observable changed the most?",
+                    "Unavailable"
+                  ],
+                  [
+                    "Largest peak?",
+                    "Unavailable"
+                  ]
+                ],
+                "title": "What Happened"
+              },
+              "description": "What did this simulation actually show, in plain language?",
+              "render": "table"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

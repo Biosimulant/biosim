@@ -1,0 +1,3146 @@
+{
+  "snapshots": [
+    {
+      "duration": 0.01,
+      "inputs": {
+        "microbial_growth": {
+          "growth_setup": {
+            "accepted_profiles": null,
+            "description": "Starting setup record from the starter-culture model.",
+            "dtype": null,
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": {
+              "available_food": "float",
+              "food_per_new_cell": "float",
+              "growth_rate": "float",
+              "initial_cells": "float",
+              "setup_label": "str",
+              "space_limit": "float"
+            },
+            "shape": null,
+            "signal_type": "record",
+            "stale_policy": "warn"
+          }
+        },
+        "starter_setup": {
+          "available_food": {
+            "accepted_profiles": [
+              {
+                "accepted_units": [
+                  "food_unit"
+                ],
+                "description": "Food units available at the start.",
+                "dtype": "float64",
+                "schema": null,
+                "shape": null,
+                "signal_type": "scalar"
+              },
+              {
+                "accepted_units": null,
+                "description": "Food units available at the start.",
+                "dtype": null,
+                "schema": {
+                  "payload": "json"
+                },
+                "shape": null,
+                "signal_type": "record"
+              }
+            ],
+            "description": "Food units available at the start.",
+            "dtype": "float64",
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": null,
+            "shape": null,
+            "signal_type": "scalar",
+            "stale_policy": "warn"
+          },
+          "growth_rate": {
+            "accepted_profiles": [
+              {
+                "accepted_units": [
+                  "1/hour"
+                ],
+                "description": "How quickly cells can multiply.",
+                "dtype": "float64",
+                "schema": null,
+                "shape": null,
+                "signal_type": "scalar"
+              },
+              {
+                "accepted_units": null,
+                "description": "How quickly cells can multiply.",
+                "dtype": null,
+                "schema": {
+                  "payload": "json"
+                },
+                "shape": null,
+                "signal_type": "record"
+              }
+            ],
+            "description": "How quickly cells can multiply.",
+            "dtype": "float64",
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": null,
+            "shape": null,
+            "signal_type": "scalar",
+            "stale_policy": "warn"
+          },
+          "initial_cells": {
+            "accepted_profiles": [
+              {
+                "accepted_units": [
+                  "cells"
+                ],
+                "description": "Starting number of cells.",
+                "dtype": "float64",
+                "schema": null,
+                "shape": null,
+                "signal_type": "scalar"
+              },
+              {
+                "accepted_units": null,
+                "description": "Starting number of cells.",
+                "dtype": null,
+                "schema": {
+                  "payload": "json"
+                },
+                "shape": null,
+                "signal_type": "record"
+              }
+            ],
+            "description": "Starting number of cells.",
+            "dtype": "float64",
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": null,
+            "shape": null,
+            "signal_type": "scalar",
+            "stale_policy": "warn"
+          },
+          "space_limit": {
+            "accepted_profiles": [
+              {
+                "accepted_units": [
+                  "cells"
+                ],
+                "description": "Approximate maximum colony size.",
+                "dtype": "float64",
+                "schema": null,
+                "shape": null,
+                "signal_type": "scalar"
+              },
+              {
+                "accepted_units": null,
+                "description": "Approximate maximum colony size.",
+                "dtype": null,
+                "schema": {
+                  "payload": "json"
+                },
+                "shape": null,
+                "signal_type": "record"
+              }
+            ],
+            "description": "Approximate maximum colony size.",
+            "dtype": "float64",
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": null,
+            "shape": null,
+            "signal_type": "scalar",
+            "stale_policy": "warn"
+          }
+        },
+        "story_reporter": {
+          "colony_state": {
+            "accepted_profiles": null,
+            "description": "Current colony state from the growth model.",
+            "dtype": null,
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": {
+              "cells": "float",
+              "death_this_step": "float",
+              "food_remaining": "float",
+              "food_used": "float",
+              "growth_this_step": "float",
+              "limiting_factor": "str",
+              "peak_cells": "float",
+              "phase": "str",
+              "space_used_percent": "float",
+              "t": "float"
+            },
+            "shape": null,
+            "signal_type": "record",
+            "stale_policy": "warn"
+          },
+          "growth_setup": {
+            "accepted_profiles": null,
+            "description": "Starting setup from the starter-culture model.",
+            "dtype": null,
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": {
+              "available_food": "float",
+              "food_per_new_cell": "float",
+              "growth_rate": "float",
+              "initial_cells": "float",
+              "setup_label": "str",
+              "space_limit": "float"
+            },
+            "shape": null,
+            "signal_type": "record",
+            "stale_policy": "warn"
+          },
+          "lesson_summary": {
+            "accepted_profiles": null,
+            "description": "Plain-language growth summary from the growth model.",
+            "dtype": null,
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": {
+              "cell_change": "float",
+              "final_cells": "float",
+              "food_used": "float",
+              "headline": "str",
+              "hours": "float",
+              "limiting_factor": "str",
+              "starting_cells": "float",
+              "takeaway": "str"
+            },
+            "shape": null,
+            "signal_type": "record",
+            "stale_policy": "warn"
+          }
+        }
+      },
+      "kind": "lab",
+      "modules": [
+        "microbial_growth",
+        "starter_setup",
+        "story_reporter"
+      ],
+      "outputs": {
+        "microbial_growth": {
+          "colony_state": {
+            "accepted_profiles": null,
+            "description": "Current viable colony size, food level, starvation loss, and limiting factor.",
+            "dtype": null,
+            "emitted_unit": "cells",
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": {
+              "cells": "float",
+              "death_this_step": "float",
+              "food_remaining": "float",
+              "food_used": "float",
+              "growth_this_step": "float",
+              "limiting_factor": "str",
+              "peak_cells": "float",
+              "phase": "str",
+              "space_used_percent": "float",
+              "t": "float"
+            },
+            "shape": null,
+            "signal_type": "record",
+            "stale_policy": "warn"
+          },
+          "lesson_summary": {
+            "accepted_profiles": null,
+            "description": "Plain-language explanation of the model run.",
+            "dtype": null,
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": {
+              "cell_change": "float",
+              "final_cells": "float",
+              "food_used": "float",
+              "headline": "str",
+              "hours": "float",
+              "limiting_factor": "str",
+              "starting_cells": "float",
+              "takeaway": "str"
+            },
+            "shape": null,
+            "signal_type": "record",
+            "stale_policy": "warn"
+          }
+        },
+        "starter_setup": {
+          "growth_setup": {
+            "accepted_profiles": null,
+            "description": "Structured setup record for the growth model.",
+            "dtype": null,
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": {
+              "available_food": "float",
+              "food_per_new_cell": "float",
+              "growth_rate": "float",
+              "initial_cells": "float",
+              "setup_label": "str",
+              "space_limit": "float"
+            },
+            "shape": null,
+            "signal_type": "record",
+            "stale_policy": "warn"
+          },
+          "run_metadata": {
+            "accepted_profiles": null,
+            "description": "Setup model status.",
+            "dtype": null,
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": {
+              "message": "str",
+              "status": "str"
+            },
+            "shape": null,
+            "signal_type": "record",
+            "stale_policy": "warn"
+          },
+          "setup_summary": {
+            "accepted_profiles": null,
+            "description": "Plain-language summary of the chosen starting plate.",
+            "dtype": null,
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": {
+              "available_food": "float",
+              "growth_rate": "float",
+              "headline": "str",
+              "space_limit": "float",
+              "starting_cells": "float"
+            },
+            "shape": null,
+            "signal_type": "record",
+            "stale_policy": "warn"
+          }
+        },
+        "story_reporter": {
+          "hello_world_story": {
+            "accepted_profiles": null,
+            "description": "Beginner-friendly story for the full hello-world run.",
+            "dtype": null,
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": {
+              "hours": "float",
+              "opening": "str",
+              "result": "str",
+              "title": "str",
+              "why_it_matters": "str"
+            },
+            "shape": null,
+            "signal_type": "record",
+            "stale_policy": "warn"
+          },
+          "next_steps": {
+            "accepted_profiles": null,
+            "description": "Simple suggestions for changing the next run.",
+            "dtype": null,
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": {
+              "headline": "str",
+              "suggestions": "list"
+            },
+            "shape": null,
+            "signal_type": "record",
+            "stale_policy": "warn"
+          },
+          "run_metadata": {
+            "accepted_profiles": null,
+            "description": "Story reporter status.",
+            "dtype": null,
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": {
+              "message": "str",
+              "status": "str"
+            },
+            "shape": null,
+            "signal_type": "record",
+            "stale_policy": "warn"
+          }
+        }
+      },
+      "signals": {
+        "microbial_growth": {
+          "colony_state": {
+            "emitted_at": 0.01,
+            "name": "colony_state",
+            "source": "microbial_growth",
+            "spec": {
+              "accepted_profiles": null,
+              "description": "Current viable colony size, food level, starvation loss, and limiting factor.",
+              "dtype": null,
+              "emitted_unit": "cells",
+              "interpolation": "zoh",
+              "kind": "state",
+              "max_age": null,
+              "schema": {
+                "cells": "float",
+                "death_this_step": "float",
+                "food_remaining": "float",
+                "food_used": "float",
+                "growth_this_step": "float",
+                "limiting_factor": "str",
+                "peak_cells": "float",
+                "phase": "str",
+                "space_used_percent": "float",
+                "t": "float"
+              },
+              "shape": null,
+              "signal_type": "record",
+              "stale_policy": "warn"
+            },
+            "type": "record",
+            "value": {
+              "cells": 10.069090909090908,
+              "death_this_step": 0.0,
+              "food_remaining": 79.9309090909091,
+              "food_used": 0.0690909090909031,
+              "growth_this_step": 0.06909090909090908,
+              "limiting_factor": "none yet",
+              "peak_cells": 10.069090909090908,
+              "phase": "growing",
+              "space_used_percent": 5.034545454545454,
+              "t": 0.01
+            }
+          },
+          "lesson_summary": {
+            "emitted_at": 0.01,
+            "name": "lesson_summary",
+            "source": "microbial_growth",
+            "spec": {
+              "accepted_profiles": null,
+              "description": "Plain-language explanation of the model run.",
+              "dtype": null,
+              "emitted_unit": null,
+              "interpolation": "zoh",
+              "kind": "state",
+              "max_age": null,
+              "schema": {
+                "cell_change": "float",
+                "final_cells": "float",
+                "food_used": "float",
+                "headline": "str",
+                "hours": "float",
+                "limiting_factor": "str",
+                "starting_cells": "float",
+                "takeaway": "str"
+              },
+              "shape": null,
+              "signal_type": "record",
+              "stale_policy": "warn"
+            },
+            "type": "record",
+            "value": {
+              "cell_change": 0.06909090909090843,
+              "final_cells": 10.069090909090908,
+              "food_used": 0.0690909090909031,
+              "headline": "The colony grew from 10.0 to 10.1 viable cells.",
+              "hours": 0.01,
+              "limiting_factor": "none yet",
+              "starting_cells": 10.0,
+              "takeaway": "Food and space are still available, so the colony is still in an easy-growth phase."
+            }
+          }
+        },
+        "starter_setup": {
+          "growth_setup": {
+            "emitted_at": 0.01,
+            "name": "growth_setup",
+            "source": "starter_setup",
+            "spec": {
+              "accepted_profiles": null,
+              "description": "Structured setup record for the growth model.",
+              "dtype": null,
+              "emitted_unit": null,
+              "interpolation": "zoh",
+              "kind": "state",
+              "max_age": null,
+              "schema": {
+                "available_food": "float",
+                "food_per_new_cell": "float",
+                "growth_rate": "float",
+                "initial_cells": "float",
+                "setup_label": "str",
+                "space_limit": "float"
+              },
+              "shape": null,
+              "signal_type": "record",
+              "stale_policy": "warn"
+            },
+            "type": "record",
+            "value": {
+              "available_food": 80.0,
+              "food_per_new_cell": 1.0,
+              "growth_rate": 0.8,
+              "initial_cells": 10.0,
+              "setup_label": "small starter plate",
+              "space_limit": 200.0
+            }
+          },
+          "run_metadata": {
+            "emitted_at": 0.01,
+            "name": "run_metadata",
+            "source": "starter_setup",
+            "spec": {
+              "accepted_profiles": null,
+              "description": "Setup model status.",
+              "dtype": null,
+              "emitted_unit": null,
+              "interpolation": "zoh",
+              "kind": "state",
+              "max_age": null,
+              "schema": {
+                "message": "str",
+                "status": "str"
+              },
+              "shape": null,
+              "signal_type": "record",
+              "stale_policy": "warn"
+            },
+            "type": "record",
+            "value": {
+              "message": "Prepared the starter culture setup.",
+              "status": "ok"
+            }
+          },
+          "setup_summary": {
+            "emitted_at": 0.01,
+            "name": "setup_summary",
+            "source": "starter_setup",
+            "spec": {
+              "accepted_profiles": null,
+              "description": "Plain-language summary of the chosen starting plate.",
+              "dtype": null,
+              "emitted_unit": null,
+              "interpolation": "zoh",
+              "kind": "state",
+              "max_age": null,
+              "schema": {
+                "available_food": "float",
+                "growth_rate": "float",
+                "headline": "str",
+                "space_limit": "float",
+                "starting_cells": "float"
+              },
+              "shape": null,
+              "signal_type": "record",
+              "stale_policy": "warn"
+            },
+            "type": "record",
+            "value": {
+              "available_food": 80.0,
+              "growth_rate": 0.8,
+              "headline": "Start with 10.0 cells, 80.0 food units, and room for 200.0 cells.",
+              "space_limit": 200.0,
+              "starting_cells": 10.0
+            }
+          }
+        },
+        "story_reporter": {
+          "hello_world_story": {
+            "emitted_at": 0.01,
+            "name": "hello_world_story",
+            "source": "story_reporter",
+            "spec": {
+              "accepted_profiles": null,
+              "description": "Beginner-friendly story for the full hello-world run.",
+              "dtype": null,
+              "emitted_unit": null,
+              "interpolation": "zoh",
+              "kind": "state",
+              "max_age": null,
+              "schema": {
+                "hours": "float",
+                "opening": "str",
+                "result": "str",
+                "title": "str",
+                "why_it_matters": "str"
+              },
+              "shape": null,
+              "signal_type": "record",
+              "stale_policy": "warn"
+            },
+            "type": "record",
+            "value": {
+              "hours": 12.0,
+              "opening": "You started with 10.0 cells, 80.0 food units, and room for 200.0 cells.",
+              "result": "After 12.0 hours, the colony reached 10.0 viable cells and gained 0.0.",
+              "title": "Microbiology Hello World",
+              "why_it_matters": "The main limit is none yet. This shows how Biosimulant can pass a setup through a simulation and into an explanation."
+            }
+          },
+          "next_steps": {
+            "emitted_at": 0.01,
+            "name": "next_steps",
+            "source": "story_reporter",
+            "spec": {
+              "accepted_profiles": null,
+              "description": "Simple suggestions for changing the next run.",
+              "dtype": null,
+              "emitted_unit": null,
+              "interpolation": "zoh",
+              "kind": "state",
+              "max_age": null,
+              "schema": {
+                "headline": "str",
+                "suggestions": "list"
+              },
+              "shape": null,
+              "signal_type": "record",
+              "stale_policy": "warn"
+            },
+            "type": "record",
+            "value": {
+              "headline": "Try changing one knob and compare the story.",
+              "suggestions": [
+                "Increase food to see whether the colony grows longer.",
+                "Lower the space limit to see crowding happen sooner.",
+                "Set growth rate to zero to see a no-growth control."
+              ]
+            }
+          },
+          "run_metadata": {
+            "emitted_at": 0.01,
+            "name": "run_metadata",
+            "source": "story_reporter",
+            "spec": {
+              "accepted_profiles": null,
+              "description": "Story reporter status.",
+              "dtype": null,
+              "emitted_unit": null,
+              "interpolation": "zoh",
+              "kind": "state",
+              "max_age": null,
+              "schema": {
+                "message": "str",
+                "status": "str"
+              },
+              "shape": null,
+              "signal_type": "record",
+              "stale_policy": "warn"
+            },
+            "type": "record",
+            "value": {
+              "message": "Wrote the hello-world story.",
+              "status": "ok"
+            }
+          }
+        }
+      },
+      "source": "models-done/models-microbiology-hello-world/labs/microbiology-hello-world-growth",
+      "state": {
+        "communication_step": 0.25,
+        "connections": {
+          "microbial_growth": [
+            {
+              "last_event_time": null,
+              "last_stale_warning_time": null,
+              "source_module": "starter_setup",
+              "source_signal": "growth_setup",
+              "target_module": "microbial_growth",
+              "target_signal": "growth_setup"
+            }
+          ],
+          "story_reporter": [
+            {
+              "last_event_time": null,
+              "last_stale_warning_time": null,
+              "source_module": "starter_setup",
+              "source_signal": "growth_setup",
+              "target_module": "story_reporter",
+              "target_signal": "growth_setup"
+            },
+            {
+              "last_event_time": null,
+              "last_stale_warning_time": null,
+              "source_module": "microbial_growth",
+              "source_signal": "colony_state",
+              "target_module": "story_reporter",
+              "target_signal": "colony_state"
+            },
+            {
+              "last_event_time": null,
+              "last_stale_warning_time": null,
+              "source_module": "microbial_growth",
+              "source_signal": "lesson_summary",
+              "target_module": "story_reporter",
+              "target_signal": "lesson_summary"
+            }
+          ]
+        },
+        "current_time": 0.01,
+        "is_setup": true,
+        "modules": {
+          "microbial_growth": {},
+          "starter_setup": {},
+          "story_reporter": {}
+        },
+        "setup_config": {},
+        "signal_store": {
+          "microbial_growth": {
+            "colony_state": {
+              "emitted_at": 0.01,
+              "name": "colony_state",
+              "source": "microbial_growth",
+              "spec": {
+                "accepted_profiles": null,
+                "description": "Current viable colony size, food level, starvation loss, and limiting factor.",
+                "dtype": null,
+                "emitted_unit": "cells",
+                "interpolation": "zoh",
+                "kind": "state",
+                "max_age": null,
+                "schema": {
+                  "cells": "float",
+                  "death_this_step": "float",
+                  "food_remaining": "float",
+                  "food_used": "float",
+                  "growth_this_step": "float",
+                  "limiting_factor": "str",
+                  "peak_cells": "float",
+                  "phase": "str",
+                  "space_used_percent": "float",
+                  "t": "float"
+                },
+                "shape": null,
+                "signal_type": "record",
+                "stale_policy": "warn"
+              },
+              "type": "record",
+              "value": {
+                "cells": 10.069090909090908,
+                "death_this_step": 0.0,
+                "food_remaining": 79.9309090909091,
+                "food_used": 0.0690909090909031,
+                "growth_this_step": 0.06909090909090908,
+                "limiting_factor": "none yet",
+                "peak_cells": 10.069090909090908,
+                "phase": "growing",
+                "space_used_percent": 5.034545454545454,
+                "t": 0.01
+              }
+            },
+            "lesson_summary": {
+              "emitted_at": 0.01,
+              "name": "lesson_summary",
+              "source": "microbial_growth",
+              "spec": {
+                "accepted_profiles": null,
+                "description": "Plain-language explanation of the model run.",
+                "dtype": null,
+                "emitted_unit": null,
+                "interpolation": "zoh",
+                "kind": "state",
+                "max_age": null,
+                "schema": {
+                  "cell_change": "float",
+                  "final_cells": "float",
+                  "food_used": "float",
+                  "headline": "str",
+                  "hours": "float",
+                  "limiting_factor": "str",
+                  "starting_cells": "float",
+                  "takeaway": "str"
+                },
+                "shape": null,
+                "signal_type": "record",
+                "stale_policy": "warn"
+              },
+              "type": "record",
+              "value": {
+                "cell_change": 0.06909090909090843,
+                "final_cells": 10.069090909090908,
+                "food_used": 0.0690909090909031,
+                "headline": "The colony grew from 10.0 to 10.1 viable cells.",
+                "hours": 0.01,
+                "limiting_factor": "none yet",
+                "starting_cells": 10.0,
+                "takeaway": "Food and space are still available, so the colony is still in an easy-growth phase."
+              }
+            }
+          },
+          "starter_setup": {
+            "growth_setup": {
+              "emitted_at": 0.01,
+              "name": "growth_setup",
+              "source": "starter_setup",
+              "spec": {
+                "accepted_profiles": null,
+                "description": "Structured setup record for the growth model.",
+                "dtype": null,
+                "emitted_unit": null,
+                "interpolation": "zoh",
+                "kind": "state",
+                "max_age": null,
+                "schema": {
+                  "available_food": "float",
+                  "food_per_new_cell": "float",
+                  "growth_rate": "float",
+                  "initial_cells": "float",
+                  "setup_label": "str",
+                  "space_limit": "float"
+                },
+                "shape": null,
+                "signal_type": "record",
+                "stale_policy": "warn"
+              },
+              "type": "record",
+              "value": {
+                "available_food": 80.0,
+                "food_per_new_cell": 1.0,
+                "growth_rate": 0.8,
+                "initial_cells": 10.0,
+                "setup_label": "small starter plate",
+                "space_limit": 200.0
+              }
+            },
+            "run_metadata": {
+              "emitted_at": 0.01,
+              "name": "run_metadata",
+              "source": "starter_setup",
+              "spec": {
+                "accepted_profiles": null,
+                "description": "Setup model status.",
+                "dtype": null,
+                "emitted_unit": null,
+                "interpolation": "zoh",
+                "kind": "state",
+                "max_age": null,
+                "schema": {
+                  "message": "str",
+                  "status": "str"
+                },
+                "shape": null,
+                "signal_type": "record",
+                "stale_policy": "warn"
+              },
+              "type": "record",
+              "value": {
+                "message": "Prepared the starter culture setup.",
+                "status": "ok"
+              }
+            },
+            "setup_summary": {
+              "emitted_at": 0.01,
+              "name": "setup_summary",
+              "source": "starter_setup",
+              "spec": {
+                "accepted_profiles": null,
+                "description": "Plain-language summary of the chosen starting plate.",
+                "dtype": null,
+                "emitted_unit": null,
+                "interpolation": "zoh",
+                "kind": "state",
+                "max_age": null,
+                "schema": {
+                  "available_food": "float",
+                  "growth_rate": "float",
+                  "headline": "str",
+                  "space_limit": "float",
+                  "starting_cells": "float"
+                },
+                "shape": null,
+                "signal_type": "record",
+                "stale_policy": "warn"
+              },
+              "type": "record",
+              "value": {
+                "available_food": 80.0,
+                "growth_rate": 0.8,
+                "headline": "Start with 10.0 cells, 80.0 food units, and room for 200.0 cells.",
+                "space_limit": 200.0,
+                "starting_cells": 10.0
+              }
+            }
+          },
+          "story_reporter": {
+            "hello_world_story": {
+              "emitted_at": 0.01,
+              "name": "hello_world_story",
+              "source": "story_reporter",
+              "spec": {
+                "accepted_profiles": null,
+                "description": "Beginner-friendly story for the full hello-world run.",
+                "dtype": null,
+                "emitted_unit": null,
+                "interpolation": "zoh",
+                "kind": "state",
+                "max_age": null,
+                "schema": {
+                  "hours": "float",
+                  "opening": "str",
+                  "result": "str",
+                  "title": "str",
+                  "why_it_matters": "str"
+                },
+                "shape": null,
+                "signal_type": "record",
+                "stale_policy": "warn"
+              },
+              "type": "record",
+              "value": {
+                "hours": 12.0,
+                "opening": "You started with 10.0 cells, 80.0 food units, and room for 200.0 cells.",
+                "result": "After 12.0 hours, the colony reached 10.0 viable cells and gained 0.0.",
+                "title": "Microbiology Hello World",
+                "why_it_matters": "The main limit is none yet. This shows how Biosimulant can pass a setup through a simulation and into an explanation."
+              }
+            },
+            "next_steps": {
+              "emitted_at": 0.01,
+              "name": "next_steps",
+              "source": "story_reporter",
+              "spec": {
+                "accepted_profiles": null,
+                "description": "Simple suggestions for changing the next run.",
+                "dtype": null,
+                "emitted_unit": null,
+                "interpolation": "zoh",
+                "kind": "state",
+                "max_age": null,
+                "schema": {
+                  "headline": "str",
+                  "suggestions": "list"
+                },
+                "shape": null,
+                "signal_type": "record",
+                "stale_policy": "warn"
+              },
+              "type": "record",
+              "value": {
+                "headline": "Try changing one knob and compare the story.",
+                "suggestions": [
+                  "Increase food to see whether the colony grows longer.",
+                  "Lower the space limit to see crowding happen sooner.",
+                  "Set growth rate to zero to see a no-growth control."
+                ]
+              }
+            },
+            "run_metadata": {
+              "emitted_at": 0.01,
+              "name": "run_metadata",
+              "source": "story_reporter",
+              "spec": {
+                "accepted_profiles": null,
+                "description": "Story reporter status.",
+                "dtype": null,
+                "emitted_unit": null,
+                "interpolation": "zoh",
+                "kind": "state",
+                "max_age": null,
+                "schema": {
+                  "message": "str",
+                  "status": "str"
+                },
+                "shape": null,
+                "signal_type": "record",
+                "stale_policy": "warn"
+              },
+              "type": "record",
+              "value": {
+                "message": "Wrote the hello-world story.",
+                "status": "ok"
+              }
+            }
+          }
+        }
+      },
+      "visuals": [
+        {
+          "module": "starter_setup",
+          "visuals": [
+            {
+              "data": {
+                "columns": [
+                  "Question",
+                  "Answer"
+                ],
+                "rows": [
+                  [
+                    "How many cells start?",
+                    "10.0 cells"
+                  ],
+                  [
+                    "How much food is available?",
+                    "80.0 food units"
+                  ],
+                  [
+                    "How fast can cells grow?",
+                    "0.80 per hour"
+                  ],
+                  [
+                    "How much room is there?",
+                    "200.0 cells"
+                  ]
+                ],
+                "title": "Starting Plate"
+              },
+              "description": "Starting conditions for the hello-world growth run.",
+              "render": "table"
+            }
+          ]
+        },
+        {
+          "module": "microbial_growth",
+          "visuals": [
+            {
+              "data": {
+                "series": [
+                  {
+                    "name": "Viable cells",
+                    "points": [
+                      [
+                        0.0,
+                        10.0
+                      ],
+                      [
+                        0.01,
+                        10.069090909090908
+                      ]
+                    ]
+                  }
+                ],
+                "title": "Viable Colony Cells",
+                "x_unit": "hour",
+                "y_unit": "cells"
+              },
+              "description": "Viable cell count over time.",
+              "render": "timeseries"
+            },
+            {
+              "data": {
+                "series": [
+                  {
+                    "name": "Food remaining",
+                    "points": [
+                      [
+                        0.0,
+                        80.0
+                      ],
+                      [
+                        0.01,
+                        79.9309090909091
+                      ]
+                    ]
+                  }
+                ],
+                "title": "Food Supply",
+                "x_unit": "hour",
+                "y_unit": "food_unit"
+              },
+              "description": "Food remaining over time.",
+              "render": "timeseries"
+            },
+            {
+              "data": {
+                "columns": [
+                  "Question",
+                  "Answer"
+                ],
+                "rows": [
+                  [
+                    "What changed?",
+                    "The colony grew from 10.0 to 10.1 viable cells."
+                  ],
+                  [
+                    "Why did it change?",
+                    "Food and space are still available, so the colony is still in an easy-growth phase."
+                  ],
+                  [
+                    "Main limit",
+                    "none yet"
+                  ],
+                  [
+                    "Food used",
+                    "0.07 food units"
+                  ],
+                  [
+                    "Space used",
+                    "5.0%"
+                  ]
+                ],
+                "title": "What Happened"
+              },
+              "description": "Plain-language explanation of the run.",
+              "render": "table"
+            }
+          ]
+        },
+        {
+          "module": "story_reporter",
+          "visuals": [
+            {
+              "data": {
+                "columns": [
+                  "Part",
+                  "Meaning"
+                ],
+                "rows": [
+                  [
+                    "Start",
+                    "You started with 10.0 cells, 80.0 food units, and room for 200.0 cells."
+                  ],
+                  [
+                    "Result",
+                    "After 12.0 hours, the colony reached 10.0 viable cells and gained 0.0."
+                  ],
+                  [
+                    "Why it matters",
+                    "The main limit is none yet. This shows how Biosimulant can pass a setup through a simulation and into an explanation."
+                  ]
+                ],
+                "title": "Hello World Story"
+              },
+              "description": "Plain-language story for the run.",
+              "render": "table"
+            },
+            {
+              "data": {
+                "columns": [
+                  "Idea"
+                ],
+                "rows": [
+                  [
+                    "Increase food to see whether the colony grows longer."
+                  ],
+                  [
+                    "Lower the space limit to see crowding happen sooner."
+                  ],
+                  [
+                    "Set growth rate to zero to see a no-growth control."
+                  ]
+                ],
+                "title": "Try Next"
+              },
+              "description": "Simple ideas for the next run.",
+              "render": "table"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "duration": 0.01,
+      "inputs": {
+        "ecology_lotka_volterra_system": {
+          "predation_rate": {
+            "accepted_profiles": [
+              {
+                "accepted_units": [
+                  "1/(count*day)"
+                ],
+                "description": "Mass-action predation coefficient beta.",
+                "dtype": "float64",
+                "schema": null,
+                "shape": null,
+                "signal_type": "scalar"
+              },
+              {
+                "accepted_units": null,
+                "description": "Mass-action predation coefficient beta.",
+                "dtype": null,
+                "schema": {
+                  "payload": "json"
+                },
+                "shape": null,
+                "signal_type": "record"
+              }
+            ],
+            "description": "Mass-action predation coefficient beta.",
+            "dtype": "float64",
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": null,
+            "shape": null,
+            "signal_type": "scalar",
+            "stale_policy": "warn"
+          },
+          "predator_initial_population": {
+            "accepted_profiles": [
+              {
+                "accepted_units": [
+                  "count"
+                ],
+                "description": "Initial predator population count.",
+                "dtype": "float64",
+                "schema": null,
+                "shape": null,
+                "signal_type": "scalar"
+              },
+              {
+                "accepted_units": null,
+                "description": "Initial predator population count.",
+                "dtype": null,
+                "schema": {
+                  "payload": "json"
+                },
+                "shape": null,
+                "signal_type": "record"
+              }
+            ],
+            "description": "Initial predator population count.",
+            "dtype": "float64",
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": null,
+            "shape": null,
+            "signal_type": "scalar",
+            "stale_policy": "warn"
+          },
+          "predator_mortality_rate": {
+            "accepted_profiles": [
+              {
+                "accepted_units": [
+                  "1/day"
+                ],
+                "description": "Predator mortality rate gamma.",
+                "dtype": "float64",
+                "schema": null,
+                "shape": null,
+                "signal_type": "scalar"
+              },
+              {
+                "accepted_units": null,
+                "description": "Predator mortality rate gamma.",
+                "dtype": null,
+                "schema": {
+                  "payload": "json"
+                },
+                "shape": null,
+                "signal_type": "record"
+              }
+            ],
+            "description": "Predator mortality rate gamma.",
+            "dtype": "float64",
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": null,
+            "shape": null,
+            "signal_type": "scalar",
+            "stale_policy": "warn"
+          },
+          "predator_reproduction_rate": {
+            "accepted_profiles": [
+              {
+                "accepted_units": [
+                  "1/(count*day)"
+                ],
+                "description": "Predator reproduction coefficient delta.",
+                "dtype": "float64",
+                "schema": null,
+                "shape": null,
+                "signal_type": "scalar"
+              },
+              {
+                "accepted_units": null,
+                "description": "Predator reproduction coefficient delta.",
+                "dtype": null,
+                "schema": {
+                  "payload": "json"
+                },
+                "shape": null,
+                "signal_type": "record"
+              }
+            ],
+            "description": "Predator reproduction coefficient delta.",
+            "dtype": "float64",
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": null,
+            "shape": null,
+            "signal_type": "scalar",
+            "stale_policy": "warn"
+          },
+          "prey_growth_rate": {
+            "accepted_profiles": [
+              {
+                "accepted_units": [
+                  "1/day"
+                ],
+                "description": "Intrinsic prey growth rate alpha.",
+                "dtype": "float64",
+                "schema": null,
+                "shape": null,
+                "signal_type": "scalar"
+              },
+              {
+                "accepted_units": null,
+                "description": "Intrinsic prey growth rate alpha.",
+                "dtype": null,
+                "schema": {
+                  "payload": "json"
+                },
+                "shape": null,
+                "signal_type": "record"
+              }
+            ],
+            "description": "Intrinsic prey growth rate alpha.",
+            "dtype": "float64",
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": null,
+            "shape": null,
+            "signal_type": "scalar",
+            "stale_policy": "warn"
+          },
+          "prey_initial_population": {
+            "accepted_profiles": [
+              {
+                "accepted_units": [
+                  "count"
+                ],
+                "description": "Initial prey population count.",
+                "dtype": "float64",
+                "schema": null,
+                "shape": null,
+                "signal_type": "scalar"
+              },
+              {
+                "accepted_units": null,
+                "description": "Initial prey population count.",
+                "dtype": null,
+                "schema": {
+                  "payload": "json"
+                },
+                "shape": null,
+                "signal_type": "record"
+              }
+            ],
+            "description": "Initial prey population count.",
+            "dtype": "float64",
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": null,
+            "shape": null,
+            "signal_type": "scalar",
+            "stale_policy": "warn"
+          }
+        },
+        "visualisation": {
+          "ecology_lotka_volterra_system_visualisation_payload": {
+            "accepted_profiles": [
+              {
+                "accepted_units": null,
+                "description": null,
+                "dtype": null,
+                "schema": {
+                  "payload": "json"
+                },
+                "shape": null,
+                "signal_type": "record"
+              },
+              {
+                "accepted_units": null,
+                "description": null,
+                "dtype": null,
+                "schema": null,
+                "shape": null,
+                "signal_type": "scalar"
+              }
+            ],
+            "description": "Internal payload from the sibling core model.",
+            "dtype": null,
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": {
+              "payload": "json"
+            },
+            "shape": null,
+            "signal_type": "record",
+            "stale_policy": "warn"
+          }
+        }
+      },
+      "kind": "lab",
+      "modules": [
+        "ecology_lotka_volterra_system",
+        "visualisation"
+      ],
+      "outputs": {
+        "ecology_lotka_volterra_system": {
+          "predator_population_state": {
+            "accepted_profiles": null,
+            "description": "Current predator population count.",
+            "dtype": null,
+            "emitted_unit": "count",
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": {
+              "count": "float",
+              "label": "str",
+              "role": "str",
+              "t": "float"
+            },
+            "shape": null,
+            "signal_type": "record",
+            "stale_policy": "warn"
+          },
+          "prey_population_state": {
+            "accepted_profiles": null,
+            "description": "Current prey population count.",
+            "dtype": null,
+            "emitted_unit": "count",
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": {
+              "count": "float",
+              "label": "str",
+              "role": "str",
+              "t": "float"
+            },
+            "shape": null,
+            "signal_type": "record",
+            "stale_policy": "warn"
+          },
+          "visualisation_payload": {
+            "accepted_profiles": null,
+            "description": "Internal history payload for the sibling visualisation model.",
+            "dtype": null,
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": {
+              "payload": "json"
+            },
+            "shape": null,
+            "signal_type": "record",
+            "stale_policy": "warn"
+          }
+        },
+        "visualisation": {}
+      },
+      "signals": {
+        "ecology_lotka_volterra_system": {
+          "predator_population_state": {
+            "emitted_at": 0.01,
+            "name": "predator_population_state",
+            "source": "ecology_lotka_volterra_system",
+            "spec": {
+              "accepted_profiles": null,
+              "description": "Current predator population count.",
+              "dtype": null,
+              "emitted_unit": "count",
+              "interpolation": "zoh",
+              "kind": "state",
+              "max_age": null,
+              "schema": {
+                "count": "float",
+                "label": "str",
+                "role": "str",
+                "t": "float"
+              },
+              "shape": null,
+              "signal_type": "record",
+              "stale_policy": "warn"
+            },
+            "type": "record",
+            "value": {
+              "count": 5.029863511888888,
+              "label": "Predator",
+              "role": "predator",
+              "t": 0.01
+            }
+          },
+          "prey_population_state": {
+            "emitted_at": 0.01,
+            "name": "prey_population_state",
+            "source": "ecology_lotka_volterra_system",
+            "spec": {
+              "accepted_profiles": null,
+              "description": "Current prey population count.",
+              "dtype": null,
+              "emitted_unit": "count",
+              "interpolation": "zoh",
+              "kind": "state",
+              "max_age": null,
+              "schema": {
+                "count": "float",
+                "label": "str",
+                "role": "str",
+                "t": "float"
+              },
+              "shape": null,
+              "signal_type": "record",
+              "stale_policy": "warn"
+            },
+            "type": "record",
+            "value": {
+              "count": 9.909810979856902,
+              "label": "Prey",
+              "role": "prey",
+              "t": 0.01
+            }
+          },
+          "visualisation_payload": {
+            "emitted_at": 0.01,
+            "name": "visualisation_payload",
+            "source": "ecology_lotka_volterra_system",
+            "spec": {
+              "accepted_profiles": null,
+              "description": "Internal history payload for the sibling visualisation model.",
+              "dtype": null,
+              "emitted_unit": null,
+              "interpolation": "zoh",
+              "kind": "state",
+              "max_age": null,
+              "schema": {
+                "payload": "json"
+              },
+              "shape": null,
+              "signal_type": "record",
+              "stale_policy": "warn"
+            },
+            "type": "record",
+            "value": {
+              "payload": {
+                "history": [
+                  {
+                    "drift": 1.758593271006248e-13,
+                    "invariant": 0.30858425912504694,
+                    "predator": 5.029863511888888,
+                    "prey": 9.909810979856902,
+                    "t": 0.01
+                  }
+                ],
+                "parameters": {
+                  "alpha": 1.1,
+                  "beta": 0.4,
+                  "delta": 0.1,
+                  "gamma": 0.4,
+                  "predator_initial": 5.0,
+                  "predator_name": "Predator",
+                  "prey_initial": 10.0,
+                  "prey_name": "Prey"
+                },
+                "predator_extinction_time": null,
+                "prey_extinction_time": null
+              }
+            }
+          }
+        },
+        "visualisation": {}
+      },
+      "source": "models-done/models-ecology/labs/ecology-lotka-volterra-system",
+      "state": {
+        "communication_step": 0.01,
+        "connections": {
+          "visualisation": [
+            {
+              "last_event_time": null,
+              "last_stale_warning_time": null,
+              "source_module": "ecology_lotka_volterra_system",
+              "source_signal": "visualisation_payload",
+              "target_module": "visualisation",
+              "target_signal": "ecology_lotka_volterra_system_visualisation_payload"
+            }
+          ]
+        },
+        "current_time": 0.01,
+        "is_setup": true,
+        "modules": {
+          "ecology_lotka_volterra_system": {},
+          "visualisation": {}
+        },
+        "setup_config": {},
+        "signal_store": {
+          "ecology_lotka_volterra_system": {
+            "predator_population_state": {
+              "emitted_at": 0.01,
+              "name": "predator_population_state",
+              "source": "ecology_lotka_volterra_system",
+              "spec": {
+                "accepted_profiles": null,
+                "description": "Current predator population count.",
+                "dtype": null,
+                "emitted_unit": "count",
+                "interpolation": "zoh",
+                "kind": "state",
+                "max_age": null,
+                "schema": {
+                  "count": "float",
+                  "label": "str",
+                  "role": "str",
+                  "t": "float"
+                },
+                "shape": null,
+                "signal_type": "record",
+                "stale_policy": "warn"
+              },
+              "type": "record",
+              "value": {
+                "count": 5.029863511888888,
+                "label": "Predator",
+                "role": "predator",
+                "t": 0.01
+              }
+            },
+            "prey_population_state": {
+              "emitted_at": 0.01,
+              "name": "prey_population_state",
+              "source": "ecology_lotka_volterra_system",
+              "spec": {
+                "accepted_profiles": null,
+                "description": "Current prey population count.",
+                "dtype": null,
+                "emitted_unit": "count",
+                "interpolation": "zoh",
+                "kind": "state",
+                "max_age": null,
+                "schema": {
+                  "count": "float",
+                  "label": "str",
+                  "role": "str",
+                  "t": "float"
+                },
+                "shape": null,
+                "signal_type": "record",
+                "stale_policy": "warn"
+              },
+              "type": "record",
+              "value": {
+                "count": 9.909810979856902,
+                "label": "Prey",
+                "role": "prey",
+                "t": 0.01
+              }
+            },
+            "visualisation_payload": {
+              "emitted_at": 0.01,
+              "name": "visualisation_payload",
+              "source": "ecology_lotka_volterra_system",
+              "spec": {
+                "accepted_profiles": null,
+                "description": "Internal history payload for the sibling visualisation model.",
+                "dtype": null,
+                "emitted_unit": null,
+                "interpolation": "zoh",
+                "kind": "state",
+                "max_age": null,
+                "schema": {
+                  "payload": "json"
+                },
+                "shape": null,
+                "signal_type": "record",
+                "stale_policy": "warn"
+              },
+              "type": "record",
+              "value": {
+                "payload": {
+                  "history": [
+                    {
+                      "drift": 1.758593271006248e-13,
+                      "invariant": 0.30858425912504694,
+                      "predator": 5.029863511888888,
+                      "prey": 9.909810979856902,
+                      "t": 0.01
+                    }
+                  ],
+                  "parameters": {
+                    "alpha": 1.1,
+                    "beta": 0.4,
+                    "delta": 0.1,
+                    "gamma": 0.4,
+                    "predator_initial": 5.0,
+                    "predator_name": "Predator",
+                    "prey_initial": 10.0,
+                    "prey_name": "Prey"
+                  },
+                  "predator_extinction_time": null,
+                  "prey_extinction_time": null
+                }
+              }
+            }
+          }
+        }
+      },
+      "visuals": []
+    },
+    {
+      "duration": 0.01,
+      "inputs": {
+        "ecology_leibovich2022_multispecies_competition": {
+          "birth_rate": {
+            "accepted_profiles": [
+              {
+                "accepted_units": [
+                  "1/time"
+                ],
+                "description": "Per-capita birth rate.",
+                "dtype": "float64",
+                "schema": null,
+                "shape": null,
+                "signal_type": "scalar"
+              },
+              {
+                "accepted_units": null,
+                "description": "Per-capita birth rate.",
+                "dtype": null,
+                "schema": {
+                  "payload": "json"
+                },
+                "shape": null,
+                "signal_type": "record"
+              }
+            ],
+            "description": "Per-capita birth rate.",
+            "dtype": "float64",
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": null,
+            "shape": null,
+            "signal_type": "scalar",
+            "stale_policy": "warn"
+          },
+          "carrying_capacity": {
+            "accepted_profiles": [
+              {
+                "accepted_units": [
+                  "individuals"
+                ],
+                "description": "Habitat carrying capacity.",
+                "dtype": "float64",
+                "schema": null,
+                "shape": null,
+                "signal_type": "scalar"
+              },
+              {
+                "accepted_units": null,
+                "description": "Habitat carrying capacity.",
+                "dtype": null,
+                "schema": {
+                  "payload": "json"
+                },
+                "shape": null,
+                "signal_type": "record"
+              }
+            ],
+            "description": "Habitat carrying capacity.",
+            "dtype": "float64",
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": null,
+            "shape": null,
+            "signal_type": "scalar",
+            "stale_policy": "warn"
+          },
+          "competition_overlap": {
+            "accepted_profiles": [
+              {
+                "accepted_units": [
+                  "dimensionless"
+                ],
+                "description": "Fraction of competition that is interspecific.",
+                "dtype": "float64",
+                "schema": null,
+                "shape": null,
+                "signal_type": "scalar"
+              },
+              {
+                "accepted_units": null,
+                "description": "Fraction of competition that is interspecific.",
+                "dtype": null,
+                "schema": {
+                  "payload": "json"
+                },
+                "shape": null,
+                "signal_type": "record"
+              }
+            ],
+            "description": "Fraction of competition that is interspecific.",
+            "dtype": "float64",
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": null,
+            "shape": null,
+            "signal_type": "scalar",
+            "stale_policy": "warn"
+          },
+          "death_rate": {
+            "accepted_profiles": [
+              {
+                "accepted_units": [
+                  "1/time"
+                ],
+                "description": "Per-capita baseline death rate.",
+                "dtype": "float64",
+                "schema": null,
+                "shape": null,
+                "signal_type": "scalar"
+              },
+              {
+                "accepted_units": null,
+                "description": "Per-capita baseline death rate.",
+                "dtype": null,
+                "schema": {
+                  "payload": "json"
+                },
+                "shape": null,
+                "signal_type": "record"
+              }
+            ],
+            "description": "Per-capita baseline death rate.",
+            "dtype": "float64",
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": null,
+            "shape": null,
+            "signal_type": "scalar",
+            "stale_policy": "warn"
+          },
+          "immigration_rate": {
+            "accepted_profiles": [
+              {
+                "accepted_units": [
+                  "individuals/time"
+                ],
+                "description": "Constant immigration rate per species.",
+                "dtype": "float64",
+                "schema": null,
+                "shape": null,
+                "signal_type": "scalar"
+              },
+              {
+                "accepted_units": null,
+                "description": "Constant immigration rate per species.",
+                "dtype": null,
+                "schema": {
+                  "payload": "json"
+                },
+                "shape": null,
+                "signal_type": "record"
+              }
+            ],
+            "description": "Constant immigration rate per species.",
+            "dtype": "float64",
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": null,
+            "shape": null,
+            "signal_type": "scalar",
+            "stale_policy": "warn"
+          },
+          "initial_abundance": {
+            "accepted_profiles": [
+              {
+                "accepted_units": [
+                  "individuals"
+                ],
+                "description": "Starting abundance per species.",
+                "dtype": "float64",
+                "schema": null,
+                "shape": null,
+                "signal_type": "scalar"
+              },
+              {
+                "accepted_units": null,
+                "description": "Starting abundance per species.",
+                "dtype": null,
+                "schema": {
+                  "payload": "json"
+                },
+                "shape": null,
+                "signal_type": "record"
+              }
+            ],
+            "description": "Starting abundance per species.",
+            "dtype": "float64",
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": null,
+            "shape": null,
+            "signal_type": "scalar",
+            "stale_policy": "warn"
+          }
+        },
+        "visualisation": {
+          "ecology_leibovich2022_multispecies_competition_visualisation_payload": {
+            "accepted_profiles": [
+              {
+                "accepted_units": null,
+                "description": null,
+                "dtype": null,
+                "schema": {
+                  "payload": "json"
+                },
+                "shape": null,
+                "signal_type": "record"
+              },
+              {
+                "accepted_units": null,
+                "description": null,
+                "dtype": null,
+                "schema": null,
+                "shape": null,
+                "signal_type": "scalar"
+              }
+            ],
+            "description": "Internal payload from the sibling core model.",
+            "dtype": null,
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": {
+              "payload": "json"
+            },
+            "shape": null,
+            "signal_type": "record",
+            "stale_policy": "warn"
+          }
+        }
+      },
+      "kind": "lab",
+      "modules": [
+        "ecology_leibovich2022_multispecies_competition",
+        "visualisation"
+      ],
+      "outputs": {
+        "ecology_leibovich2022_multispecies_competition": {
+          "community_state": {
+            "accepted_profiles": null,
+            "description": "Species-resolved abundances for the stochastic competition community.",
+            "dtype": null,
+            "emitted_unit": "individuals",
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": {
+              "species_abundances": "json",
+              "total_abundance": "json"
+            },
+            "shape": null,
+            "signal_type": "record",
+            "stale_policy": "warn"
+          },
+          "diversity_metrics": {
+            "accepted_profiles": null,
+            "description": "Diversity and dominance metrics for the multispecies community.",
+            "dtype": null,
+            "emitted_unit": "dimensionless",
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": {
+              "dominant_species": "json",
+              "evenness": "json",
+              "richness": "json",
+              "shannon_diversity": "json"
+            },
+            "shape": null,
+            "signal_type": "record",
+            "stale_policy": "warn"
+          },
+          "visualisation_payload": {
+            "accepted_profiles": null,
+            "description": "Internal history payload for the sibling visualisation model.",
+            "dtype": null,
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": {
+              "payload": "json"
+            },
+            "shape": null,
+            "signal_type": "record",
+            "stale_policy": "warn"
+          }
+        },
+        "visualisation": {}
+      },
+      "signals": {
+        "ecology_leibovich2022_multispecies_competition": {
+          "community_state": {
+            "emitted_at": 0.01,
+            "name": "community_state",
+            "source": "ecology_leibovich2022_multispecies_competition",
+            "spec": {
+              "accepted_profiles": null,
+              "description": "Species-resolved abundances for the stochastic competition community.",
+              "dtype": null,
+              "emitted_unit": "individuals",
+              "interpolation": "zoh",
+              "kind": "state",
+              "max_age": null,
+              "schema": {
+                "species_abundances": "json",
+                "total_abundance": "json"
+              },
+              "shape": null,
+              "signal_type": "record",
+              "stale_policy": "warn"
+            },
+            "type": "record",
+            "value": {
+              "species_abundances": {
+                "species_1": 66,
+                "species_2": 60,
+                "species_3": 52,
+                "species_4": 49,
+                "species_5": 40,
+                "species_6": 35
+              },
+              "total_abundance": 302
+            }
+          },
+          "diversity_metrics": {
+            "emitted_at": 0.01,
+            "name": "diversity_metrics",
+            "source": "ecology_leibovich2022_multispecies_competition",
+            "spec": {
+              "accepted_profiles": null,
+              "description": "Diversity and dominance metrics for the multispecies community.",
+              "dtype": null,
+              "emitted_unit": "dimensionless",
+              "interpolation": "zoh",
+              "kind": "state",
+              "max_age": null,
+              "schema": {
+                "dominant_species": "json",
+                "evenness": "json",
+                "richness": "json",
+                "shannon_diversity": "json"
+              },
+              "shape": null,
+              "signal_type": "record",
+              "stale_policy": "warn"
+            },
+            "type": "record",
+            "value": {
+              "dominant_species": "species_1",
+              "evenness": 0.9872549054212983,
+              "richness": 6,
+              "shannon_diversity": 1.768923325330459
+            }
+          },
+          "visualisation_payload": {
+            "emitted_at": 0.01,
+            "name": "visualisation_payload",
+            "source": "ecology_leibovich2022_multispecies_competition",
+            "spec": {
+              "accepted_profiles": null,
+              "description": "Internal history payload for the sibling visualisation model.",
+              "dtype": null,
+              "emitted_unit": null,
+              "interpolation": "zoh",
+              "kind": "state",
+              "max_age": null,
+              "schema": {
+                "payload": "json"
+              },
+              "shape": null,
+              "signal_type": "record",
+              "stale_policy": "warn"
+            },
+            "type": "record",
+            "value": {
+              "payload": {
+                "history": [
+                  {
+                    "dominant_species_index": 1.0,
+                    "evenness": 0.9872549054212983,
+                    "richness": 6.0,
+                    "shannon_diversity": 1.768923325330459,
+                    "species_1": 66.0,
+                    "species_2": 60.0,
+                    "species_3": 52.0,
+                    "species_4": 49.0,
+                    "species_5": 40.0,
+                    "species_6": 35.0,
+                    "t": 0.01,
+                    "total_abundance": 302.0
+                  }
+                ],
+                "species_count": 6
+              }
+            }
+          }
+        },
+        "visualisation": {}
+      },
+      "source": "models-done/models-ecology/labs/ecology-leibovich2022-multispecies-competition",
+      "state": {
+        "communication_step": 0.5,
+        "connections": {
+          "visualisation": [
+            {
+              "last_event_time": null,
+              "last_stale_warning_time": null,
+              "source_module": "ecology_leibovich2022_multispecies_competition",
+              "source_signal": "visualisation_payload",
+              "target_module": "visualisation",
+              "target_signal": "ecology_leibovich2022_multispecies_competition_visualisation_payload"
+            }
+          ]
+        },
+        "current_time": 0.01,
+        "is_setup": true,
+        "modules": {
+          "ecology_leibovich2022_multispecies_competition": {},
+          "visualisation": {}
+        },
+        "setup_config": {},
+        "signal_store": {
+          "ecology_leibovich2022_multispecies_competition": {
+            "community_state": {
+              "emitted_at": 0.01,
+              "name": "community_state",
+              "source": "ecology_leibovich2022_multispecies_competition",
+              "spec": {
+                "accepted_profiles": null,
+                "description": "Species-resolved abundances for the stochastic competition community.",
+                "dtype": null,
+                "emitted_unit": "individuals",
+                "interpolation": "zoh",
+                "kind": "state",
+                "max_age": null,
+                "schema": {
+                  "species_abundances": "json",
+                  "total_abundance": "json"
+                },
+                "shape": null,
+                "signal_type": "record",
+                "stale_policy": "warn"
+              },
+              "type": "record",
+              "value": {
+                "species_abundances": {
+                  "species_1": 66,
+                  "species_2": 60,
+                  "species_3": 52,
+                  "species_4": 49,
+                  "species_5": 40,
+                  "species_6": 35
+                },
+                "total_abundance": 302
+              }
+            },
+            "diversity_metrics": {
+              "emitted_at": 0.01,
+              "name": "diversity_metrics",
+              "source": "ecology_leibovich2022_multispecies_competition",
+              "spec": {
+                "accepted_profiles": null,
+                "description": "Diversity and dominance metrics for the multispecies community.",
+                "dtype": null,
+                "emitted_unit": "dimensionless",
+                "interpolation": "zoh",
+                "kind": "state",
+                "max_age": null,
+                "schema": {
+                  "dominant_species": "json",
+                  "evenness": "json",
+                  "richness": "json",
+                  "shannon_diversity": "json"
+                },
+                "shape": null,
+                "signal_type": "record",
+                "stale_policy": "warn"
+              },
+              "type": "record",
+              "value": {
+                "dominant_species": "species_1",
+                "evenness": 0.9872549054212983,
+                "richness": 6,
+                "shannon_diversity": 1.768923325330459
+              }
+            },
+            "visualisation_payload": {
+              "emitted_at": 0.01,
+              "name": "visualisation_payload",
+              "source": "ecology_leibovich2022_multispecies_competition",
+              "spec": {
+                "accepted_profiles": null,
+                "description": "Internal history payload for the sibling visualisation model.",
+                "dtype": null,
+                "emitted_unit": null,
+                "interpolation": "zoh",
+                "kind": "state",
+                "max_age": null,
+                "schema": {
+                  "payload": "json"
+                },
+                "shape": null,
+                "signal_type": "record",
+                "stale_policy": "warn"
+              },
+              "type": "record",
+              "value": {
+                "payload": {
+                  "history": [
+                    {
+                      "dominant_species_index": 1.0,
+                      "evenness": 0.9872549054212983,
+                      "richness": 6.0,
+                      "shannon_diversity": 1.768923325330459,
+                      "species_1": 66.0,
+                      "species_2": 60.0,
+                      "species_3": 52.0,
+                      "species_4": 49.0,
+                      "species_5": 40.0,
+                      "species_6": 35.0,
+                      "t": 0.01,
+                      "total_abundance": 302.0
+                    }
+                  ],
+                  "species_count": 6
+                }
+              }
+            }
+          }
+        }
+      },
+      "visuals": []
+    },
+    {
+      "duration": 0.01,
+      "inputs": {
+        "ligand_pdbqt_path": {
+          "accepted_profiles": [
+            {
+              "accepted_units": null,
+              "description": null,
+              "dtype": null,
+              "schema": {
+                "payload": "json"
+              },
+              "shape": null,
+              "signal_type": "record"
+            },
+            {
+              "accepted_units": null,
+              "description": null,
+              "dtype": null,
+              "schema": null,
+              "shape": null,
+              "signal_type": "scalar"
+            }
+          ],
+          "description": null,
+          "dtype": null,
+          "emitted_unit": null,
+          "interpolation": "zoh",
+          "kind": "state",
+          "max_age": null,
+          "schema": {
+            "payload": "json"
+          },
+          "shape": null,
+          "signal_type": "record",
+          "stale_policy": "warn"
+        },
+        "receptor_pdbqt_path": {
+          "accepted_profiles": [
+            {
+              "accepted_units": null,
+              "description": null,
+              "dtype": null,
+              "schema": {
+                "payload": "json"
+              },
+              "shape": null,
+              "signal_type": "record"
+            },
+            {
+              "accepted_units": null,
+              "description": null,
+              "dtype": null,
+              "schema": null,
+              "shape": null,
+              "signal_type": "scalar"
+            }
+          ],
+          "description": null,
+          "dtype": null,
+          "emitted_unit": null,
+          "interpolation": "zoh",
+          "kind": "state",
+          "max_age": null,
+          "schema": {
+            "payload": "json"
+          },
+          "shape": null,
+          "signal_type": "record",
+          "stale_policy": "warn"
+        },
+        "run_options": {
+          "accepted_profiles": [
+            {
+              "accepted_units": null,
+              "description": null,
+              "dtype": null,
+              "schema": {
+                "payload": "json"
+              },
+              "shape": null,
+              "signal_type": "record"
+            },
+            {
+              "accepted_units": null,
+              "description": null,
+              "dtype": null,
+              "schema": null,
+              "shape": null,
+              "signal_type": "scalar"
+            }
+          ],
+          "description": null,
+          "dtype": null,
+          "emitted_unit": null,
+          "interpolation": "zoh",
+          "kind": "state",
+          "max_age": null,
+          "schema": {
+            "payload": "json"
+          },
+          "shape": null,
+          "signal_type": "record",
+          "stale_policy": "warn"
+        }
+      },
+      "kind": "model",
+      "outputs": {
+        "docking_summary": {
+          "accepted_profiles": null,
+          "description": null,
+          "dtype": null,
+          "emitted_unit": null,
+          "interpolation": "zoh",
+          "kind": "state",
+          "max_age": null,
+          "schema": {
+            "payload": "json"
+          },
+          "shape": null,
+          "signal_type": "record",
+          "stale_policy": "warn"
+        },
+        "pose_summary": {
+          "accepted_profiles": null,
+          "description": null,
+          "dtype": null,
+          "emitted_unit": null,
+          "interpolation": "zoh",
+          "kind": "state",
+          "max_age": null,
+          "schema": {
+            "payload": "json"
+          },
+          "shape": null,
+          "signal_type": "record",
+          "stale_policy": "warn"
+        },
+        "run_metadata": {
+          "accepted_profiles": null,
+          "description": null,
+          "dtype": null,
+          "emitted_unit": null,
+          "interpolation": "zoh",
+          "kind": "state",
+          "max_age": null,
+          "schema": {
+            "payload": "json"
+          },
+          "shape": null,
+          "signal_type": "record",
+          "stale_policy": "warn"
+        },
+        "structure_artifacts": {
+          "accepted_profiles": null,
+          "description": null,
+          "dtype": null,
+          "emitted_unit": null,
+          "interpolation": "zoh",
+          "kind": "state",
+          "max_age": null,
+          "schema": {
+            "payload": "json"
+          },
+          "shape": null,
+          "signal_type": "record",
+          "stale_policy": "warn"
+        }
+      },
+      "signals": {
+        "docking_summary": {
+          "emitted_at": 0.01,
+          "name": "docking_summary",
+          "source": "vina",
+          "spec": {
+            "accepted_profiles": null,
+            "description": null,
+            "dtype": null,
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": {
+              "payload": "json"
+            },
+            "shape": null,
+            "signal_type": "record",
+            "stale_policy": "warn"
+          },
+          "type": "record",
+          "value": {
+            "payload": {}
+          }
+        },
+        "pose_summary": {
+          "emitted_at": 0.01,
+          "name": "pose_summary",
+          "source": "vina",
+          "spec": {
+            "accepted_profiles": null,
+            "description": null,
+            "dtype": null,
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": {
+              "payload": "json"
+            },
+            "shape": null,
+            "signal_type": "record",
+            "stale_policy": "warn"
+          },
+          "type": "record",
+          "value": {
+            "payload": []
+          }
+        },
+        "run_metadata": {
+          "emitted_at": 0.01,
+          "name": "run_metadata",
+          "source": "vina",
+          "spec": {
+            "accepted_profiles": null,
+            "description": null,
+            "dtype": null,
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": {
+              "payload": "json"
+            },
+            "shape": null,
+            "signal_type": "record",
+            "stale_policy": "warn"
+          },
+          "type": "record",
+          "value": {
+            "payload": {
+              "cache_dir": "${SOURCE_ROOT}/models-done/models-autodock-vina/labs/vina-autodock-vina-docking-predictor/.runtime/vina/downloads",
+              "error": "receptor_pdbqt_path input is required",
+              "runtime_bootstrapped": false,
+              "runtime_dir": "${SOURCE_ROOT}/models-done/models-autodock-vina/labs/vina-autodock-vina-docking-predictor/.runtime/vina",
+              "runtime_mode": "managed",
+              "status": "error",
+              "stderr": "",
+              "stdout": "",
+              "vina_version": "1.2.7"
+            }
+          }
+        },
+        "structure_artifacts": {
+          "emitted_at": 0.01,
+          "name": "structure_artifacts",
+          "source": "vina",
+          "spec": {
+            "accepted_profiles": null,
+            "description": null,
+            "dtype": null,
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": {
+              "payload": "json"
+            },
+            "shape": null,
+            "signal_type": "record",
+            "stale_policy": "warn"
+          },
+          "type": "record",
+          "value": {
+            "payload": {}
+          }
+        }
+      },
+      "source": "models-done/models-autodock-vina/labs/vina-autodock-vina-docking-predictor/models/core",
+      "state": {},
+      "visuals": []
+    },
+    {
+      "duration": 0.01,
+      "inputs": {
+        "ligand_description": {
+          "accepted_profiles": [
+            {
+              "accepted_units": null,
+              "description": null,
+              "dtype": null,
+              "schema": {
+                "payload": "json"
+              },
+              "shape": null,
+              "signal_type": "record"
+            },
+            {
+              "accepted_units": null,
+              "description": null,
+              "dtype": null,
+              "schema": null,
+              "shape": null,
+              "signal_type": "scalar"
+            }
+          ],
+          "description": null,
+          "dtype": null,
+          "emitted_unit": null,
+          "interpolation": "zoh",
+          "kind": "state",
+          "max_age": null,
+          "schema": {
+            "payload": "json"
+          },
+          "shape": null,
+          "signal_type": "record",
+          "stale_policy": "warn"
+        },
+        "protein_path": {
+          "accepted_profiles": [
+            {
+              "accepted_units": null,
+              "description": null,
+              "dtype": null,
+              "schema": {
+                "payload": "json"
+              },
+              "shape": null,
+              "signal_type": "record"
+            },
+            {
+              "accepted_units": null,
+              "description": null,
+              "dtype": null,
+              "schema": null,
+              "shape": null,
+              "signal_type": "scalar"
+            }
+          ],
+          "description": null,
+          "dtype": null,
+          "emitted_unit": null,
+          "interpolation": "zoh",
+          "kind": "state",
+          "max_age": null,
+          "schema": {
+            "payload": "json"
+          },
+          "shape": null,
+          "signal_type": "record",
+          "stale_policy": "warn"
+        },
+        "run_options": {
+          "accepted_profiles": [
+            {
+              "accepted_units": null,
+              "description": null,
+              "dtype": null,
+              "schema": {
+                "payload": "json"
+              },
+              "shape": null,
+              "signal_type": "record"
+            },
+            {
+              "accepted_units": null,
+              "description": null,
+              "dtype": null,
+              "schema": null,
+              "shape": null,
+              "signal_type": "scalar"
+            }
+          ],
+          "description": null,
+          "dtype": null,
+          "emitted_unit": null,
+          "interpolation": "zoh",
+          "kind": "state",
+          "max_age": null,
+          "schema": {
+            "payload": "json"
+          },
+          "shape": null,
+          "signal_type": "record",
+          "stale_policy": "warn"
+        }
+      },
+      "kind": "model",
+      "outputs": {
+        "confidence_summary": {
+          "accepted_profiles": null,
+          "description": null,
+          "dtype": null,
+          "emitted_unit": null,
+          "interpolation": "zoh",
+          "kind": "state",
+          "max_age": null,
+          "schema": {
+            "payload": "json"
+          },
+          "shape": null,
+          "signal_type": "record",
+          "stale_policy": "warn"
+        },
+        "pose_summary": {
+          "accepted_profiles": null,
+          "description": null,
+          "dtype": null,
+          "emitted_unit": null,
+          "interpolation": "zoh",
+          "kind": "state",
+          "max_age": null,
+          "schema": {
+            "payload": "json"
+          },
+          "shape": null,
+          "signal_type": "record",
+          "stale_policy": "warn"
+        },
+        "run_metadata": {
+          "accepted_profiles": null,
+          "description": null,
+          "dtype": null,
+          "emitted_unit": null,
+          "interpolation": "zoh",
+          "kind": "state",
+          "max_age": null,
+          "schema": {
+            "payload": "json"
+          },
+          "shape": null,
+          "signal_type": "record",
+          "stale_policy": "warn"
+        },
+        "structure_artifacts": {
+          "accepted_profiles": null,
+          "description": null,
+          "dtype": null,
+          "emitted_unit": null,
+          "interpolation": "zoh",
+          "kind": "state",
+          "max_age": null,
+          "schema": {
+            "payload": "json"
+          },
+          "shape": null,
+          "signal_type": "record",
+          "stale_policy": "warn"
+        }
+      },
+      "signals": {
+        "confidence_summary": {
+          "emitted_at": 0.01,
+          "name": "confidence_summary",
+          "source": "diffdock",
+          "spec": {
+            "accepted_profiles": null,
+            "description": null,
+            "dtype": null,
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": {
+              "payload": "json"
+            },
+            "shape": null,
+            "signal_type": "record",
+            "stale_policy": "warn"
+          },
+          "type": "record",
+          "value": {
+            "payload": {}
+          }
+        },
+        "pose_summary": {
+          "emitted_at": 0.01,
+          "name": "pose_summary",
+          "source": "diffdock",
+          "spec": {
+            "accepted_profiles": null,
+            "description": null,
+            "dtype": null,
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": {
+              "payload": "json"
+            },
+            "shape": null,
+            "signal_type": "record",
+            "stale_policy": "warn"
+          },
+          "type": "record",
+          "value": {
+            "payload": []
+          }
+        },
+        "run_metadata": {
+          "emitted_at": 0.01,
+          "name": "run_metadata",
+          "source": "diffdock",
+          "spec": {
+            "accepted_profiles": null,
+            "description": null,
+            "dtype": null,
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": {
+              "payload": "json"
+            },
+            "shape": null,
+            "signal_type": "record",
+            "stale_policy": "warn"
+          },
+          "type": "record",
+          "value": {
+            "payload": {
+              "cache_dir": "${SOURCE_ROOT}/models-done/models-diffdock/labs/diffdock-diffdockl-docking-predictor/.runtime/diffdock/cache",
+              "error": "protein_path input is required",
+              "repo_bootstrapped": false,
+              "requirements_file": "${SOURCE_ROOT}/models-done/models-diffdock/labs/diffdock-diffdockl-docking-predictor/models/core/requirements/runtime-gpu.txt",
+              "runtime_bootstrapped": false,
+              "runtime_dir": "${SOURCE_ROOT}/models-done/models-diffdock/labs/diffdock-diffdockl-docking-predictor/.runtime/diffdock",
+              "runtime_mode": "managed",
+              "runtime_setup_commands": [],
+              "status": "error",
+              "stderr": "",
+              "stdout": ""
+            }
+          }
+        },
+        "structure_artifacts": {
+          "emitted_at": 0.01,
+          "name": "structure_artifacts",
+          "source": "diffdock",
+          "spec": {
+            "accepted_profiles": null,
+            "description": null,
+            "dtype": null,
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": {
+              "payload": "json"
+            },
+            "shape": null,
+            "signal_type": "record",
+            "stale_policy": "warn"
+          },
+          "type": "record",
+          "value": {
+            "payload": {}
+          }
+        }
+      },
+      "source": "models-done/models-diffdock/labs/diffdock-diffdockl-docking-predictor/models/core",
+      "state": {},
+      "visuals": []
+    },
+    {
+      "duration": 0.01,
+      "inputs": {
+        "ligand_smiles": {
+          "accepted_profiles": [
+            {
+              "accepted_units": null,
+              "description": null,
+              "dtype": null,
+              "schema": {
+                "payload": "json"
+              },
+              "shape": null,
+              "signal_type": "record"
+            },
+            {
+              "accepted_units": null,
+              "description": null,
+              "dtype": null,
+              "schema": null,
+              "shape": null,
+              "signal_type": "scalar"
+            }
+          ],
+          "description": null,
+          "dtype": null,
+          "emitted_unit": null,
+          "interpolation": "zoh",
+          "kind": "state",
+          "max_age": null,
+          "schema": {
+            "payload": "json"
+          },
+          "shape": null,
+          "signal_type": "record",
+          "stale_policy": "warn"
+        },
+        "msa_path": {
+          "accepted_profiles": [
+            {
+              "accepted_units": null,
+              "description": null,
+              "dtype": null,
+              "schema": {
+                "payload": "json"
+              },
+              "shape": null,
+              "signal_type": "record"
+            },
+            {
+              "accepted_units": null,
+              "description": null,
+              "dtype": null,
+              "schema": null,
+              "shape": null,
+              "signal_type": "scalar"
+            }
+          ],
+          "description": null,
+          "dtype": null,
+          "emitted_unit": null,
+          "interpolation": "zoh",
+          "kind": "state",
+          "max_age": null,
+          "schema": {
+            "payload": "json"
+          },
+          "shape": null,
+          "signal_type": "record",
+          "stale_policy": "warn"
+        },
+        "protein_sequence": {
+          "accepted_profiles": [
+            {
+              "accepted_units": null,
+              "description": null,
+              "dtype": null,
+              "schema": {
+                "payload": "json"
+              },
+              "shape": null,
+              "signal_type": "record"
+            },
+            {
+              "accepted_units": null,
+              "description": null,
+              "dtype": null,
+              "schema": null,
+              "shape": null,
+              "signal_type": "scalar"
+            }
+          ],
+          "description": null,
+          "dtype": null,
+          "emitted_unit": null,
+          "interpolation": "zoh",
+          "kind": "state",
+          "max_age": null,
+          "schema": {
+            "payload": "json"
+          },
+          "shape": null,
+          "signal_type": "record",
+          "stale_policy": "warn"
+        },
+        "run_options": {
+          "accepted_profiles": [
+            {
+              "accepted_units": null,
+              "description": null,
+              "dtype": null,
+              "schema": {
+                "payload": "json"
+              },
+              "shape": null,
+              "signal_type": "record"
+            },
+            {
+              "accepted_units": null,
+              "description": null,
+              "dtype": null,
+              "schema": null,
+              "shape": null,
+              "signal_type": "scalar"
+            }
+          ],
+          "description": null,
+          "dtype": null,
+          "emitted_unit": null,
+          "interpolation": "zoh",
+          "kind": "state",
+          "max_age": null,
+          "schema": {
+            "payload": "json"
+          },
+          "shape": null,
+          "signal_type": "record",
+          "stale_policy": "warn"
+        }
+      },
+      "kind": "model",
+      "outputs": {
+        "affinity_summary": {
+          "accepted_profiles": null,
+          "description": "Parsed Boltz affinity summary for the latest run",
+          "dtype": null,
+          "emitted_unit": null,
+          "interpolation": "zoh",
+          "kind": "state",
+          "max_age": null,
+          "schema": {
+            "payload": "json"
+          },
+          "shape": null,
+          "signal_type": "record",
+          "stale_policy": "warn"
+        },
+        "confidence_summary": {
+          "accepted_profiles": null,
+          "description": "Parsed Boltz confidence summary for the top-ranked prediction",
+          "dtype": null,
+          "emitted_unit": null,
+          "interpolation": "zoh",
+          "kind": "state",
+          "max_age": null,
+          "schema": {
+            "payload": "json"
+          },
+          "shape": null,
+          "signal_type": "record",
+          "stale_policy": "warn"
+        },
+        "run_metadata": {
+          "accepted_profiles": null,
+          "description": "Execution metadata and captured logs for the latest Boltz invocation",
+          "dtype": null,
+          "emitted_unit": null,
+          "interpolation": "zoh",
+          "kind": "state",
+          "max_age": null,
+          "schema": {
+            "payload": "json"
+          },
+          "shape": null,
+          "signal_type": "record",
+          "stale_policy": "warn"
+        },
+        "structure_artifacts": {
+          "accepted_profiles": null,
+          "description": "Absolute paths to the latest Boltz output artifacts",
+          "dtype": null,
+          "emitted_unit": null,
+          "interpolation": "zoh",
+          "kind": "state",
+          "max_age": null,
+          "schema": {
+            "payload": "json"
+          },
+          "shape": null,
+          "signal_type": "record",
+          "stale_policy": "warn"
+        }
+      },
+      "signals": {
+        "affinity_summary": {
+          "emitted_at": 0.01,
+          "name": "affinity_summary",
+          "source": "Boltz2AffinityPredictor",
+          "spec": {
+            "accepted_profiles": null,
+            "description": "Parsed Boltz affinity summary for the latest run",
+            "dtype": null,
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": {
+              "payload": "json"
+            },
+            "shape": null,
+            "signal_type": "record",
+            "stale_policy": "warn"
+          },
+          "type": "record",
+          "value": {
+            "payload": {}
+          }
+        },
+        "confidence_summary": {
+          "emitted_at": 0.01,
+          "name": "confidence_summary",
+          "source": "Boltz2AffinityPredictor",
+          "spec": {
+            "accepted_profiles": null,
+            "description": "Parsed Boltz confidence summary for the top-ranked prediction",
+            "dtype": null,
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": {
+              "payload": "json"
+            },
+            "shape": null,
+            "signal_type": "record",
+            "stale_policy": "warn"
+          },
+          "type": "record",
+          "value": {
+            "payload": {}
+          }
+        },
+        "run_metadata": {
+          "emitted_at": 0.01,
+          "name": "run_metadata",
+          "source": "Boltz2AffinityPredictor",
+          "spec": {
+            "accepted_profiles": null,
+            "description": "Execution metadata and captured logs for the latest Boltz invocation",
+            "dtype": null,
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": {
+              "payload": "json"
+            },
+            "shape": null,
+            "signal_type": "record",
+            "stale_policy": "warn"
+          },
+          "type": "record",
+          "value": {
+            "payload": {
+              "command": null,
+              "cwd": null,
+              "error": "protein_sequence input is required",
+              "input_yaml_path": null,
+              "output_dir": null,
+              "runtime_bootstrapped": false,
+              "runtime_dir": "${SOURCE_ROOT}/models-done/models-boltz/labs/boltz-boltz2-affinity-predictor/.runtime/boltz2",
+              "runtime_mode": "managed",
+              "runtime_setup_commands": [],
+              "status": "error",
+              "stderr": "",
+              "stdout": ""
+            }
+          }
+        },
+        "structure_artifacts": {
+          "emitted_at": 0.01,
+          "name": "structure_artifacts",
+          "source": "Boltz2AffinityPredictor",
+          "spec": {
+            "accepted_profiles": null,
+            "description": "Absolute paths to the latest Boltz output artifacts",
+            "dtype": null,
+            "emitted_unit": null,
+            "interpolation": "zoh",
+            "kind": "state",
+            "max_age": null,
+            "schema": {
+              "payload": "json"
+            },
+            "shape": null,
+            "signal_type": "record",
+            "stale_policy": "warn"
+          },
+          "type": "record",
+          "value": {
+            "payload": {}
+          }
+        }
+      },
+      "source": "models-done/models-boltz/labs/boltz-boltz2-affinity-predictor/models/core",
+      "state": {},
+      "visuals": []
+    }
+  ]
+}

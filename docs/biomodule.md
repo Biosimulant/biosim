@@ -62,6 +62,43 @@ class Counter(biosim.BioModule):
         self.count = int(snapshot["count"])
 ```
 
+## Opt-in convenience bases
+
+`BioModule` stays intentionally small. Use it directly when a model needs full
+control over timing, solver state, or emitted signal construction.
+
+For common adapter patterns, `biosim.modules` also provides:
+
+- `SignalEmitterBioModule`: owns `_outputs`, resolves the emitted `source` from
+  `_world_name`, wraps raw values into typed signals with `make_signal()`, and
+  implements `get_outputs()`.
+- `StatefulBioModule`: extends `SignalEmitterBioModule` with `_time`,
+  `_input_overrides`, bounded `_history`, fixed-step `advance_window()`, and
+  hooks for `apply_overrides()`, `step()`, `record_state()`, and
+  `output_payload()`.
+
+These classes are convenience layers, not a replacement contract. External
+modules can continue to subclass `BioModule` directly.
+
+```python
+class Counter(biosim.StatefulBioModule):
+    def __init__(self) -> None:
+        super().__init__(integration_step=0.1, record_initial_state=True)
+        self.count = 0
+
+    def outputs(self):
+        return {"count": biosim.SignalSpec.scalar(dtype="int64")}
+
+    def step(self, h: float) -> None:
+        self.count += 1
+
+    def record_state(self, t: float) -> None:
+        self._history.append({"t": t, "count": self.count})
+
+    def output_payload(self, t: float):
+        return {"count": self.count}
+```
+
 ## Notes
 
 - The world binds `_world_name` on registered modules so emitted signals can use the registered module name as their source.

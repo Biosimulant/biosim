@@ -7,6 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import copy
 import json
+import math
 from typing import Any, Literal, Mapping, Optional
 
 try:  # pragma: no cover - optional dependency
@@ -96,6 +97,56 @@ def _normalize_array_value(value: Any, dtype: Optional[str]) -> Any:
     if not isinstance(value, list):
         raise TypeError("array signals require list/tuple/ndarray-like values")
     return copy.deepcopy(value)
+
+
+def unwrap_payload(value: Any, *, max_depth: int = 1) -> Any:
+    """Return the payload carried by a signal-like object or payload envelope.
+
+    The default preserves the local helper behavior used by model packs: unwrap
+    one exact ``{"payload": value}`` carrier and leave all other mappings alone.
+    Increase ``max_depth`` only when nested payload envelopes are intentional.
+    """
+
+    if max_depth < 0:
+        raise ValueError("max_depth must be non-negative")
+
+    if hasattr(value, "value") and hasattr(value, "emitted_at"):
+        value = getattr(value, "value")
+
+    for _ in range(max_depth):
+        if isinstance(value, Mapping) and set(value.keys()) == {"payload"}:
+            value = value["payload"]
+        else:
+            break
+    return value
+
+
+def coerce_float(
+    value: Any,
+    *,
+    keys: tuple[str, ...] = ("value", "count", "payload"),
+    reject_nan: bool = True,
+) -> float | None:
+    """Coerce scalar-ish signal payloads to ``float``.
+
+    Accepts plain numeric values, typed signal objects, exact payload envelopes,
+    and record-style mappings containing the first matching key from ``keys``.
+    Invalid values return ``None`` instead of raising.
+    """
+
+    value = unwrap_payload(value)
+    if isinstance(value, Mapping):
+        for key in keys:
+            if key in value:
+                value = value[key]
+                break
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if reject_nan and math.isnan(number):
+        return None
+    return number
 
 
 @dataclass(frozen=True)
@@ -445,6 +496,28 @@ def validate_connection_specs(source: SignalSpec, target: SignalSpec) -> None:
         )
     if target.interpolation == "linear" and not source.is_numeric:
         raise ValueError("linear interpolation requires a numeric source signal")
+
+
+def scalar_or_record_input(unit: str, description: str, *, dtype: str = "float64") -> SignalSpec:
+    """Create the common scalar-or-``{"payload": ...}`` input declaration."""
+
+    return SignalSpec.scalar(
+        dtype=dtype,
+        accepted_profiles=(
+            AcceptedSignalProfile(
+                signal_type="scalar",
+                dtype=dtype,
+                accepted_units=(unit,),
+                description=description,
+            ),
+            AcceptedSignalProfile(
+                signal_type="record",
+                schema={"payload": "json"},
+                description=description,
+            ),
+        ),
+        description=description,
+    )
 
 
 class BioSignal:
@@ -811,3 +884,57 @@ class EventSignal(BioSignal):
             emitted_at=float(data["emitted_at"]),
             spec=spec,
         )
+
+
+def _schema_type(value: Any) -> str:
+    if isinstance(value, bool):
+        return "bool"
+    if isinstance(value, int) and not isinstance(value, bool):
+        return "int"
+    if isinstance(value, float):
+        return "float"
+    if isinstance(value, str):
+        return "str"
+    return "json"
+
+
+def make_signal(
+    spec: SignalSpec | Mapping[str, Any] | None = None,
+    *,
+    source: str,
+    name: str,
+    value: Any,
+    emitted_at: float,
+) -> BioSignal:
+    """Construct the typed signal class matching ``spec.signal_type``.
+
+    When ``spec`` is omitted, the helper infers the same simple record/scalar
+    shapes used by generated model-pack boilerplate.
+    """
+
+    if isinstance(spec, Mapping):
+        spec = SignalSpec.from_dict(spec)
+    if spec is None:
+        if isinstance(value, Mapping):
+            spec = SignalSpec.record(schema={str(key): _schema_type(item) for key, item in value.items()})
+        elif isinstance(value, (list, tuple)):
+            spec = SignalSpec.record(schema={"payload": "json"})
+        else:
+            spec = SignalSpec.scalar(dtype=_schema_type(value))
+
+    if spec.signal_type == "scalar":
+        return ScalarSignal(source=source, name=name, value=value, emitted_at=emitted_at, spec=spec)
+    if spec.signal_type == "array":
+        return ArraySignal(source=source, name=name, value=value, emitted_at=emitted_at, spec=spec)
+    if spec.signal_type == "event":
+        event_value = value
+        if spec.schema is not None and not (
+            isinstance(value, Mapping) and set(value.keys()) == set(spec.schema.keys())
+        ):
+            event_value = {"payload": value}
+        return EventSignal(source=source, name=name, value=event_value, emitted_at=emitted_at, spec=spec)
+
+    record_value = value
+    if not isinstance(value, Mapping) or set(value.keys()) != set((spec.schema or {}).keys()):
+        record_value = {"payload": value}
+    return RecordSignal(source=source, name=name, value=dict(record_value), emitted_at=emitted_at, spec=spec)

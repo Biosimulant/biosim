@@ -174,6 +174,11 @@ models:
 `biosim pack build path/to/lab` always emits a self-contained `.bsilab`. The packaged
 payload preserves the runnable source tree exactly as it exists on disk under `payload/`.
 
+Lab-local visualisation modules should remain inside each lab when portability is
+the goal. If several labs intentionally carry byte-identical visualisation code,
+keep those copies local and use a drift check in repository maintenance rather
+than introducing a shared runtime import path.
+
 Nested `models[]` and `children[]` must use relative `path` refs only. Nested executable
 `package`, `version`, `model_id`, `lab_id`, `hub_model_id`, and `hub_lab_id` are invalid.
 

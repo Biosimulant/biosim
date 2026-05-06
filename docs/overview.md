@@ -7,6 +7,11 @@ biosim is a modular biological simulation library. It centers around four ideas:
 - **BioSignal**: typed data exchanged between modules over named ports. Each signal carries `source`, `name`, `value`, `emitted_at`, and a bound `SignalSpec`.
 - **SimUI**: a lightweight web UI layer for running, visualizing, and editing simulations from the browser, backed by FastAPI + a React SPA.
 
+`BioModule` is the minimal full-control interface. Authors who want less adapter
+boilerplate can opt into `SignalEmitterBioModule` for output wrapping or
+`StatefulBioModule` for fixed-step state/history handling. Those subclasses are
+helpers, not required architecture.
+
 ## Event flow (typical)
 - STARTED -> STEP x N -> FINISHED
 - PAUSED, RESUMED, STOPPED, and ERROR may be emitted depending on runtime control flow.
@@ -30,6 +35,9 @@ biosim is a modular biological simulation library. It centers around four ideas:
 ## Standard-agnostic by design
 - Biomodules are self-contained Python packages and may wrap external simulators internally.
 - The core focuses on orchestration, wiring contracts, and visualization.
+- Optional contrib bases such as `biosim.contrib.sbml.TelluriumSBMLBioModule`
+  keep heavy simulator imports lazy and leave domain-specific visuals or
+  payloads in the model wrapper.
 
 ## Beachhead domains
 - **Neuroscience**: single neuron + small E/I microcircuits + Hodgkin-Huxley with strong visuals (raster, firing rate, Vm traces) and reproducible configs.

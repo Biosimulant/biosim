@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 from .__about__ import __version__
 from .world import BioWorld, WorldEvent
-from .modules import BioModule
+from .modules import BioModule, SignalEmitterBioModule, StatefulBioModule
 from .signals import (
     AcceptedSignalProfile,
     ArraySignal,
@@ -18,6 +18,10 @@ from .signals import (
     RecordSignal,
     ScalarSignal,
     SignalSpec,
+    coerce_float,
+    make_signal,
+    scalar_or_record_input,
+    unwrap_payload,
     validate_connection_specs,
     validate_port_spec_direction,
 )
@@ -50,6 +54,8 @@ __all__ = [
     "validate_visual_spec",
     "normalize_visuals",
     "BioModule",
+    "SignalEmitterBioModule",
+    "StatefulBioModule",
     "BioSignal",
     "AcceptedSignalProfile",
     "ScalarSignal",
@@ -57,6 +63,10 @@ __all__ = [
     "RecordSignal",
     "EventSignal",
     "SignalSpec",
+    "unwrap_payload",
+    "coerce_float",
+    "scalar_or_record_input",
+    "make_signal",
     "validate_connection_specs",
     "validate_port_spec_direction",
     "WiringBuilder",
