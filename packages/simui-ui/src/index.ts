@@ -17,6 +17,7 @@ export { default as SimuiMainContent } from "./components/MainContent";
 export { default as SimuiSidebar } from "./components/Sidebar";
 export { default as SimuiEventsLogsPanel } from "./components/EventsLogsPanel";
 export { default as SimuiDescriptionPanel } from "./components/DescriptionPanel";
+export { default as DesktopLabShell } from "./components/DesktopLabShell";
 
 export { createSimuiApi } from "./lib/api";
 export type {
@@ -50,4 +51,11 @@ export type {
   Snapshot,
 } from "./types/api";
 
-export type { ChatMessageRole, ChatMessage, ChatThread, ChatAdapter } from "./types/chat";
+export type {
+  ThemeMode,
+  ResolvedTheme,
+  CenterView,
+  RunPanelTab,
+  DesktopLabShellState,
+  ServeRunHistoryEntry,
+} from "./types/shell";

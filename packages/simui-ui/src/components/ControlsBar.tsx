@@ -102,11 +102,11 @@ export default function ControlsBar({
         {st?.running && progress.simTime !== null && (
           <span className="controls-bar-simtime">{formatDuration(progress.simTime)}</span>
         )}
-        {st?.running && progress.progressPct !== null && (
+        {st?.running && (
           <div className="controls-bar-progress" title="Simulation-time progress">
             <span className="controls-bar-progress-label">{progress.progressLabel}</span>
             <div className="sim-progress-track controls-bar-progress-track" aria-hidden="true">
-              <div className="sim-progress-fill" style={{ width: `${progress.progressPct}%` }} />
+              <div className="sim-progress-fill" style={{ width: `${progress.progressPct ?? 0}%` }} />
             </div>
           </div>
         )}

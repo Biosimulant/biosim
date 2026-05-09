@@ -10,12 +10,11 @@ const ModulePalette: React.FC<ModulePaletteProps> = ({ registry, onDragStart }) 
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['neuro', 'ecology']))
   const [search, setSearch] = useState('')
 
-  // Dark theme colors
-  const bg = '#0f1628'
-  const surface = '#11182b'
-  const text = '#e6eaf2'
-  const muted = '#9aa6c1'
-  const border = '#1e2a44'
+  const bg = 'var(--surface-deep)'
+  const surface = 'var(--surface)'
+  const text = 'var(--text)'
+  const muted = 'var(--muted)'
+  const border = 'var(--border)'
 
   if (!registry) {
     return (
@@ -37,8 +36,8 @@ const ModulePalette: React.FC<ModulePaletteProps> = ({ registry, onDragStart }) 
 
   const categoryColors: Record<string, string> = {
     neuro: 'var(--primary)',
-    ecology: '#22c55e',
-    custom: '#a855f7',
+    ecology: 'var(--success)',
+    custom: 'var(--accent-2)',
   }
 
   const filteredCategories = Object.entries(registry.categories).map(([category, paths]) => {

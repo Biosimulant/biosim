@@ -21,11 +21,10 @@ const ModuleNode: React.FC<NodeProps> = ({ data, selected }) => {
   // Determine category for color coding
   const category = moduleType.includes('.neuro.') ? 'neuro' : moduleType.includes('.ecology.') ? 'ecology' : 'custom'
 
-  // Dark theme colors matching globals.css
   const categoryColors: Record<string, { bg: string; border: string; header: string; text: string }> = {
-    neuro: { bg: 'var(--primary-bg)', border: 'var(--primary)', header: 'var(--primary-dark)', text: 'var(--primary-text)' },
-    ecology: { bg: '#14352a', border: '#22c55e', header: '#16a34a', text: '#dcfce7' },
-    custom: { bg: '#2e1a47', border: '#a855f7', header: '#9333ea', text: '#f3e8ff' },
+    neuro: { bg: 'var(--module-neuro-bg)', border: 'var(--module-neuro-border)', header: 'var(--module-neuro-header)', text: 'var(--module-neuro-text)' },
+    ecology: { bg: 'var(--module-ecology-bg)', border: 'var(--module-ecology-border)', header: 'var(--module-ecology-header)', text: 'var(--module-ecology-text)' },
+    custom: { bg: 'var(--module-custom-bg)', border: 'var(--module-custom-border)', header: 'var(--module-custom-header)', text: 'var(--module-custom-text)' },
   }
 
   const colors = categoryColors[category]
@@ -35,10 +34,10 @@ const ModuleNode: React.FC<NodeProps> = ({ data, selected }) => {
       className="module-node"
       style={{
         background: colors.bg,
-        border: `2px solid ${selected ? '#fbbf24' : colors.border}`,
-        borderRadius: '10px',
+        border: `2px solid ${selected ? 'var(--warning)' : colors.border}`,
+        borderRadius: '8px',
         minWidth: '180px',
-        boxShadow: selected ? '0 0 0 2px #fbbf24' : '0 4px 16px rgba(0,0,0,0.5)',
+        boxShadow: selected ? '0 0 0 2px color-mix(in srgb, var(--warning) 45%, transparent)' : '0 8px 18px rgba(15, 23, 42, 0.16)',
         fontFamily: 'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
       }}
     >
@@ -48,7 +47,7 @@ const ModuleNode: React.FC<NodeProps> = ({ data, selected }) => {
           background: colors.header,
           color: '#fff',
           padding: '10px 14px',
-          borderRadius: '8px 8px 0 0',
+          borderRadius: '6px 6px 0 0',
           fontWeight: 600,
           fontSize: '14px',
           letterSpacing: '0.01em',
@@ -83,8 +82,8 @@ const ModuleNode: React.FC<NodeProps> = ({ data, selected }) => {
                 style={{
                   width: '12px',
                   height: '12px',
-                  background: '#6b7280',
-                  border: '2px solid var(--primary-bg)',
+                  background: 'var(--muted)',
+                  border: '2px solid var(--surface)',
                   left: '-6px',
                 }}
               />
@@ -92,7 +91,7 @@ const ModuleNode: React.FC<NodeProps> = ({ data, selected }) => {
             </div>
           ))}
           {inputs.length === 0 && (
-            <div style={{ paddingLeft: '14px', fontSize: '12px', color: '#9aa6c1', fontStyle: 'italic' }}>
+              <div style={{ paddingLeft: '14px', fontSize: '12px', color: 'var(--muted)', fontStyle: 'italic' }}>
               no inputs
             </div>
           )}
@@ -111,14 +110,14 @@ const ModuleNode: React.FC<NodeProps> = ({ data, selected }) => {
                   width: '12px',
                   height: '12px',
                   background: colors.header,
-                  border: '2px solid var(--primary-bg)',
+                  border: '2px solid var(--surface)',
                   right: '-6px',
                 }}
               />
             </div>
           ))}
           {outputs.length === 0 && (
-            <div style={{ paddingRight: '14px', fontSize: '12px', color: '#9aa6c1', fontStyle: 'italic' }}>
+              <div style={{ paddingRight: '14px', fontSize: '12px', color: 'var(--muted)', fontStyle: 'italic' }}>
               no outputs
             </div>
           )}

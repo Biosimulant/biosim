@@ -18,13 +18,12 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   onDeleteNode,
   onRenameNode,
 }) => {
-  // Dark theme colors
-  const bg = '#0f1628'
-  const surface = '#11182b'
-  const text = '#e6eaf2'
-  const muted = '#9aa6c1'
-  const border = '#1e2a44'
-  const accent = '#22d3ee'
+  const bg = 'var(--surface-deep)'
+  const surface = 'var(--surface)'
+  const text = 'var(--text)'
+  const muted = 'var(--muted)'
+  const border = 'var(--border)'
+  const accent = 'var(--primary)'
 
   if (!selectedNode) {
     return (
@@ -121,7 +120,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 
         {/* Module Description */}
         {moduleSpec?.description && (
-          <div style={{ marginBottom: '18px', padding: '10px', background: '#0c2135', borderRadius: '8px', fontSize: '12px', color: accent, border: `1px solid ${border}` }}>
+          <div style={{ marginBottom: '18px', padding: '10px', background: 'color-mix(in srgb, var(--primary) 10%, transparent)', borderRadius: '8px', fontSize: '12px', color: accent, border: `1px solid ${border}` }}>
             {moduleSpec.description.split('\n')[0]}
           </div>
         )}
@@ -141,7 +140,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', marginBottom: '6px', color: muted }}>
                   <span style={{ fontWeight: 500, color: text }}>{arg.name}</span>
                   <span style={{ color: muted }}>({arg.type})</span>
-                  {arg.required && <span style={{ color: '#ef4444' }}>*</span>}
+                  {arg.required && <span style={{ color: 'var(--danger)' }}>*</span>}
                 </label>
 
                 {inputType === 'checkbox' ? (
@@ -230,10 +229,10 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
           style={{
             width: '100%',
             padding: '10px',
-            background: '#3b1c1c',
-            border: '1px solid #7f1d1d',
+            background: 'color-mix(in srgb, var(--danger) 10%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)',
             borderRadius: '8px',
-            color: '#fca5a5',
+            color: 'var(--danger)',
             fontSize: '13px',
             fontWeight: 500,
             cursor: 'pointer',

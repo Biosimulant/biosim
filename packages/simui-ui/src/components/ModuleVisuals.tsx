@@ -6,6 +6,10 @@ import Table from '../renderers/Table'
 import ImageView from '../renderers/ImageView'
 import Graph from '../renderers/Graph'
 import TextView from '../renderers/TextView'
+import Scatter from '../renderers/Scatter'
+import Heatmap from '../renderers/Heatmap'
+import Structure3D from '../renderers/Structure3D'
+import RawJson from '../renderers/RawJson'
 
 const RENDERERS: Record<string, React.ComponentType<{ data: any; isFullscreen?: boolean }>> = {
   timeseries: Timeseries,
@@ -14,6 +18,11 @@ const RENDERERS: Record<string, React.ComponentType<{ data: any; isFullscreen?: 
   image: ImageView,
   graph: Graph,
   text: TextView,
+  scatter: Scatter,
+  heatmap: Heatmap,
+  structure3d: Structure3D,
+  json: RawJson,
+  raw: RawJson,
 }
 
 function FullscreenButton({ isFullscreen, onClick }: { isFullscreen: boolean; onClick: () => void }) {
@@ -71,13 +80,11 @@ function VisualizationCard({ visual, index }: { visual: VisualSpec; index: numbe
     return (
       <div className="visualization-card error">
         <div className="card-header">
-          <h4 className="card-title">Unknown Renderer</h4>
+          <h4 className="card-title">Raw Visualization</h4>
           <span className="card-type error">{visual.render}</span>
         </div>
         <div className="card-content">
-          <div className="error-message">
-            <p>Renderer type "{visual.render}" is not supported.</p>
-          </div>
+          <RawJson data={visual.data} />
         </div>
       </div>
     )

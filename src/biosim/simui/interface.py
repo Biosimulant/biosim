@@ -330,6 +330,13 @@ class Interface:
                 "controls": controls,
                 "outputs": outputs,
                 "modules": modules,
+                "capabilities": {
+                    "controls": True,
+                    "run": True,
+                    "pauseResume": True,
+                    "reset": True,
+                    "editor": self._config_path is not None,
+                },
             }
 
         @router.post("/api/run")
