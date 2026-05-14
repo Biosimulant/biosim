@@ -13,6 +13,11 @@ runtime:
   communication_step: 0.1
 ```
 
+`communication_step` controls how often modules exchange committed signals. A
+separate lab/package runtime may also declare `duration` and optional
+`settle_steps`; `settle_steps` gives downstream report/export/visualisation
+modules zero-time turns after the requested simulation duration.
+
 ## Module declarations
 
 Each module is either:

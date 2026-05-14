@@ -46,6 +46,7 @@ Tip: Import the library as `import biosim`.
 
 ## Architecture Overview (Brief)
 - Orchestration: `BioWorld` advances modules across shared communication windows and routes typed signals between committed boundaries.
+- Final propagation: `BioWorld.settle(steps)` performs opt-in zero-time downstream communication turns after a run; it is for report/export/visualisation modules that consume final outputs and must not advance simulation time.
 - Events: `WorldEvent` published by `BioWorld`; subscribe via `world.on(...)`.
 - Modules: implement the runnable `BioModule` contract and add with `world.add_biomodule(...)`.
 

@@ -109,6 +109,11 @@ class Accumulator(BioModule):
 
     def get_outputs(self):
         return {"total": ScalarSignal(source="acc", name="total", value=self.total, emitted_at=0.1, spec=self.outputs()["total"])}
+
+    def visualize(self):
+        if self.total <= 0:
+            return None
+        return {"render": "table", "data": {"rows": [{"total": self.total}]}}
 """.strip() + "\n",
         encoding="utf-8",
     )
@@ -348,6 +353,9 @@ def test_lab_build_embeds_models_and_runs_without_registry(tmp_path: Path):
     assert (unpacked / "payload" / "models" / "accumulator" / "model.yaml").exists()
     result = run_package(lab_pkg, install_deps=False)
     assert result["package"] == "local/source-lab"
+    assert result["duration"] == pytest.approx(0.2)
+    assert result["communication_step"] == pytest.approx(0.1)
+    assert result["settle_steps"] == 0
     assert result["modules"] == [
         {
             "alias": "counter",
@@ -372,6 +380,40 @@ def test_export_lab_alias_embeds_models(tmp_path: Path):
     assert validation.valid
     result = run_package(exported, install_deps=False)
     assert result["package"] == "local/source-lab"
+
+
+def test_lab_package_run_settles_final_visuals(tmp_path: Path):
+    lab_dir = _write_lab(tmp_path / "lab")
+    (lab_dir / "lab.yaml").write_text(
+        """
+schema_version: "2.0"
+title: "Test: Settled Lab"
+description: "Final propagation lab"
+models:
+  - path: models/counter
+    alias: counter
+  - path: models/accumulator
+    alias: accumulator
+runtime:
+  communication_step: 0.1
+  duration: 0.1
+  settle_steps: 1
+  initial_inputs: {}
+wiring:
+  - from: counter.count
+    to: [accumulator.value]
+""".strip() + "\n",
+        encoding="utf-8",
+    )
+
+    package_path = build_package(
+        lab_dir, package_name="local/settled-lab", version="1.0.0"
+    )
+    result = run_package(package_path, install_deps=False)
+
+    assert result["communication_step"] == pytest.approx(0.1)
+    assert result["settle_steps"] == 1
+    assert result["visuals"][0]["module"] == "accumulator"
 
 
 def test_lab_build_ignores_generated_files(tmp_path: Path):

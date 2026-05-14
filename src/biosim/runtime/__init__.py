@@ -12,7 +12,7 @@ from __future__ import annotations
 from .coercion import coerce_typed_inputs
 from .entrypoint import flush_package_cache, load_entrypoint
 from .flatten import flatten_lab_tree, lab_io_from_mapping
-from .runtime_config import extract_communication_step
+from .runtime_config import extract_communication_step, extract_settle_steps
 from .types import (
     FlattenedLab,
     LabTree,
@@ -33,6 +33,7 @@ __all__ = [
     "LabTreeWire",
     "coerce_typed_inputs",
     "extract_communication_step",
+    "extract_settle_steps",
     "flatten_lab_tree",
     "flush_package_cache",
     "lab_io_from_mapping",

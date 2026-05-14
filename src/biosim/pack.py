@@ -23,6 +23,7 @@ from .runtime import (
     LabTreeWire,
     coerce_typed_inputs,
     extract_communication_step,
+    extract_settle_steps,
     flatten_lab_tree,
     lab_io_from_mapping,
     load_entrypoint,
@@ -1153,6 +1154,7 @@ def _run_lab_loaded_package(
         else runtime
     )
     duration = float(effective_runtime.get("duration", 1.0))
+    settle_steps = extract_settle_steps(None, effective_runtime, error_cls=PackageError)
     world.setup(setup_config)
     initial_inputs = (
         effective_runtime.get("initial_inputs")
@@ -1174,10 +1176,14 @@ def _run_lab_loaded_package(
             )
         )
     world.run(duration=duration)
+    if settle_steps:
+        world.settle(settle_steps)
     return {
         "package": loaded.package_yaml["package"],
         "version": loaded.package_yaml["version"],
         "duration": duration,
+        "communication_step": communication_step,
+        "settle_steps": settle_steps,
         "modules": resolved_models,
         "visuals": world.collect_visuals(),
     }
@@ -1353,6 +1359,7 @@ def _validate_lab_manifest(manifest: Mapping[str, Any]) -> None:
         raise PackageError(
             "Lab manifest runtime.communication_step must be numeric"
         ) from exc
+    extract_settle_steps(None, runtime, error_cls=PackageError)
 
 
 __all__ = [

@@ -116,6 +116,164 @@ def test_run_zero_duration_is_no_op(biosim):
     assert world.current_time == 0.0
 
 
+def test_settle_propagates_final_outputs_without_advancing_time(biosim):
+    scalar = _scalar_spec(biosim)
+
+    class Producer(biosim.BioModule):
+        def __init__(self):
+            self.calls = 0
+            self._outputs = {}
+
+        def outputs(self):
+            return {"x": scalar}
+
+        def advance_window(self, _start, end):
+            self.calls += 1
+            self._outputs = {
+                "x": biosim.ScalarSignal(source="producer", name="x", value=42.0, emitted_at=end)
+            }
+
+        def get_outputs(self):
+            return dict(self._outputs)
+
+    class Visual(biosim.BioModule):
+        def __init__(self):
+            self.received = None
+            self.windows = []
+
+        def inputs(self):
+            return {"x": scalar}
+
+        def set_inputs(self, signals):
+            if "x" in signals:
+                self.received = signals["x"].value
+
+        def advance_window(self, start, end):
+            self.windows.append((start, end))
+
+        def get_outputs(self):
+            return {}
+
+        def visualize(self):
+            if self.received is None:
+                return None
+            return {"render": "table", "data": {"rows": [{"value": self.received}]}}
+
+    producer = Producer()
+    visual = Visual()
+    world = BioWorld(communication_step=0.1)
+    world.add_biomodule("producer", producer)
+    world.add_biomodule("visual", visual)
+    world.connect("producer.x", "visual.x")
+
+    world.run(duration=0.1)
+
+    assert world.current_time == pytest.approx(0.1)
+    assert producer.calls == 1
+    assert world.collect_visuals() == []
+
+    world.settle(1)
+
+    assert world.current_time == pytest.approx(0.1)
+    assert producer.calls == 1
+    assert visual.windows[-1] == (pytest.approx(0.1), pytest.approx(0.1))
+    assert world.collect_visuals()[0]["module"] == "visual"
+
+
+def test_settle_steps_propagate_one_graph_hop_each(biosim):
+    scalar = _scalar_spec(biosim)
+
+    class Producer(biosim.BioModule):
+        def __init__(self):
+            self._outputs = {}
+
+        def outputs(self):
+            return {"x": scalar}
+
+        def advance_window(self, _start, end):
+            self._outputs = {
+                "x": biosim.ScalarSignal(source="producer", name="x", value=2.0, emitted_at=end)
+            }
+
+        def get_outputs(self):
+            return dict(self._outputs)
+
+    class Doubler(biosim.BioModule):
+        def __init__(self):
+            self.input_value = None
+            self._outputs = {}
+
+        def inputs(self):
+            return {"x": scalar}
+
+        def outputs(self):
+            return {"y": scalar}
+
+        def set_inputs(self, signals):
+            if "x" in signals:
+                self.input_value = signals["x"].value
+
+        def advance_window(self, _start, end):
+            if self.input_value is not None:
+                self._outputs = {
+                    "y": biosim.ScalarSignal(
+                        source="doubler",
+                        name="y",
+                        value=self.input_value * 2.0,
+                        emitted_at=end,
+                    )
+                }
+
+        def get_outputs(self):
+            return dict(self._outputs)
+
+    class Visual(biosim.BioModule):
+        def __init__(self):
+            self.received = None
+
+        def inputs(self):
+            return {"y": scalar}
+
+        def set_inputs(self, signals):
+            if "y" in signals:
+                self.received = signals["y"].value
+
+        def advance_window(self, _start, _end):
+            return
+
+        def get_outputs(self):
+            return {}
+
+        def visualize(self):
+            if self.received is None:
+                return None
+            return {"render": "table", "data": {"rows": [{"value": self.received}]}}
+
+    world = BioWorld(communication_step=0.1)
+    world.add_biomodule("producer", Producer())
+    world.add_biomodule("doubler", Doubler())
+    world.add_biomodule("visual", Visual())
+    world.connect("producer.x", "doubler.x")
+    world.connect("doubler.y", "visual.y")
+
+    world.run(duration=0.1)
+    world.settle(1)
+    assert world.collect_visuals() == []
+
+    world.settle(1)
+    visuals = world.collect_visuals()
+    assert visuals[0]["module"] == "visual"
+    assert visuals[0]["visuals"][0]["data"]["rows"][0]["value"] == 4.0
+
+
+@pytest.mark.parametrize("steps", [-1, 1.5, True])
+def test_settle_rejects_invalid_steps(biosim, steps):
+    world = BioWorld(communication_step=0.1)
+    world.add_biomodule("m", _make_module(biosim))
+    with pytest.raises((TypeError, ValueError)):
+        world.settle(steps)
+
+
 def test_run_auto_setup_and_tick_payloads(biosim):
     events = []
     world = BioWorld(communication_step=0.1)

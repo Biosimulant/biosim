@@ -19,6 +19,12 @@ class BioWorld:
 - Outputs are committed atomically at the end boundary.
 - Tied-time behavior is order-independent by design; the kernel has no execution-order scheduling contract.
 
+Outputs produced during a window become visible to downstream modules at the next
+communication boundary. For workflow-style graphs that end immediately after a
+producer emits final outputs, call `settle(steps)` after `run(duration)` to give
+downstream modules explicit zero-time communication turns. Settling is opt-in and
+does not advance simulation time.
+
 ## Key methods
 
 - `on(listener)` / `off(listener)`
@@ -26,6 +32,7 @@ class BioWorld:
 - `connect("src.port", "dst.port")`
 - `setup(config=None)`
 - `run(duration)`
+- `settle(steps=1)`
 - `request_pause()` / `request_resume()` / `request_stop()`
 - `snapshot()` / `restore(snapshot)` / `branch()`
 - `get_outputs(name)`

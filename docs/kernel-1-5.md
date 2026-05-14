@@ -22,6 +22,23 @@ For each window `[t, t + communication_step]`:
 
 This means closed loops are modeled as sampled-data coupling at communication boundaries. Rollback, algebraic-loop solving, and FMI negotiation are explicit non-goals for this version.
 
+## Final settle turns
+
+`BioWorld.run(duration)` stops at the requested simulation time. Outputs produced
+at the final boundary are committed, but downstream modules only observe them on
+a later communication turn. `BioWorld.settle(steps)` provides those turns without
+advancing simulation time:
+
+1. start from the outputs published at the last committed boundary
+2. schedule only modules downstream of those outputs
+3. deliver their current committed inputs
+4. call `advance_window(current_time, current_time)`
+5. commit any new outputs as the next propagation frontier
+
+Use this for report, export, or visualisation modules that should consume final
+producer outputs after the scientific duration has completed. The default runtime
+behavior is unchanged unless a runner explicitly calls `settle()`.
+
 ## Typed signals
 
 The communication-step kernel defines a closed signal family:

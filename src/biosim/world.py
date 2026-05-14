@@ -61,6 +61,7 @@ class BioWorld:
         self._modules: Dict[str, ModuleEntry] = {}
         self._connections_by_target: Dict[str, List[Connection]] = {}
         self._signal_store: Dict[str, Dict[str, BioSignal]] = {}
+        self._last_published_refs: set[tuple[str, str]] = set()
         self._current_time: float = 0.0
         self._is_setup: bool = False
         self._listeners: List[Listener] = []
@@ -194,6 +195,7 @@ class BioWorld:
         config = config or {}
         self._setup_config = {name: dict(module_cfg or {}) for name, module_cfg in config.items()}
         self._signal_store = {}
+        self._last_published_refs = set()
         self._current_time = 0.0
         for connections in self._connections_by_target.values():
             for conn in connections:
@@ -336,6 +338,11 @@ class BioWorld:
                 for name, outputs in pending_outputs.items():
                     self._commit_outputs(name, outputs)
 
+                self._last_published_refs = {
+                    (name, port)
+                    for name, outputs in pending_outputs.items()
+                    for port in outputs.keys()
+                }
                 self._current_time = window_end
 
                 self._emit(
@@ -361,6 +368,56 @@ class BioWorld:
             self._active_run_start = None
             self._active_run_end = None
 
+    def settle(self, steps: int = 1) -> None:
+        """Propagate final committed outputs through downstream modules.
+
+        Settling performs zero-time communication turns after a run. It is
+        opt-in and does not advance simulated time.
+        """
+        if isinstance(steps, bool) or not isinstance(steps, int):
+            raise TypeError("settle steps must be an integer")
+        if steps < 0:
+            raise ValueError("settle steps must be non-negative")
+        if steps == 0:
+            return
+        if not self._is_setup:
+            self.setup()
+
+        frontier = set(self._last_published_refs)
+        for _ in range(steps):
+            if not frontier:
+                break
+
+            target_names = {
+                conn.target_module
+                for conns in self._connections_by_target.values()
+                for conn in conns
+                if (conn.source_module, conn.source_signal) in frontier
+            }
+            if not target_names:
+                break
+
+            pending_outputs: Dict[str, Dict[str, BioSignal]] = {}
+            window_time = self._current_time
+            for name, entry in self._modules.items():
+                if name not in target_names:
+                    continue
+                inputs = self._collect_inputs(name, window_time)
+                if inputs:
+                    entry.module.set_inputs(inputs)
+                entry.module.advance_window(window_time, window_time)
+                pending_outputs[name] = self._normalize_outputs(name, entry.module.get_outputs() or {})
+
+            for name, outputs in pending_outputs.items():
+                self._commit_outputs(name, outputs)
+
+            frontier = {
+                (name, port)
+                for name, outputs in pending_outputs.items()
+                for port in outputs.keys()
+            }
+            self._last_published_refs = set(frontier)
+
     # --- Cooperative controls ----------------------------------------
     def request_stop(self) -> None:
         self._stop_requested = True
@@ -385,6 +442,10 @@ class BioWorld:
                 module_name: {port: signal.to_dict() for port, signal in outputs.items()}
                 for module_name, outputs in self._signal_store.items()
             },
+            "last_published_refs": [
+                {"module": module_name, "port": port}
+                for module_name, port in sorted(self._last_published_refs)
+            ],
             "connections": {
                 target: [
                     {
@@ -431,6 +492,11 @@ class BioWorld:
                 for port, signal_dict in outputs.items()
             }
         self._signal_store = signal_store
+        self._last_published_refs = {
+            (str(ref["module"]), str(ref["port"]))
+            for ref in snapshot.get("last_published_refs", [])
+            if isinstance(ref, Mapping) and ref.get("module") and ref.get("port")
+        }
 
         snapshot_connections = snapshot.get("connections", {})
         if not isinstance(snapshot_connections, Mapping):

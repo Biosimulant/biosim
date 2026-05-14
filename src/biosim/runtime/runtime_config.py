@@ -46,3 +46,52 @@ def extract_communication_step(
     if communication_step <= 0:
         _raise(error_cls, "communication_step must be positive")
     return communication_step
+
+
+def extract_settle_steps(
+    sim_cfg: Mapping[str, Any] | None = None,
+    runtime: Mapping[str, Any] | None = None,
+    *,
+    fallback: int | float | str | None = 0,
+    error_cls: type[Exception] = RuntimeError,
+) -> int:
+    """Resolve optional final graph propagation turns using platform precedence."""
+
+    runtime = runtime if isinstance(runtime, Mapping) else {}
+    sim_cfg = sim_cfg if isinstance(sim_cfg, Mapping) else {}
+    runtime_override = (
+        sim_cfg.get("runtime") if isinstance(sim_cfg.get("runtime"), Mapping) else {}
+    )
+
+    raw_value = runtime_override.get("settle_steps")
+    if raw_value is None:
+        raw_value = sim_cfg.get("settle_steps")
+    if raw_value is None:
+        raw_value = runtime.get("settle_steps")
+    if raw_value is None:
+        raw_value = fallback
+    if raw_value is None:
+        raw_value = 0
+
+    if isinstance(raw_value, bool):
+        _raise(error_cls, "settle_steps must be an integer")
+    try:
+        if isinstance(raw_value, float):
+            if not raw_value.is_integer():
+                _raise(error_cls, "settle_steps must be an integer")
+            settle_steps = int(raw_value)
+        elif isinstance(raw_value, int):
+            settle_steps = raw_value
+        elif isinstance(raw_value, str):
+            stripped = raw_value.strip()
+            if not stripped:
+                _raise(error_cls, "settle_steps must be an integer")
+            settle_steps = int(stripped, 10)
+        else:
+            _raise(error_cls, "settle_steps must be an integer")
+    except ValueError as exc:
+        _raise(error_cls, "settle_steps must be an integer", exc)
+
+    if settle_steps < 0:
+        _raise(error_cls, "settle_steps must be non-negative")
+    return settle_steps

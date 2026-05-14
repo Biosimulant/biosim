@@ -47,6 +47,7 @@ Package execution uses the provisional `biosim.runtime` helpers for behavior tha
 - entrypoints are loaded from the model directory with file-spec loading when possible, so multiple models can each use a `src/` namespace-style layout in one process
 - `runtime.initial_inputs` are coerced into typed `BioSignal` objects against each module's declared `inputs()`
 - `communication_step` is resolved using the same precedence chain as platform executors: runtime override, simulation config, base runtime, then explicit fallback
+- `settle_steps` is resolved with the same runtime precedence and defaults to `0`
 - nested child labs are flattened with canonical alias scoping and `io.maps_to` remapping
 
 The `biosim.runtime` API is public but provisional for this minor release.
@@ -178,6 +179,12 @@ Lab-local visualisation modules should remain inside each lab when portability i
 the goal. If several labs intentionally carry byte-identical visualisation code,
 keep those copies local and use a drift check in repository maintenance rather
 than introducing a shared runtime import path.
+
+If a lab has downstream report, export, or visualisation modules that consume
+outputs produced at the final simulation boundary, set `runtime.settle_steps` to
+the number of extra graph hops needed. One direct producer-to-visualisation edge
+usually needs `settle_steps: 1`; a producer-to-postprocessor-to-visualisation
+chain needs `settle_steps: 2`. Settling does not extend simulated time.
 
 Nested `models[]` and `children[]` must use relative `path` refs only. Nested executable
 `package`, `version`, `model_id`, `lab_id`, `hub_model_id`, and `hub_lab_id` are invalid.
