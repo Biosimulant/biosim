@@ -421,6 +421,9 @@ def test_lab_build_ignores_generated_files(tmp_path: Path):
     (lab_dir / ".DS_Store").write_text("junk", encoding="utf-8")
     (lab_dir / "dist").mkdir(exist_ok=True)
     (lab_dir / "dist" / "old.bsilab").write_text("junk", encoding="utf-8")
+    experiment_dir = lab_dir / ".biosimulant" / "experiments" / "exp-test"
+    experiment_dir.mkdir(parents=True, exist_ok=True)
+    (experiment_dir / "experiment.json").write_text("{}", encoding="utf-8")
     pycache_dir = lab_dir / "models" / "counter" / "__pycache__"
     pycache_dir.mkdir(exist_ok=True)
     (pycache_dir / "counter.cpython-311.pyc").write_bytes(b"junk")
@@ -431,6 +434,7 @@ def test_lab_build_ignores_generated_files(tmp_path: Path):
     unpacked = unpack_package(package_path, dest=tmp_path / "lab-unpacked")
 
     assert not (unpacked / "payload" / ".DS_Store").exists()
+    assert not (unpacked / "payload" / ".biosimulant").exists()
     assert not (unpacked / "payload" / "dist").exists()
     assert not (unpacked / "payload" / "models" / "counter" / "__pycache__").exists()
 
