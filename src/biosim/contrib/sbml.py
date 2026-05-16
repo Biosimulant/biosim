@@ -10,6 +10,7 @@ import xml.etree.ElementTree as ET
 
 from biosim.modules import StatefulBioModule
 from biosim.signals import (
+    AcceptedSignalProfile,
     BioSignal,
     RecordSignal,
     ScalarSignal,
@@ -104,6 +105,7 @@ class TelluriumSBMLBioModule(StatefulBioModule):
     _SBML_ID = ""
     _TITLE = "Tellurium SBML Model"
     _PARAMETER_INPUTS: Mapping[str, ParameterInput] = {}
+    _INITIAL_CONDITION_INPUTS: Mapping[str, ParameterInput] = {}
     _MULTIPLIER_INPUTS: Mapping[str, MultiplierInput] = {}
     _HEADLINE_OUTPUTS: Mapping[str, HeadlineOutput] = {}
     _TIME_UNIT = "s"
@@ -112,6 +114,17 @@ class TelluriumSBMLBioModule(StatefulBioModule):
     _NON_BIOLOGICAL_OBSERVABLES: set[str] = {"dummy"}
     _HEADLINE_EMIT_UNITS = False
     _BIOSIM_SUBCLASS_FILE: str | None = None
+    _OBSERVABLES: list[str] | None = None
+    _SPECIES_LABELS: Mapping[str, str] = {}
+    _STATE_OUTPUT_ALIASES: Mapping[str, str] = {}
+    _ENABLE_PARAMETER_OVERRIDES = False
+    _ENABLE_INITIAL_CONDITIONS = False
+    _STATE_OUTPUT_AS_PAYLOAD = False
+    _SPECIES_LABELS_OUTPUT_AS_PAYLOAD = False
+    _EXPOSE_INTEGRATION_STEP_INPUT = True
+    _STATE_OUTPUT_NAME = "state"
+    _SUMMARY_OUTPUT_NAME = "summary"
+    _SPECIES_LABELS_OUTPUT_NAME = "species_labels"
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
@@ -137,6 +150,8 @@ class TelluriumSBMLBioModule(StatefulBioModule):
         self._model_path = (base_dir / model_path).resolve()
         self._runner: Any = None
         self._observables, _, _ = self._discover_observables_from_xml()
+        if self._OBSERVABLES is not None:
+            self._observables = list(self._OBSERVABLES)
         self._initial_values: dict[str, float] = {}
         self._history: list[dict[str, float]] = []
         self._patches_applied: list[tuple[str, str]] = []
@@ -152,6 +167,9 @@ class TelluriumSBMLBioModule(StatefulBioModule):
         observables, _, _ = self._discover_observables_from_xml()
         if observables:
             self._observables = observables
+        if self._OBSERVABLES is not None:
+            self._observables = list(self._OBSERVABLES)
+        self.apply_overrides(reset_initial_state=True)
         self._initial_values = self._read_observables()
         self._time = 0.0
         self._history = [{"t": 0.0, **self._initial_values}]
@@ -165,25 +183,49 @@ class TelluriumSBMLBioModule(StatefulBioModule):
         self.clear_outputs()
         if self._runner is not None:
             self._capture_multiplier_baselines()
+            self.apply_overrides(reset_initial_state=True)
             self._initial_values = self._read_observables()
             self._history = [{"t": 0.0, **self._initial_values}]
             self.publish_outputs(0.0)
 
     def inputs(self) -> dict[str, SignalSpec]:
-        specs = {
-            "integration_step": scalar_or_record_input(
+        specs = {}
+        if self._EXPOSE_INTEGRATION_STEP_INPUT:
+            specs["integration_step"] = scalar_or_record_input(
                 self._TIME_UNIT,
                 "Output sampling step for the tellurium simulator.",
-            ),
-        }
+            )
         for name, (_sbml, _default, units, description) in self._PARAMETER_INPUTS.items():
+            specs[name] = scalar_or_record_input(units, description)
+        for name, (_sbml, _default, units, description) in self._INITIAL_CONDITION_INPUTS.items():
             specs[name] = scalar_or_record_input(units, description)
         for name, (_targets, _default, units, description) in self._MULTIPLIER_INPUTS.items():
             specs[name] = scalar_or_record_input(units, description)
+        if self._ENABLE_PARAMETER_OVERRIDES:
+            specs["parameter_overrides"] = SignalSpec.record(
+                schema={"payload": "json"},
+                accepted_profiles=(
+                    AcceptedSignalProfile(signal_type="record", schema={"payload": "json"}),
+                ),
+                description="Map of SBML global parameter name to override value.",
+            )
+        if self._ENABLE_INITIAL_CONDITIONS:
+            specs["initial_conditions"] = SignalSpec.record(
+                schema={"payload": "json"},
+                accepted_profiles=(
+                    AcceptedSignalProfile(signal_type="record", schema={"payload": "json"}),
+                ),
+                description="Map of SBML species or state variable ID to initial value override.",
+            )
         return specs
 
     def outputs(self) -> dict[str, SignalSpec]:
-        state_schema = {name: "float" for name in self._observables} or {"payload": "json"}
+        state_names = [self._public_observable_name(name) for name in self._observables]
+        state_schema = (
+            {"payload": "json"}
+            if self._STATE_OUTPUT_AS_PAYLOAD
+            else ({name: "float" for name in state_names} or {"payload": "json"})
+        )
         summary_schema = {
             "duration_simulated": "float",
             "observable_count": "int",
@@ -193,15 +235,24 @@ class TelluriumSBMLBioModule(StatefulBioModule):
             "peak_value": "float",
         }
         specs = {
-            "state": SignalSpec.record(
+            self._STATE_OUTPUT_NAME: SignalSpec.record(
                 schema=state_schema,
                 description=f"Latest value of every observable ({self._OBSERVABLE_STRATEGY} variables).",
             ),
-            "summary": SignalSpec.record(
+            self._SUMMARY_OUTPUT_NAME: SignalSpec.record(
                 schema=summary_schema,
                 description="Final, peak, and minimum value per observable plus simulated duration.",
             ),
         }
+        if self._SPECIES_LABELS:
+            specs[self._SPECIES_LABELS_OUTPUT_NAME] = SignalSpec.record(
+                schema=(
+                    {"payload": "json"}
+                    if self._SPECIES_LABELS_OUTPUT_AS_PAYLOAD
+                    else {self._public_observable_name(name): "str" for name in self._SPECIES_LABELS}
+                ),
+                description="Static map of public observable key to human-friendly label.",
+            )
         aux_schema = self.visualisation_aux_schema()
         if aux_schema is not None:
             specs["visualisation_aux"] = SignalSpec.record(
@@ -235,6 +286,7 @@ class TelluriumSBMLBioModule(StatefulBioModule):
 
         if self._runner is None:
             self.setup()
+            self.apply_overrides(reset_initial_state=False)
 
         target = float(end)
         if target <= self._time:
@@ -255,22 +307,41 @@ class TelluriumSBMLBioModule(StatefulBioModule):
         latest = self._history[-1]
         source = self.source_name()
         specs = self.outputs()
+        state_output_name = self._STATE_OUTPUT_NAME
+        summary_output_name = self._SUMMARY_OUTPUT_NAME
+        species_labels_output_name = self._SPECIES_LABELS_OUTPUT_NAME
         outputs: dict[str, BioSignal] = {
-            "state": RecordSignal(
+            state_output_name: RecordSignal(
                 source=source,
-                name="state",
-                value={name: latest.get(name, 0.0) for name in self._observables},
+                name=state_output_name,
+                value=(
+                    {"payload": self._public_state_values(latest)}
+                    if self._STATE_OUTPUT_AS_PAYLOAD
+                    else self._public_state_values(latest)
+                ),
                 emitted_at=float(t),
-                spec=specs["state"],
+                spec=specs[state_output_name],
             ),
-            "summary": RecordSignal(
+            summary_output_name: RecordSignal(
                 source=source,
-                name="summary",
+                name=summary_output_name,
                 value=self._compute_summary(t),
                 emitted_at=float(t),
-                spec=specs["summary"],
+                spec=specs[summary_output_name],
             ),
         }
+        if self._SPECIES_LABELS and species_labels_output_name in specs:
+            outputs[species_labels_output_name] = RecordSignal(
+                source=source,
+                name=species_labels_output_name,
+                value=(
+                    {"payload": self._public_species_labels()}
+                    if self._SPECIES_LABELS_OUTPUT_AS_PAYLOAD
+                    else self._public_species_labels()
+                ),
+                emitted_at=float(t),
+                spec=specs[species_labels_output_name],
+            )
         aux_payload = self.visualisation_aux_payload(t, latest)
         if aux_payload is not None and "visualisation_aux" in specs:
             outputs["visualisation_aux"] = RecordSignal(
@@ -309,6 +380,25 @@ class TelluriumSBMLBioModule(StatefulBioModule):
                 self._runner[sbml_id] = float(number)
             except (KeyError, ValueError, TypeError, RuntimeError):
                 pass
+        apply_named_initials = reset_initial_state or float(getattr(self, "_time", 0.0)) <= 0.0
+        named_initial_applied = False
+        if apply_named_initials:
+            for input_name, (sbml_id, _default, _units, _description) in self._INITIAL_CONDITION_INPUTS.items():
+                signal = self._input_overrides.get(input_name)
+                if signal is None:
+                    continue
+                number = coerce_float(unwrap_payload(signal), keys=("value", "payload"))
+                if number is None:
+                    continue
+                try:
+                    self._runner[sbml_id] = float(number)
+                    named_initial_applied = True
+                except (KeyError, ValueError, TypeError, RuntimeError):
+                    pass
+        if named_initial_applied and float(getattr(self, "_time", 0.0)) <= 0.0:
+            self._initial_values = self._read_observables()
+            if self._history:
+                self._history = [{"t": 0.0, **self._initial_values}]
         for input_name, (sbml_ids, _default, _units, _description) in self._MULTIPLIER_INPUTS.items():
             signal = self._input_overrides.get(input_name)
             if signal is None:
@@ -324,6 +414,30 @@ class TelluriumSBMLBioModule(StatefulBioModule):
                     self._runner[sbml_id] = float(base) * float(number)
                 except (KeyError, ValueError, TypeError, RuntimeError):
                     pass
+        if self._ENABLE_PARAMETER_OVERRIDES:
+            signal = self._input_overrides.get("parameter_overrides")
+            value = unwrap_payload(signal) if signal is not None else None
+            if isinstance(value, Mapping):
+                for sbml_id, raw in value.items():
+                    number = coerce_float(raw, keys=("value", "payload"))
+                    if number is None:
+                        continue
+                    try:
+                        self._runner[str(sbml_id)] = float(number)
+                    except (KeyError, ValueError, TypeError, RuntimeError):
+                        pass
+        if self._ENABLE_INITIAL_CONDITIONS:
+            signal = self._input_overrides.get("initial_conditions")
+            value = unwrap_payload(signal) if signal is not None else None
+            if isinstance(value, Mapping):
+                for sbml_id, raw in value.items():
+                    number = coerce_float(raw, keys=("value", "payload"))
+                    if number is None:
+                        continue
+                    try:
+                        self._runner[str(sbml_id)] = float(number)
+                    except (KeyError, ValueError, TypeError, RuntimeError):
+                        pass
 
     def _capture_multiplier_baselines(self) -> None:
         self._param_baselines = {}
@@ -345,15 +459,16 @@ class TelluriumSBMLBioModule(StatefulBioModule):
         ns = root.tag.split("}")[0].strip("{") if "}" in root.tag else None
         if not ns:
             return [], {}, {}
-        suffix_species = "}species"
-        suffix_rate = "}rateRule"
-        suffix_param = "}parameter"
+
+        def is_sbml_element(element: ET.Element, local_name: str) -> bool:
+            return element.tag == "{" + ns + "}" + local_name
+
         observables: list[str] = []
         units: dict[str, Optional[str]] = {}
         display: dict[str, str] = {}
         if self._OBSERVABLE_STRATEGY == "species":
             for element in root.iter():
-                if element.tag.endswith(suffix_species):
+                if is_sbml_element(element, "species"):
                     species_id = element.attrib.get("id")
                     sbo = element.attrib.get("sboTerm", "")
                     if (
@@ -369,13 +484,13 @@ class TelluriumSBMLBioModule(StatefulBioModule):
         else:
             param_names: dict[str, str] = {}
             for element in root.iter():
-                if element.tag.endswith(suffix_param):
+                if is_sbml_element(element, "parameter"):
                     param_id = element.attrib.get("id")
                     param_name = element.attrib.get("name")
                     if param_id and param_name and param_name != param_id:
                         param_names[param_id] = param_name
             for element in root.iter():
-                if element.tag.endswith(suffix_rate):
+                if is_sbml_element(element, "rateRule"):
                     variable = element.attrib.get("variable")
                     if variable and variable not in self._NON_BIOLOGICAL_OBSERVABLES:
                         observables.append(variable)
@@ -383,9 +498,8 @@ class TelluriumSBMLBioModule(StatefulBioModule):
                         if variable in param_names:
                             display[variable] = param_names[variable]
             if not observables:
-                suffix_assign = "}assignmentRule"
                 for element in root.iter():
-                    if element.tag.endswith(suffix_assign):
+                    if is_sbml_element(element, "assignmentRule"):
                         variable = element.attrib.get("variable")
                         if variable and variable not in self._NON_BIOLOGICAL_OBSERVABLES:
                             observables.append(variable)
@@ -402,6 +516,21 @@ class TelluriumSBMLBioModule(StatefulBioModule):
             except (KeyError, ValueError, TypeError, RuntimeError):
                 values[name] = 0.0
         return values
+
+    def _public_observable_name(self, raw_name: str) -> str:
+        return str(self._STATE_OUTPUT_ALIASES.get(raw_name, raw_name))
+
+    def _public_state_values(self, latest: Mapping[str, float]) -> dict[str, float]:
+        return {
+            self._public_observable_name(name): latest.get(name, 0.0)
+            for name in self._observables
+        }
+
+    def _public_species_labels(self) -> dict[str, str]:
+        return {
+            self._public_observable_name(name): label
+            for name, label in self._SPECIES_LABELS.items()
+        }
 
     def visualisation_aux_schema(self) -> Mapping[str, str] | None:
         """Return an optional lab-local visualisation payload schema.
@@ -470,9 +599,9 @@ class TelluriumSBMLBioModule(StatefulBioModule):
         return {
             "duration_simulated": float(t),
             "observable_count": len(self._observables),
-            "largest_change_observable": biggest_change,
+            "largest_change_observable": self._public_observable_name(biggest_change),
             "largest_change_magnitude": float(changes[biggest_change]),
-            "peak_observable": biggest_peak,
+            "peak_observable": self._public_observable_name(biggest_peak),
             "peak_value": float(peaks[biggest_peak]),
         }
 
