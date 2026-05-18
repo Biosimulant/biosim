@@ -160,7 +160,28 @@ def _manifest_fingerprint(manifest: Mapping[str, Any]) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+_LEGACY_LOGICAL_HASH_WARNING = (
+    "package.yaml sha256 uses a legacy logical hash that includes "
+    ".biosimulant-project.json"
+)
+
+
 def _logical_hash(entries: Mapping[str, bytes]) -> str:
+    digest = hashlib.sha256()
+    for name in sorted(entries):
+        if (
+            name in {"package.yaml", "integrity/sha256sums.txt"}
+            or Path(name).name == ".biosimulant-project.json"
+        ):
+            continue
+        digest.update(name.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(entries[name])
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def _legacy_logical_hash_with_project_metadata(entries: Mapping[str, bytes]) -> str:
     digest = hashlib.sha256()
     for name in sorted(entries):
         if name in {"package.yaml", "integrity/sha256sums.txt"}:
@@ -547,9 +568,12 @@ def validate_package(path: str | Path) -> PackageValidationResult:
             actual_logical_hash = _logical_hash(entries)
             declared_hash = package_yaml.get("sha256")
             if declared_hash and declared_hash != actual_logical_hash:
-                raise PackageError(
-                    "Logical package hash does not match package.yaml sha256"
-                )
+                legacy_logical_hash = _legacy_logical_hash_with_project_metadata(entries)
+                if declared_hash != legacy_logical_hash:
+                    raise PackageError(
+                        "Logical package hash does not match package.yaml sha256"
+                    )
+                result.warnings.append(_LEGACY_LOGICAL_HASH_WARNING)
 
             manifest = _safe_yaml_load(entries[entry_manifest])
             package_type = package_yaml.get("package_type")

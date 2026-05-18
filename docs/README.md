@@ -11,6 +11,8 @@ Welcome to the biosim documentation. This guide explains the core concepts, APIs
   - [BioModule](biomodule.md): module interface, lifecycle, port metadata, visualization
   - [Wiring](wiring.md): WiringBuilder, `build_from_spec`, and YAML/TOML loaders
   - [Configuration](config.md): how to write wiring files
+- Optional contrib runtimes:
+  - [CellML runtime](cellml.md): libCellML-backed CellML parsing, codegen, SciPy integration, and wrapper migration guidance
 - [Example: Eye → LGN → SC pipeline](brain_pipeline.md)
 - [Neuro packs](neuro.md): computational neuroscience modules (Izhikevich, Hodgkin-Huxley, Poisson input, synapses, monitors) — lives in the companion [`models`](https://github.com/Biosimulant/models) repo
 - [Plugin Development](plugin-development.md): creating and distributing custom biomodules

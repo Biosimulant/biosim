@@ -91,9 +91,13 @@ ui = [
 ml = [
   "onnxruntime>=1.18",
 ]
+cellml = [
+  "libcellml>=0.6.3,<0.7",
+  "scipy>=1.11,<2",
+]
 # Everything
 all = [
-  "biosim[dev,ui,ml]",
+  "biosim[dev,ui,ml,cellml]",
 ]
 
 [tool.hatch.build]

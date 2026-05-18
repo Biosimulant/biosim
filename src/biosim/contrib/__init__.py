@@ -6,4 +6,4 @@ specific contrib module you need instead of relying on eager package imports.
 
 from __future__ import annotations
 
-__all__ = ["sbml"]
+__all__ = ["cellml", "sbml"]

@@ -382,6 +382,34 @@ def test_export_lab_alias_embeds_models(tmp_path: Path):
     assert result["package"] == "local/source-lab"
 
 
+def test_export_lab_package_ignores_project_metadata_in_logical_hash(tmp_path: Path):
+    lab_dir = _write_lab(tmp_path / "lab")
+    metadata_path = lab_dir / ".biosimulant-project.json"
+    metadata_path.write_text('{"hub_id":"old"}\n', encoding="utf-8")
+    first = export_lab_package(
+        lab_dir,
+        output_path=tmp_path / "first.bsilab",
+        package_name="local/source-lab",
+        version="1.0.0",
+    )
+    first_validation = validate_package(first)
+    assert first_validation.valid
+
+    metadata_path.write_text(
+        '{"hub_id":"new","last_synced_at":"2026-05-15T00:00:00Z"}\n',
+        encoding="utf-8",
+    )
+    second = export_lab_package(
+        lab_dir,
+        output_path=tmp_path / "second.bsilab",
+        package_name="local/source-lab",
+        version="1.0.0",
+    )
+    second_validation = validate_package(second)
+    assert second_validation.valid
+    assert second_validation.metadata["sha256"] == first_validation.metadata["sha256"]
+
+
 def test_lab_package_run_settles_final_visuals(tmp_path: Path):
     lab_dir = _write_lab(tmp_path / "lab")
     (lab_dir / "lab.yaml").write_text(

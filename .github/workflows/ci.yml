@@ -50,6 +50,22 @@ jobs:
         run: |
           pytest -q
 
+  test-cellml:
+    runs-on: ubuntu-latest
+    needs: [public-boundary, secret-scan]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install CellML dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[dev,cellml]'
+      - name: Run CellML tests
+        run: |
+          pytest -q tests/test_cellml_contrib.py
+
   build-package:
     runs-on: ubuntu-latest
     needs: [public-boundary, secret-scan]
