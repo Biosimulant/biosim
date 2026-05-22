@@ -1186,8 +1186,13 @@ def _run_lab_loaded_package(
         if isinstance(effective_runtime.get("initial_inputs"), Mapping)
         else {}
     )
+    allow_global_inputs = len(modules_by_alias) == 1
     for alias, module in modules_by_alias.items():
-        alias_inputs = _select_alias_override(initial_inputs, alias)
+        alias_inputs = _select_alias_override(
+            initial_inputs,
+            alias,
+            allow_global=allow_global_inputs,
+        )
         if not alias_inputs:
             continue
         declared_inputs = module.inputs() if isinstance(module.inputs(), dict) else {}
@@ -1219,16 +1224,22 @@ def _scoped_ref(prefix: str, ref: str) -> str:
 
 
 def _select_alias_override(
-    payload: Mapping[str, Any] | None, alias: str
+    payload: Mapping[str, Any] | None,
+    alias: str,
+    *,
+    allow_global: bool = False,
 ) -> dict[str, Any]:
     if not isinstance(payload, Mapping):
         return {}
+    overrides = payload.get(alias)
+    if not allow_global:
+        return dict(overrides) if isinstance(overrides, Mapping) else {}
+
     global_values = {
         key: value
         for key, value in payload.items()
         if key != alias and not isinstance(value, Mapping)
     }
-    overrides = payload.get(alias)
     if isinstance(overrides, Mapping):
         merged = dict(global_values)
         merged.update(dict(overrides))

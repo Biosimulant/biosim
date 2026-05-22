@@ -26,6 +26,15 @@ MultiplierInput = tuple[list[str], float, str, str]
 HeadlineOutput = tuple[str, str, str]
 
 
+def read_sbml_text(path: Path) -> str:
+    """Read SBML XML with a conservative fallback for legacy BioModels files."""
+
+    try:
+        return path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        return path.read_text(encoding="latin-1")
+
+
 def patch_uninitialised_parameters(xml_text: str) -> tuple[str, list[tuple[str, str]]]:
     """Repair SBML parameters without initial values before Tellurium loads them."""
 
@@ -160,7 +169,7 @@ class TelluriumSBMLBioModule(StatefulBioModule):
     def setup(self, config: Optional[dict[str, Any]] = None) -> None:
         import tellurium as te
 
-        xml_text = self._model_path.read_text()
+        xml_text = read_sbml_text(self._model_path)
         patched_text, self._patches_applied = patch_uninitialised_parameters(xml_text)
         self._runner = te.loadSBMLModel(patched_text if self._patches_applied else str(self._model_path))
         self._capture_multiplier_baselines()

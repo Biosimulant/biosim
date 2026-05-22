@@ -405,6 +405,7 @@ class LibCellMLBioModule(StatefulBioModule):
     _EXPOSE_INTEGRATION_STEP_INPUT = True
     _ENABLE_PARAMETER_OVERRIDES = False
     _ENABLE_INITIAL_CONDITIONS = False
+    _TIME_ROW_KEY = "t"
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
@@ -725,13 +726,22 @@ class LibCellMLBioModule(StatefulBioModule):
             self._variables[self._variable_names.index(name)] = float(value)
 
     def _value_for_name(self, name: str, row: Mapping[str, float] | None = None) -> float:
-        if row is not None and name in row:
-            return float(row[name])
+        if row is not None:
+            row_key = self._row_key(name)
+            if row_key in row:
+                return float(row[row_key])
+            if name in row:
+                return float(row[name])
         if name in self._state_names:
             return float(self._states[self._state_names.index(name)])
         if name in self._variable_names:
             return float(self._variables[self._variable_names.index(name)])
         return 0.0
+
+    def _row_key(self, source_name: str) -> str:
+        if source_name == self._TIME_ROW_KEY:
+            return f"cellml:{source_name}"
+        return source_name
 
     def _simulate_window(self, start: float, end: float) -> list[dict[str, float]]:
         if self._generated is None:
@@ -769,16 +779,16 @@ class LibCellMLBioModule(StatefulBioModule):
             row = self._row_from_values(float(t), states, variables)
             rows.append(row)
         if rows:
-            self._states = [rows[-1].get(name, 0.0) for name in self._state_names]
+            self._states = [self._value_for_name(name, rows[-1]) for name in self._state_names]
             self._variables = self._generated.variables_at(float(rows[-1]["t"]), self._states, self._variables)
         return rows
 
     def _row_from_values(self, t: float, states: list[float], variables: list[float]) -> dict[str, float]:
         row = {"t": float(t)}
         for name, value in zip(self._state_names, states):
-            row[name] = float(value)
+            row[self._row_key(name)] = float(value)
         for name, value in zip(self._variable_names, variables):
-            row[name] = float(value)
+            row[self._row_key(name)] = float(value)
         return row
 
     def _current_row(self, t: float) -> dict[str, float]:
@@ -790,7 +800,7 @@ class LibCellMLBioModule(StatefulBioModule):
         return str(self._STATE_OUTPUT_ALIASES.get(raw_name, raw_name))
 
     def _public_state_values(self, latest: Mapping[str, float]) -> dict[str, float]:
-        return {self._public_observable_name(name): float(latest.get(name, 0.0)) for name in self._observables}
+        return {self._public_observable_name(name): self._value_for_name(name, latest) for name in self._observables}
 
     def _public_variable_labels(self) -> dict[str, str]:
         return {
@@ -810,9 +820,12 @@ class LibCellMLBioModule(StatefulBioModule):
             }
         first = self._history[0]
         last = self._history[-1]
-        changes = {name: abs(last.get(name, 0.0) - first.get(name, 0.0)) for name in self._observables}
+        changes = {
+            name: abs(self._value_for_name(name, last) - self._value_for_name(name, first))
+            for name in self._observables
+        }
         biggest_change = max(changes, key=changes.get)
-        peaks = {name: max(point.get(name, 0.0) for point in self._history) for name in self._observables}
+        peaks = {name: max(self._value_for_name(name, point) for point in self._history) for name in self._observables}
         biggest_peak = max(peaks, key=peaks.get)
         return {
             "duration_simulated": float(t),
@@ -825,10 +838,11 @@ class LibCellMLBioModule(StatefulBioModule):
 
     def _headline_value(self, source_id: str, latest: Mapping[str, float], t: float) -> float:
         window_start = float(t) - self._HEADLINE_WINDOW_S
+        row_key = self._row_key(source_id)
         values = [
-            row[source_id]
+            row[row_key]
             for row in self._history
-            if source_id in row and float(row.get("t", 0.0)) >= window_start
+            if row_key in row and float(row.get("t", 0.0)) >= window_start
         ]
         if values:
             return sum(values) / len(values)

@@ -75,6 +75,37 @@ def _fake_solver(rhs, span, y0, *, t_eval):
     return _FakeSolverResult()
 
 
+def _fake_generated_module_with_time_variable() -> types.SimpleNamespace:
+    module = types.SimpleNamespace()
+    module.STATE_INFO = [{"name": "x", "component": "main", "units": "dimensionless"}]
+    module.VARIABLE_INFO = [{"name": "t", "component": "main", "units": "second"}]
+    module.STATE_COUNT = 1
+    module.VARIABLE_COUNT = 1
+
+    def create_states_array() -> list[float]:
+        return [0.0]
+
+    def create_variables_array() -> list[float]:
+        return [0.0]
+
+    def initialise_states_and_constants(states: list[float], variables: list[float]) -> None:
+        states[0] = 1.0
+        variables[0] = 99.0
+
+    def compute_rates(t: float, states: list[float], rates: list[float], variables: list[float]) -> None:
+        rates[0] = -float(states[0])
+
+    def compute_variables(t: float, states: list[float], rates: list[float], variables: list[float]) -> None:
+        variables[0] = 10.0 + float(t)
+
+    module.create_states_array = create_states_array
+    module.create_variables_array = create_variables_array
+    module.initialise_states_and_constants = initialise_states_and_constants
+    module.compute_rates = compute_rates
+    module.compute_variables = compute_variables
+    return module
+
+
 def test_importing_cellml_contrib_does_not_import_optional_dependencies(monkeypatch) -> None:
     monkeypatch.delitem(sys.modules, "libcellml", raising=False)
     monkeypatch.delitem(sys.modules, "scipy", raising=False)
@@ -277,6 +308,30 @@ def test_advance_window_publishes_typed_cellml_signals(tmp_path) -> None:
     assert outputs["summary"].value["largest_change_observable"] == "y"
     assert outputs["variable_labels"].value == {"state_x": "main.x", "y": "main.y"}
     assert outputs["mean_state_x"].value == pytest.approx((1.0 + 0.5 + 0.25) / 3.0)
+
+
+def test_source_variable_named_t_does_not_clobber_simulation_time(tmp_path) -> None:
+    model_file = tmp_path / "model.cellml"
+    model_file.write_text("<model />")
+
+    class Wrapper(LibCellMLBioModule):
+        _OBSERVABLES = ["x", "t"]
+
+    wrapper = Wrapper(
+        str(model_file),
+        integration_step=0.5,
+        generated_module=_fake_generated_module_with_time_variable(),
+        solver=_fake_solver,
+    )
+    wrapper.advance_window(0.0, 1.0)
+
+    outputs = wrapper.get_outputs()
+
+    assert outputs["state"].emitted_at == 1.0
+    assert outputs["summary"].value["duration_simulated"] == 1.0
+    assert outputs["state"].value == {"x": 0.25, "t": 11.0}
+    assert wrapper._history[-1]["t"] == 1.0
+    assert wrapper._history[-1]["cellml:t"] == 11.0
 
 
 def test_parameter_and_initial_condition_inputs_apply_before_integration(tmp_path) -> None:
