@@ -283,6 +283,20 @@ def test_generated_code_adapter_reports_missing_required_functions() -> None:
         GeneratedCellMLModel(types.SimpleNamespace())
 
 
+def test_declared_cellml_observables_shape_outputs_before_setup(tmp_path) -> None:
+    model_file = tmp_path / "model.cellml"
+    model_file.write_text("<model />")
+
+    class Wrapper(LibCellMLBioModule):
+        _OBSERVABLES = ["x", "y"]
+        _STATE_OUTPUT_ALIASES = {"x": "state_x"}
+
+    wrapper = Wrapper(str(model_file), generated_module=_fake_generated_module(), solver=_fake_solver)
+
+    assert wrapper.outputs()["state"].schema == {"state_x": "float", "y": "float"}
+    assert wrapper.outputs()["variable_labels"].schema == {"state_x": "str", "y": "str"}
+
+
 def test_advance_window_publishes_typed_cellml_signals(tmp_path) -> None:
     model_file = tmp_path / "model.cellml"
     model_file.write_text("<model />")

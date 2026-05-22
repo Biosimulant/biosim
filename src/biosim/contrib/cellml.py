@@ -442,7 +442,7 @@ class LibCellMLBioModule(StatefulBioModule):
         self._states: list[float] = []
         self._rates: list[float] = []
         self._variables: list[float] = []
-        self._observables: list[str] = []
+        self._observables: list[str] = list(self._OBSERVABLES or [])
         self._state_names: list[str] = []
         self._variable_names: list[str] = []
         self._variable_labels: dict[str, str] = {}
