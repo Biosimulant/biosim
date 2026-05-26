@@ -133,6 +133,7 @@ class TelluriumSBMLBioModule(StatefulBioModule):
     _EXPOSE_INTEGRATION_STEP_INPUT = True
     _STATE_OUTPUT_NAME = "state"
     _SUMMARY_OUTPUT_NAME = "summary"
+    _TRAJECTORY_OUTPUT_NAME = "trajectory"
     _SPECIES_LABELS_OUTPUT_NAME = "species_labels"
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
@@ -252,6 +253,10 @@ class TelluriumSBMLBioModule(StatefulBioModule):
                 schema=summary_schema,
                 description="Final, peak, and minimum value per observable plus simulated duration.",
             ),
+            self._TRAJECTORY_OUTPUT_NAME: SignalSpec.record(
+                schema={"payload": "json"},
+                description="Source-faithful time trajectory for selected SBML observables from the current run.",
+            ),
         }
         if self._SPECIES_LABELS:
             specs[self._SPECIES_LABELS_OUTPUT_NAME] = SignalSpec.record(
@@ -318,6 +323,7 @@ class TelluriumSBMLBioModule(StatefulBioModule):
         specs = self.outputs()
         state_output_name = self._STATE_OUTPUT_NAME
         summary_output_name = self._SUMMARY_OUTPUT_NAME
+        trajectory_output_name = self._TRAJECTORY_OUTPUT_NAME
         species_labels_output_name = self._SPECIES_LABELS_OUTPUT_NAME
         outputs: dict[str, BioSignal] = {
             state_output_name: RecordSignal(
@@ -337,6 +343,13 @@ class TelluriumSBMLBioModule(StatefulBioModule):
                 value=self._compute_summary(t),
                 emitted_at=float(t),
                 spec=specs[summary_output_name],
+            ),
+            trajectory_output_name: RecordSignal(
+                source=source,
+                name=trajectory_output_name,
+                value={"payload": self._public_trajectory()},
+                emitted_at=float(t),
+                spec=specs[trajectory_output_name],
             ),
         }
         if self._SPECIES_LABELS and species_labels_output_name in specs:
@@ -533,6 +546,22 @@ class TelluriumSBMLBioModule(StatefulBioModule):
         return {
             self._public_observable_name(name): latest.get(name, 0.0)
             for name in self._observables
+        }
+
+    def _public_trajectory(self) -> dict[str, Any]:
+        series = []
+        for raw_name in self._observables:
+            public_name = self._public_observable_name(raw_name)
+            points = []
+            for row in self._history:
+                value = float(row.get(raw_name, 0.0))
+                if math.isfinite(value):
+                    points.append([float(row.get("t", 0.0)), value])
+            if len(points) >= 2:
+                series.append({"name": public_name, "source": raw_name, "points": points})
+        return {
+            "time_unit": self._TIME_UNIT,
+            "series": series,
         }
 
     def _public_species_labels(self) -> dict[str, str]:

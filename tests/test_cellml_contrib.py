@@ -320,6 +320,8 @@ def test_advance_window_publishes_typed_cellml_signals(tmp_path) -> None:
     assert outputs["state"].value == {"state_x": 0.25, "y": 0.5}
     assert outputs["summary"].value["observable_count"] == 2
     assert outputs["summary"].value["largest_change_observable"] == "y"
+    assert outputs["trajectory"].value["payload"]["series"][0]["name"] == "state_x"
+    assert len(outputs["trajectory"].value["payload"]["series"][0]["points"]) == 3
     assert outputs["variable_labels"].value == {"state_x": "main.x", "y": "main.y"}
     assert outputs["mean_state_x"].value == pytest.approx((1.0 + 0.5 + 0.25) / 3.0)
 

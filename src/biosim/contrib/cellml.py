@@ -400,6 +400,7 @@ class LibCellMLBioModule(StatefulBioModule):
     _STATE_OUTPUT_ALIASES: Mapping[str, str] = {}
     _STATE_OUTPUT_NAME = "state"
     _SUMMARY_OUTPUT_NAME = "summary"
+    _TRAJECTORY_OUTPUT_NAME = "trajectory"
     _VARIABLE_LABELS_OUTPUT_NAME = "variable_labels"
     _EMIT_VARIABLE_LABELS = True
     _EXPOSE_INTEGRATION_STEP_INPUT = True
@@ -523,6 +524,10 @@ class LibCellMLBioModule(StatefulBioModule):
                 schema=summary_schema,
                 description="Final, peak, and largest-change diagnostics for selected CellML observables.",
             ),
+            self._TRAJECTORY_OUTPUT_NAME: SignalSpec.record(
+                schema={"payload": "json"},
+                description="Source-faithful time trajectory for selected CellML observables from the current run.",
+            ),
         }
         if self._EMIT_VARIABLE_LABELS:
             specs[self._VARIABLE_LABELS_OUTPUT_NAME] = SignalSpec.record(
@@ -572,6 +577,7 @@ class LibCellMLBioModule(StatefulBioModule):
         specs = self.outputs()
         state_output_name = self._STATE_OUTPUT_NAME
         summary_output_name = self._SUMMARY_OUTPUT_NAME
+        trajectory_output_name = self._TRAJECTORY_OUTPUT_NAME
         outputs: dict[str, BioSignal] = {
             state_output_name: RecordSignal(
                 source=source,
@@ -586,6 +592,13 @@ class LibCellMLBioModule(StatefulBioModule):
                 value=self._compute_summary(t),
                 emitted_at=float(t),
                 spec=specs[summary_output_name],
+            ),
+            trajectory_output_name: RecordSignal(
+                source=source,
+                name=trajectory_output_name,
+                value={"payload": self._public_trajectory()},
+                emitted_at=float(t),
+                spec=specs[trajectory_output_name],
             ),
         }
         if self._EMIT_VARIABLE_LABELS and self._VARIABLE_LABELS_OUTPUT_NAME in specs:
@@ -801,6 +814,22 @@ class LibCellMLBioModule(StatefulBioModule):
 
     def _public_state_values(self, latest: Mapping[str, float]) -> dict[str, float]:
         return {self._public_observable_name(name): self._value_for_name(name, latest) for name in self._observables}
+
+    def _public_trajectory(self) -> dict[str, Any]:
+        series = []
+        for raw_name in self._observables:
+            public_name = self._public_observable_name(raw_name)
+            points = []
+            for row in self._history:
+                value = self._value_for_name(raw_name, row)
+                if math.isfinite(value):
+                    points.append([float(row.get("t", 0.0)), float(value)])
+            if len(points) >= 2:
+                series.append({"name": public_name, "source": raw_name, "points": points})
+        return {
+            "time_unit": self._TIME_UNIT,
+            "series": series,
+        }
 
     def _public_variable_labels(self) -> dict[str, str]:
         return {
