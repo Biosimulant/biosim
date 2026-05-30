@@ -34,6 +34,7 @@ _ALIASED_SUBMODULES = (
     "modules",
     "onnx",
     "pack",
+    "package_repo",
     "runtime",
     "runtime.coercion",
     "runtime.entrypoint",

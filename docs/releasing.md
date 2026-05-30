@@ -8,9 +8,9 @@ The primary distribution name is `biosimulant`. The wheel still includes the
 ## Release workflow
 
 1. Confirm the PyPI Trusted Publisher is configured for the `biosimulant` project.
-2. Update `src/biosim/__about__.py` with a new version (example: `0.0.10`).
+2. Update `src/biosim/__about__.py` with a new version (example: `0.0.11`).
 3. Commit and push the version bump to `main`.
-4. Create and push a matching tag (`v0.0.10`).
+4. Create and push a matching tag (`v0.0.11`).
 5. Verify GitHub Actions `Publish to PyPI` finishes successfully.
 6. Verify a fresh install from PyPI:
 
@@ -32,10 +32,10 @@ release verification and debugging.
 
 ```bash
 git add src/biosim/__about__.py
-git commit -m "Bump version to 0.0.10"
+git commit -m "Bump version to 0.0.11"
 git push origin main
-git tag v0.0.10
-git push origin v0.0.10
+git tag v0.0.11
+git push origin v0.0.11
 ```
 
 ## Automation script
@@ -54,5 +54,5 @@ Behavior:
 
 Options:
 
-- Explicit version: `bash scripts/release_pypi.sh 0.0.10`
+- Explicit version: `bash scripts/release_pypi.sh 0.0.11`
 - Local tag only (no push): `bash scripts/release_pypi.sh --no-push`

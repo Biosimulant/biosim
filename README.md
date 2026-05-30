@@ -76,13 +76,35 @@ own Hub, auth, cloud, app state, and managed-service workflows.
 
 See the release guide: [`docs/releasing.md`](docs/releasing.md).
 
+## Local Labs
+
+The open-source Python CLI can create, validate, run, and serve local labs
+without Desktop or Hub:
+
+```bash
+biosimulant labs init ./my-lab --name "My Lab"
+biosimulant labs validate ./my-lab
+biosimulant labs run ./my-lab --no-install-deps
+biosimulant labs serve ./my-lab
+```
+
+`labs init` creates a runnable starter lab by default. Use `--empty` when you
+want only a bare `lab.yaml` scaffold.
+
 ## Packaging Models And Labs
 
-`biosim` can package one model or one lab into a single archive for portability, upload, caching, and validation.
+`biosimulant` can package one model or one lab into a single archive for portability, upload, caching, and validation.
 
 Common commands:
 
 ```bash
+# Validate and build a package repository manifest
+biosimulant packages validate biosimulant-packages.yaml
+biosimulant packages build biosimulant-packages.yaml --out dist/biosimulant-packages
+
+# Run a local package archive
+biosimulant packages run dist/local__source-lab-1.0.0.bsilab --no-install-deps
+
 # Build a package from a directory that contains model.yaml or lab.yaml
 biosimulant pack build path/to/model-or-lab
 

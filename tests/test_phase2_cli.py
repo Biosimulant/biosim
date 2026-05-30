@@ -1,0 +1,125 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from unittest.mock import patch
+
+from biosim.__main__ import main
+from biosim.pack import validate_package
+
+
+def test_labs_init_validate_and_run_without_desktop(tmp_path: Path, capsys) -> None:
+    lab_dir = tmp_path / "starter-lab"
+
+    main(["labs", "init", str(lab_dir), "--name", "Starter Lab"], prog="biosimulant")
+    init_output = capsys.readouterr().out
+    assert "Biosimulant lab initialized." in init_output
+    assert (lab_dir / "lab.yaml").is_file()
+    assert (lab_dir / "models" / "hello" / "model.yaml").is_file()
+
+    main(["labs", "validate", str(lab_dir), "--json"], prog="biosimulant")
+    validate_payload = json.loads(capsys.readouterr().out)
+    assert validate_payload["valid"] is True
+    assert validate_payload["package"] == "local/starter-lab"
+
+    main(
+        ["labs", "run", str(lab_dir), "--no-install-deps", "--json"],
+        prog="biosimulant",
+    )
+    run_payload = json.loads(capsys.readouterr().out)
+    assert run_payload["package"] == "local/starter-lab"
+    assert run_payload["duration"] == 1.0
+    assert run_payload["modules"][0]["alias"] == "hello"
+
+
+def test_labs_serve_uses_local_simui_without_desktop(tmp_path: Path) -> None:
+    lab_dir = tmp_path / "served-lab"
+    main(["labs", "init", str(lab_dir), "--name", "Served Lab"], prog="biosimulant")
+
+    with patch("biosim.__main__.run_simui") as run_simui:
+        main(
+            ["labs", "serve", str(lab_dir), "--port", "9999", "--no-install-deps"],
+            prog="biosimulant",
+        )
+
+    run_simui.assert_called_once()
+    _, config = run_simui.call_args.args[:2]
+    assert config["meta"]["title"] == "Served Lab"
+    assert run_simui.call_args.kwargs["port"] == 9999
+
+
+def test_packages_validate_build_and_run_repo_manifest(tmp_path: Path, capsys) -> None:
+    lab_dir = tmp_path / "lab"
+    main(["labs", "init", str(lab_dir), "--name", "Package Lab"], prog="biosimulant")
+    capsys.readouterr()
+
+    manifest = tmp_path / "biosimulant-packages.yaml"
+    manifest.write_text(
+        """
+schema_version: "1"
+namespace: demo
+default_visibility: public
+packages:
+  - id: package-lab
+    package: demo/package-lab
+    version: 1.0.0
+    type: lab
+    path: lab
+    visibility: public
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    main(["packages", "validate", str(manifest), "--json"], prog="biosimulant")
+    validate_payload = json.loads(capsys.readouterr().out)
+    assert validate_payload["valid"] is True
+    assert validate_payload["package_count"] == 1
+
+    out_dir = tmp_path / "dist" / "packages"
+    main(
+        ["packages", "build", str(manifest), "--out", str(out_dir), "--json"],
+        prog="biosimulant",
+    )
+    build_payload = json.loads(capsys.readouterr().out)
+    built_path = Path(build_payload["built"][0]["path"])
+    assert built_path.name == "demo__package-lab-1.0.0.bsilab"
+    assert validate_package(built_path).valid
+
+    main(
+        ["packages", "run", str(built_path), "--no-install-deps", "--json"],
+        prog="biosimulant",
+    )
+    run_payload = json.loads(capsys.readouterr().out)
+    assert run_payload["package"] == "demo/package-lab"
+    assert run_payload["modules"][0]["alias"] == "hello"
+
+
+def test_package_archive_validate_alias_under_packages(tmp_path: Path, capsys) -> None:
+    lab_dir = tmp_path / "lab"
+    main(["labs", "init", str(lab_dir), "--name", "Archive Lab"], prog="biosimulant")
+    capsys.readouterr()
+    main(["packages", "build", _write_single_package_manifest(tmp_path, lab_dir), "--json"], prog="biosimulant")
+    built_path = Path(json.loads(capsys.readouterr().out)["built"][0]["path"])
+
+    main(["packages", "validate", str(built_path), "--json"], prog="biosimulant")
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["valid"] is True
+    assert payload["package"] == "demo/archive-lab"
+
+
+def _write_single_package_manifest(tmp_path: Path, lab_dir: Path) -> str:
+    manifest = tmp_path / "packages.yaml"
+    manifest.write_text(
+        f"""
+schema_version: "1"
+packages:
+  - package: demo/archive-lab
+    version: 1.0.0
+    type: lab
+    path: {lab_dir.relative_to(tmp_path).as_posix()}
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+    return str(manifest)

@@ -20,6 +20,7 @@ def _load_pyproject() -> dict:
 def test_biosimulant_reexports_biosim_runtime_api() -> None:
     import biosim
     import biosimulant
+    import biosimulant.package_repo
     import biosimulant.signals
     import biosimulant.world
 
@@ -27,6 +28,7 @@ def test_biosimulant_reexports_biosim_runtime_api() -> None:
     assert biosimulant.BioWorld is biosim.BioWorld
     assert biosimulant.BioModule is biosim.BioModule
     assert biosimulant.build_package is biosim.build_package
+    assert biosimulant.package_repo.validate_package_repo is not None
     assert biosimulant.world.BioWorld is biosim.BioWorld
     assert biosimulant.signals.SignalSpec is biosim.SignalSpec
 
@@ -67,4 +69,4 @@ def test_pyproject_declares_biosimulant_distribution_and_console_script() -> Non
 def test_release_version_targets_first_biosimulant_package() -> None:
     import biosimulant
 
-    assert biosimulant.__version__ == "0.0.10"
+    assert biosimulant.__version__ == "0.0.11"

@@ -31,13 +31,17 @@ from __future__ import annotations
 
 import argparse
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any, Dict
 
+from .package_repo import build_package_repo, validate_package_repo
 from .pack import (
+    PACKAGE_EXTENSIONS,
     PackageError,
     build_package,
     fetch_package,
+    prepare_lab_package,
     run_package,
     validate_package,
 )
@@ -158,6 +162,12 @@ def main(argv: list[str] | None = None, *, prog: str = "python -m biosim") -> No
     if args_list and args_list[0] == "pack":
         _main_pack(args_list[1:], prog=f"{prog} pack")
         return
+    if args_list and args_list[0] == "packages":
+        _main_packages(args_list[1:], prog=f"{prog} packages")
+        return
+    if args_list and args_list[0] == "labs":
+        _main_labs(args_list[1:], prog=f"{prog} labs")
+        return
 
     parser = argparse.ArgumentParser(
         prog=prog,
@@ -165,6 +175,9 @@ def main(argv: list[str] | None = None, *, prog: str = "python -m biosim") -> No
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=f"""
 Examples:
+  {prog} labs init ./my-lab --name "My Lab"
+  {prog} labs validate ./my-lab
+  {prog} packages build biosimulant-packages.yaml
   {prog} wiring.yaml --simui
   {prog} config.yaml --duration 10.0
   {prog} config.yaml --simui --port 8080 --open
@@ -245,6 +258,147 @@ Examples:
         )
     else:
         run_headless(world, duration=args.duration)
+
+
+def _main_labs(argv: list[str], *, prog: str = "python -m biosim labs") -> None:
+    parser = argparse.ArgumentParser(
+        prog=prog,
+        description="Initialize, validate, run, and serve local Biosimulant labs.",
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    init_parser = subparsers.add_parser("init", help="Create a local runnable lab")
+    init_parser.add_argument("path", type=Path, nargs="?", default=Path("."))
+    init_parser.add_argument("--name", required=True)
+    init_parser.add_argument("--description", default=None)
+    init_parser.add_argument("--force", action="store_true")
+    init_parser.add_argument("--empty", action="store_true", help="Create only lab.yaml without a starter model")
+    init_parser.add_argument("--json", action="store_true", dest="json_output")
+
+    validate_parser = subparsers.add_parser("validate", help="Validate a local lab source tree or .bsilab")
+    validate_parser.add_argument("lab", type=Path, nargs="?", default=Path("."))
+    validate_parser.add_argument("--json", action="store_true", dest="json_output")
+
+    run_parser = subparsers.add_parser("run", help="Run a local lab source tree or .bsilab")
+    run_parser.add_argument("lab", type=Path, nargs="?", default=Path("."))
+    run_parser.add_argument("--no-install-deps", action="store_true")
+    run_parser.add_argument("--results-file", type=Path, default=None)
+    run_parser.add_argument("--json", action="store_true", dest="json_output")
+
+    serve_parser = subparsers.add_parser("serve", help="Serve a local lab through SimUI")
+    serve_parser.add_argument("lab", type=Path, nargs="?", default=Path("."))
+    serve_parser.add_argument("--host", default="127.0.0.1")
+    serve_parser.add_argument("--port", type=int, default=8765)
+    serve_parser.add_argument("--open", action="store_true", dest="open_browser")
+    serve_parser.add_argument("--no-install-deps", action="store_true")
+    serve_parser.add_argument("--json", action="store_true", dest="json_output")
+
+    args = parser.parse_args(argv)
+    try:
+        if args.command == "init":
+            payload = _init_lab_project(
+                args.path,
+                name=args.name,
+                description=args.description,
+                force=args.force,
+                empty=args.empty,
+            )
+            _print_lab_init_success(payload, json_output=args.json_output)
+            return
+        if args.command == "validate":
+            result = _validate_local_lab(args.lab)
+            if not result.valid:
+                _print_validation_failure(args.lab, result, json_output=args.json_output)
+                raise SystemExit(1)
+            _print_lab_validation_success(args.lab, result, json_output=args.json_output)
+            return
+        if args.command == "run":
+            package_file = _package_file_for_lab(args.lab)
+            result = run_package(package_file, install_deps=not args.no_install_deps)
+            if args.results_file:
+                args.results_file.parent.mkdir(parents=True, exist_ok=True)
+                args.results_file.write_text(json_dumps(result) + "\n", encoding="utf-8")
+            _print_run_result(package_file, result, json_output=args.json_output)
+            return
+        if args.command == "serve":
+            package_file = _package_file_for_lab(args.lab)
+            prepared = prepare_lab_package(package_file, install_deps=not args.no_install_deps)
+            meta = {
+                "title": prepared.manifest.get("title") or prepared.package,
+                "description": prepared.manifest.get("description"),
+            }
+            if args.json_output:
+                print(
+                    json_dumps(
+                        {
+                            "command": "serve",
+                            "package": prepared.package,
+                            "version": prepared.version,
+                            "url": f"http://{args.host}:{args.port}/ui/",
+                            "modules": prepared.modules,
+                        }
+                    )
+                )
+            run_simui(
+                prepared.world,
+                {"meta": meta},
+                config_path=_lab_config_path(args.lab),
+                duration=prepared.duration,
+                port=args.port,
+                host=args.host,
+                open_browser=args.open_browser,
+            )
+            return
+    except PackageError as exc:
+        _print_pack_error(exc, json_output=getattr(args, "json_output", False))
+        raise SystemExit(1) from exc
+
+
+def _main_packages(argv: list[str], *, prog: str = "python -m biosim packages") -> None:
+    parser = argparse.ArgumentParser(
+        prog=prog,
+        description="Validate/build package repositories and run local package archives.",
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    validate_parser = subparsers.add_parser("validate", help="Validate a package repo manifest or package archive")
+    validate_parser.add_argument("target", type=Path)
+    validate_parser.add_argument("--json", action="store_true", dest="json_output")
+
+    build_parser = subparsers.add_parser("build", help="Build packages declared in a repo manifest")
+    build_parser.add_argument("manifest", type=Path)
+    build_parser.add_argument("--out", type=Path, default=Path("dist/biosimulant-packages"))
+    build_parser.add_argument("--json", action="store_true", dest="json_output")
+
+    run_parser = subparsers.add_parser("run", help="Run a local .bsimodel or .bsilab package")
+    run_parser.add_argument("package_file", type=Path)
+    run_parser.add_argument("--no-install-deps", action="store_true")
+    run_parser.add_argument("--json", action="store_true", dest="json_output")
+
+    args = parser.parse_args(argv)
+    try:
+        if args.command == "validate":
+            if args.target.suffix in PACKAGE_EXTENSIONS:
+                result = validate_package(args.target)
+                if not result.valid:
+                    _print_validation_failure(args.target, result, json_output=args.json_output)
+                    raise SystemExit(1)
+                _print_validation_success(args.target, result, json_output=args.json_output)
+                return
+            manifest = validate_package_repo(args.target)
+            _print_package_repo_validation_success(manifest, json_output=args.json_output)
+            return
+        if args.command == "build":
+            built = build_package_repo(args.manifest, args.out)
+            _print_package_repo_build_success(built, json_output=args.json_output)
+            return
+        if args.command == "run":
+            result = run_package(args.package_file, install_deps=not args.no_install_deps)
+            _print_run_result(args.package_file, result, json_output=args.json_output)
+            return
+    except PackageError as exc:
+        _print_pack_error(exc, json_output=getattr(args, "json_output", False))
+        raise SystemExit(1) from exc
 
 
 def _main_pack(argv: list[str], *, prog: str = "python -m biosim pack") -> None:
@@ -338,10 +492,223 @@ def _parse_package_reference(value: str) -> tuple[str, str]:
     return package_name.strip(), version.strip()
 
 
+def _init_lab_project(
+    path: Path,
+    *,
+    name: str,
+    description: str | None,
+    force: bool,
+    empty: bool,
+) -> dict[str, Any]:
+    target = path.expanduser().resolve()
+    if target.exists() and not target.is_dir():
+        raise PackageError(f"Lab path must be a directory: {target}")
+    if target.exists() and not force and any(target.iterdir()):
+        raise PackageError(
+            f"Lab path is not empty: {target}. Re-run with --force to write lab files."
+        )
+    target.mkdir(parents=True, exist_ok=True)
+
+    slug = _slugify(name)
+    if empty:
+        models_block = "models: []\nchildren: []\nwiring: []"
+    else:
+        _write_starter_model(target / "models" / "hello")
+        models_block = """models:
+  - path: models/hello
+    alias: hello
+children: []
+wiring: []"""
+
+    lab_yaml = f"""schema_version: "2.0"
+title: {_yaml_string(name)}
+description: {_yaml_string(description) if description is not None else "null"}
+package: local/{slug}
+version: 0.1.0
+{models_block}
+runtime:
+  communication_step: 1.0
+  duration: 1.0
+  initial_inputs: {{}}
+"""
+    (target / "lab.yaml").write_text(lab_yaml, encoding="utf-8")
+    return {
+        "created": True,
+        "path": str(target),
+        "manifest": str(target / "lab.yaml"),
+        "starter_model": None if empty else str(target / "models" / "hello"),
+    }
+
+
+def _write_starter_model(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+    (path / "model.yaml").write_text(
+        """schema_version: "2.0"
+title: "Hello Model"
+description: "Starter local Biosimulant model"
+standard: other
+tags: [starter]
+authors: ["Biosimulant"]
+package: local/hello
+version: 0.1.0
+biosim:
+  entrypoint: "src.hello:HelloModule"
+  communication_step: 1.0
+""",
+        encoding="utf-8",
+    )
+    src_dir = path / "src"
+    src_dir.mkdir(exist_ok=True)
+    (src_dir / "hello.py").write_text(
+        '''from biosim import BioModule, ScalarSignal, SignalSpec
+
+
+class HelloModule(BioModule):
+    def __init__(self):
+        self.time = 0.0
+
+    def outputs(self):
+        return {"time": SignalSpec.scalar(dtype="float64")}
+
+    def advance_window(self, _start, end):
+        self.time = float(end)
+
+    def get_outputs(self):
+        spec = self.outputs()["time"]
+        return {
+            "time": ScalarSignal(
+                source="hello",
+                name="time",
+                value=self.time,
+                emitted_at=self.time,
+                spec=spec,
+            )
+        }
+
+    def snapshot(self):
+        return {"time": self.time}
+''',
+        encoding="utf-8",
+    )
+
+
+def _validate_local_lab(path: Path) -> Any:
+    return validate_package(_package_file_for_lab(path))
+
+
+def _package_file_for_lab(path: Path) -> Path:
+    target = path.expanduser().resolve()
+    if target.is_file():
+        if target.suffix != ".bsilab":
+            raise PackageError(f"Expected a .bsilab package: {target}")
+        return target
+    if not target.is_dir():
+        raise PackageError(f"Lab path not found: {target}")
+    _lab_config_path(target)
+    temp_dir = Path(tempfile.mkdtemp(prefix="biosim-lab-"))
+    return build_package(target, output_path=temp_dir / f"{target.name or 'lab'}.bsilab")
+
+
+def _lab_config_path(path: Path) -> Path:
+    target = path.expanduser().resolve()
+    if target.is_file():
+        return target
+    for name in ("lab.yaml", "lab.yml"):
+        manifest = target / name
+        if manifest.is_file():
+            return manifest
+    raise PackageError(f"Could not find lab.yaml or lab.yml in {target}")
+
+
+def _slugify(value: str) -> str:
+    slug = "".join(char.lower() if char.isalnum() else "-" for char in value)
+    slug = "-".join(part for part in slug.split("-") if part)
+    return slug or "lab"
+
+
+def _yaml_string(value: str) -> str:
+    import json
+
+    return json.dumps(value)
+
+
 def json_dumps(value: Any) -> str:
     import json
 
     return json.dumps(value, sort_keys=True)
+
+
+def _print_lab_init_success(payload: dict[str, Any], *, json_output: bool) -> None:
+    if json_output:
+        print(json_dumps(payload))
+        return
+    print("Biosimulant lab initialized.")
+    print(f"Path: {payload['path']}")
+    print(f"Manifest: {payload['manifest']}")
+    if payload.get("starter_model"):
+        print(f"Starter model: {payload['starter_model']}")
+
+
+def _print_lab_validation_success(package_file: Path, result: Any, *, json_output: bool) -> None:
+    payload = {
+        "command": "labs.validate",
+        "lab": str(package_file),
+        "valid": True,
+        "package": result.metadata.get("package") if result.metadata else None,
+        "version": result.metadata.get("version") if result.metadata else None,
+        "warnings": result.warnings,
+        "metadata": result.metadata,
+    }
+    if json_output:
+        print(json_dumps(payload))
+        return
+    print("Biosimulant lab validation passed.")
+    print(f"Lab: {package_file}")
+    if result.metadata:
+        print(f"Package: {result.metadata.get('package')}@{result.metadata.get('version')}")
+    for warning in result.warnings:
+        print(f"Warning: {warning}")
+
+
+def _print_package_repo_validation_success(manifest: Any, *, json_output: bool) -> None:
+    payload = {
+        "command": "packages.validate",
+        "manifest": str(manifest.path),
+        "valid": True,
+        "package_count": len(manifest.packages),
+        "packages": [
+            {
+                "package": entry.package,
+                "version": entry.version,
+                "package_type": entry.package_type,
+                "path": entry.path.as_posix(),
+                "visibility": entry.visibility,
+            }
+            for entry in manifest.packages
+        ],
+    }
+    if json_output:
+        print(json_dumps(payload))
+        return
+    print("Biosimulant package manifest validation passed.")
+    print(f"Manifest: {manifest.path}")
+    print(f"Packages: {len(manifest.packages)}")
+    for entry in manifest.packages:
+        print(f"  - {entry.package}@{entry.version} ({entry.package_type})")
+
+
+def _print_package_repo_build_success(built: list[dict[str, Any]], *, json_output: bool) -> None:
+    payload = {"command": "packages.build", "built": built}
+    if json_output:
+        print(json_dumps(payload))
+        return
+    print("Biosimulant package manifest build succeeded.")
+    print(f"Built packages: {len(built)}")
+    for entry in built:
+        print(
+            f"  - {entry['package']}@{entry['version']} "
+            f"({entry['package_type']}): {entry['path']}"
+        )
 
 
 def _print_pack_result(json_output: bool, payload: dict[str, Any]) -> None:

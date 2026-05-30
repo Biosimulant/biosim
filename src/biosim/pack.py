@@ -68,6 +68,19 @@ class _LoadedPackage:
     payload_root: Path
 
 
+@dataclass
+class LabPackageRuntime:
+    package: str
+    version: str
+    world: BioWorld
+    manifest: dict[str, Any]
+    lab_path: Path
+    duration: float
+    communication_step: float
+    settle_steps: int
+    modules: list[dict[str, Any]]
+
+
 def _require_yaml():
     try:
         import yaml  # type: ignore
@@ -1101,9 +1114,9 @@ def _embedded_lab_tree_from_dir(
     )
 
 
-def _run_lab_loaded_package(
+def _prepare_lab_loaded_package(
     loaded: _LoadedPackage, *, install_deps: bool = True
-) -> dict[str, Any]:
+) -> LabPackageRuntime:
     runtime = loaded.manifest.get("runtime")
     if not isinstance(runtime, Mapping):
         raise PackageError("Lab manifest must contain models, wiring, and runtime")
@@ -1205,16 +1218,36 @@ def _run_lab_loaded_package(
                 error_cls=PackageError,
             )
         )
+    return LabPackageRuntime(
+        package=str(loaded.package_yaml["package"]),
+        version=str(loaded.package_yaml["version"]),
+        world=world,
+        manifest=parsed_lab,
+        lab_path=loaded.payload_root / "lab.yaml",
+        duration=duration,
+        communication_step=communication_step,
+        settle_steps=settle_steps,
+        modules=resolved_models,
+    )
+
+
+def _run_lab_loaded_package(
+    loaded: _LoadedPackage, *, install_deps: bool = True
+) -> dict[str, Any]:
+    prepared = _prepare_lab_loaded_package(loaded, install_deps=install_deps)
+    world = prepared.world
+    duration = prepared.duration
+    settle_steps = prepared.settle_steps
     world.run(duration=duration)
     if settle_steps:
         world.settle(settle_steps)
     return {
-        "package": loaded.package_yaml["package"],
-        "version": loaded.package_yaml["version"],
+        "package": prepared.package,
+        "version": prepared.version,
         "duration": duration,
-        "communication_step": communication_step,
+        "communication_step": prepared.communication_step,
         "settle_steps": settle_steps,
-        "modules": resolved_models,
+        "modules": prepared.modules,
         "visuals": world.collect_visuals(),
     }
 
@@ -1304,6 +1337,15 @@ def run_package(path: str | Path, *, install_deps: bool = True) -> dict[str, Any
     if loaded.package_type == "lab":
         return _run_lab_loaded_package(loaded, install_deps=install_deps)
     raise PackageError(f"Unsupported package type: {loaded.package_type}")
+
+
+def prepare_lab_package(
+    path: str | Path, *, install_deps: bool = True
+) -> LabPackageRuntime:
+    loaded = _loaded_package_from_path(Path(path).expanduser().resolve())
+    if loaded.package_type != "lab":
+        raise PackageError(f"Expected a lab package, got: {loaded.package_type}")
+    return _prepare_lab_loaded_package(loaded, install_deps=install_deps)
 
 
 def _validate_model_manifest(manifest: Mapping[str, Any]) -> None:
@@ -1401,11 +1443,13 @@ def _validate_lab_manifest(manifest: Mapping[str, Any]) -> None:
 __all__ = [
     "PACKAGE_EXTENSION",
     "PACKAGE_EXTENSIONS",
+    "LabPackageRuntime",
     "PackageError",
     "PackageValidationResult",
     "build_package",
     "export_lab_package",
     "fetch_package",
+    "prepare_lab_package",
     "publish_package",
     "run_package",
     "unpack_package",

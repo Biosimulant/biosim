@@ -16,6 +16,28 @@ Typical use cases:
 
 ## CLI
 
+Initialize, validate, run, and serve a local lab without Desktop:
+
+```bash
+biosimulant labs init ./my-lab --name "My Lab"
+biosimulant labs validate ./my-lab
+biosimulant labs run ./my-lab --no-install-deps
+biosimulant labs serve ./my-lab
+```
+
+Build all packages declared in a package repository manifest:
+
+```bash
+biosimulant packages validate biosimulant-packages.yaml
+biosimulant packages build biosimulant-packages.yaml --out dist/biosimulant-packages
+```
+
+Run a package archive locally:
+
+```bash
+biosimulant packages run path/to/lab.bsilab --no-install-deps
+```
+
 Build a package from a model or lab directory:
 
 ```bash
@@ -40,7 +62,31 @@ Run a package locally:
 biosimulant pack run path/to/model.bsimodel
 ```
 
-Use `--json` with any `biosimulant pack` command when you need machine-readable output.
+Use `--json` with `biosimulant labs`, `biosimulant packages`, or `biosimulant pack`
+commands when you need machine-readable output.
+
+`biosimulant packages` is the open-source package repository surface. `biosimulant pack`
+remains the lower-level compatibility command for building or validating a single archive.
+
+## Package Repository Manifest
+
+A package repository manifest declares one or more top-level packages to build:
+
+```yaml
+schema_version: "1"
+default_visibility: public
+packages:
+  - id: example-lab
+    package: demo/example-lab
+    version: 1.0.0
+    type: lab
+    path: labs/example-lab
+    visibility: public
+```
+
+`packages validate` checks the manifest shape, package identity, SemVer versions,
+source paths, package type, dependency pins, embedded lab/model paths, and archive
+compatibility by building into a temporary directory.
 
 ## Runtime Compatibility
 
