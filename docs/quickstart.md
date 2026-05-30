@@ -18,7 +18,7 @@ biosimulant labs serve ./my-lab
 ## Minimal 1.5 example
 
 ```python
-import biosim
+import biosimulant as biosim
 
 
 class Eye(biosim.BioModule):

@@ -29,7 +29,7 @@ class BioModule:
 ## Minimal example
 
 ```python
-import biosim
+import biosimulant as biosim
 
 
 class Counter(biosim.BioModule):
@@ -67,7 +67,7 @@ class Counter(biosim.BioModule):
 `BioModule` stays intentionally small. Use it directly when a model needs full
 control over timing, solver state, or emitted signal construction.
 
-For common adapter patterns, `biosim.modules` also provides:
+For common adapter patterns, `biosimulant.modules` also provides:
 
 - `SignalEmitterBioModule`: owns `_outputs`, resolves the emitted `source` from
   `_world_name`, wraps raw values into typed signals with `make_signal()`, and

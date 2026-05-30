@@ -1,6 +1,6 @@
 # Configuration Files
 
-BioSim wiring configs are YAML or TOML mappings with three top-level sections:
+Biosimulant wiring configs are YAML or TOML mappings with three top-level sections:
 
 - `runtime`
 - `modules`

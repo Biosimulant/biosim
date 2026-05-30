@@ -11,7 +11,7 @@ Or:
 
 from __future__ import annotations
 
-import biosim
+import biosimulant as biosim
 
 
 def main() -> None:
@@ -35,7 +35,7 @@ def main() -> None:
 
     world.add_biomodule("ts", TS())
 
-    from biosim.simui import Interface, Number, Button, EventLog, VisualsPanel
+    from biosimulant.simui import Interface, Number, Button, EventLog, VisualsPanel
 
     ui = Interface(
         world,

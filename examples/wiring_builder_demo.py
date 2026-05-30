@@ -8,7 +8,7 @@ Run:
 
 from __future__ import annotations
 
-import biosim
+import biosimulant as biosim
 
 
 class Eye(biosim.BioModule):

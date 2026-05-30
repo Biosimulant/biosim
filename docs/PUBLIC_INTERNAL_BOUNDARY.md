@@ -1,6 +1,6 @@
 # Public/Internal Boundary
 
-`bio-sim` is a public OSS repository.
+`biosimulant` is a public OSS repository.
 
 ## Allowed (public)
 - Runtime/library source code
@@ -17,4 +17,4 @@
 ## Enforcement
 - CI blocks commits containing common business-sensitive terms in docs.
 - CI blocks commits containing detected secrets.
-- Internal planning docs are stored in `biosim-platform`.
+- Internal planning docs are stored outside the public `biosim/docs` tree.

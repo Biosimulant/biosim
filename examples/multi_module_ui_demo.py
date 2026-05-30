@@ -8,7 +8,7 @@ from __future__ import annotations
 import math
 import random
 
-import biosim
+import biosimulant as biosim
 
 
 class SineWave(biosim.BioModule):

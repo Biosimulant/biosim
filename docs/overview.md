@@ -1,6 +1,6 @@
 # Overview
 
-biosim is a modular biological simulation library. It centers around four ideas:
+`biosimulant` is a modular biological simulation library. It centers around four ideas:
 
 - **BioWorld**: the runtime container that orchestrates multi-rate biomodules, routes signals, and publishes lifecycle events. Supports cooperative pause/resume/stop.
 - **BioModule**: a unit of behavior with local state that implements the runnable contract (`setup/reset/advance_window/get_outputs/snapshot/restore/...`).
@@ -35,7 +35,7 @@ helpers, not required architecture.
 ## Standard-agnostic by design
 - Biomodules are self-contained Python packages and may wrap external simulators internally.
 - The core focuses on orchestration, wiring contracts, and visualization.
-- Optional contrib bases such as `biosim.contrib.sbml.TelluriumSBMLBioModule`
+- Optional contrib bases such as `biosimulant.contrib.sbml.TelluriumSBMLBioModule`
   keep heavy simulator imports lazy and leave domain-specific visuals or
   payloads in the model wrapper.
 

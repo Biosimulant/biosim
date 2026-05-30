@@ -2,8 +2,9 @@
 
 Welcome to the biosimulant documentation. This guide explains the core concepts, APIs, and practical wiring patterns for building modular biological simulations.
 
-`biosimulant` is the primary package and CLI name. The `biosim` import path and
-`python -m biosim` command remain supported for existing model packages.
+`biosimulant` is the primary package, import namespace, and CLI name. The
+`biosim` import path and `python -m biosim` command remain supported for
+existing model packages.
 
 ## Contents
 
@@ -27,7 +28,7 @@ See the files in this folder for a textbook-style walkthrough with code and conc
 
 ## SimUI
 
-The biosim core includes a lightweight web UI (SimUI) for running and visualizing simulations. See the [README](../README.md#simui-python-declared-ui) for:
+The Biosimulant core includes a lightweight web UI (SimUI) for running and visualizing simulations. See the [README](../README.md#simui-python-declared-ui) for:
 - Python-declared interface API
 - Full REST + SSE endpoint reference
 - Config editor sub-API for visual wiring editing

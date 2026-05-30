@@ -5,6 +5,8 @@
 ## Code builder
 
 ```python
+import biosimulant as biosim
+
 world = biosim.BioWorld(communication_step=0.1)
 builder = biosim.WiringBuilder(world)
 builder.add("eye", Eye()).add("lgn", LGN()).add("sc", SC())
@@ -35,7 +37,7 @@ wiring:
 
 ## Loader helpers
 
-- `biosim.build_from_spec(world, spec)`
-- `biosim.load_wiring(world, path)`
-- `biosim.load_wiring_yaml(world, path)`
-- `biosim.load_wiring_toml(world, path)`
+- `biosimulant.build_from_spec(world, spec)`
+- `biosimulant.load_wiring(world, path)`
+- `biosimulant.load_wiring_yaml(world, path)`
+- `biosimulant.load_wiring_toml(world, path)`

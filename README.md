@@ -5,9 +5,9 @@
 
 Composable simulation runtime + UI layer for orchestrating runnable biomodules.
 
-`biosimulant` is the primary package and CLI name. The existing `biosim`
-Python import path and `python -m biosim` command remain supported for existing
-model packages during the migration.
+`biosimulant` is the primary package, import namespace, and CLI name. The
+existing `biosim` Python import path and `python -m biosim` command remain
+supported for existing model packages during the migration.
 
 ---
 
@@ -52,8 +52,14 @@ pip install "biosimulant[ml]"
 
 ### Compatibility and command ownership
 
-The `biosimulant` package still ships the `biosim` Python import path so existing
-model packages keep working:
+Use `biosimulant` for new Python examples:
+
+```python
+import biosimulant as biosim
+```
+
+The package still ships the legacy `biosim` Python import path so existing model
+packages keep working:
 
 ```python
 import biosim
@@ -126,20 +132,20 @@ See [`docs/packaging.md`](docs/packaging.md) for the full package layout, recomm
 
 ## Provisional Runtime Helpers
 
-`biosim.runtime` is the provisional public home for package interpretation helpers shared by the open-source CLI and Biosimulant platform executors. It owns entrypoint loading, typed `runtime.initial_inputs` coercion, communication-step resolution, and source-neutral lab flattening. Import these helpers from `biosim.runtime`; they are not exported from top-level `biosim` while the API settles.
+`biosimulant.runtime` is the provisional public home for package interpretation helpers shared by the open-source CLI and Biosimulant platform executors. It owns entrypoint loading, typed `runtime.initial_inputs` coercion, communication-step resolution, and source-neutral lab flattening. Import these helpers from `biosimulant.runtime`; the legacy `biosim.runtime` path remains available for compatibility.
 
 ## BioModule Convenience Layers
 
 `BioModule` remains the minimal full-control runtime contract. For common model
-adapters, `biosim` also exports opt-in helpers:
+adapters, `biosimulant` also exports opt-in helpers:
 
 - `SignalEmitterBioModule`: output storage, source-name resolution, and raw
   value to typed `BioSignal` wrapping.
 - `StatefulBioModule`: fixed-step window advancement, input override storage,
   bounded history, and output publishing hooks.
 
-Signal helper functions are available from `biosim.signals` and top-level
-`biosim`: `unwrap_payload`, `coerce_float`, `scalar_or_record_input`, and
+Signal helper functions are available from `biosimulant.signals` and top-level
+`biosimulant`: `unwrap_payload`, `coerce_float`, `scalar_or_record_input`, and
 `make_signal`.
 
 ## Examples
@@ -160,8 +166,8 @@ For advanced curated demos (neuro/ecology), wiring configs, and model-pack templ
 Minimal usage:
 
 ```python
-import biosim
-from biosim import ScalarSignal, SignalSpec
+import biosimulant as biosim
+from biosimulant import ScalarSignal, SignalSpec
 
 
 class Counter(biosim.BioModule):
@@ -245,12 +251,12 @@ See `examples/visuals_demo.py` for a minimal end-to-end example.
 
 ### ONNX Modules
 
-`biosim` can host ONNX-backed modules without changing the core runtime. Install
+`biosimulant` can host ONNX-backed modules without changing the core runtime. Install
 the ML extras and wrap the ONNX model behind the standard `BioModule`
 interface:
 
 ```python
-from biosim import OnnxClassifierModule, ScalarSignal, SignalSpec
+from biosimulant import OnnxClassifierModule, ScalarSignal, SignalSpec
 
 classifier = OnnxClassifierModule(
     model_path="artifacts/model.onnx",
@@ -290,7 +296,9 @@ SimUI lets you build and launch a small web UI entirely from Python (similar to 
   - From your own code:
 
     ```python
-    from biosim.simui import Interface, Number, Button, EventLog, VisualsPanel
+    import biosimulant as biosim
+    from biosimulant.simui import Interface, Number, Button, EventLog, VisualsPanel
+
     world = biosim.BioWorld(communication_step=0.1)
     ui = Interface(
         world,
@@ -321,14 +329,14 @@ Per-run resets for clean visuals
 
 - Maintainer flow (building the frontend SPA):
   - Edit the React/Vite app under `src/biosim/simui/_frontend/`.
-  - Build via Python: `python -m biosim.simui.build` (requires Node/npm). This writes `src/biosim/simui/static/app.js`.
+  - Build via Python: `python -m biosimulant.simui.build` (requires Node/npm). This writes `src/biosim/simui/static/app.js`.
   - Alternatively: `bash scripts/build_simui_frontend.sh`.
   - Packaging includes `src/biosim/simui/static/**`, so end users never need npm.
 
 - CI packaging (recommended): run the frontend build before `python -m build` so wheels/sdists ship the bundled assets.
 
 Troubleshooting:
-- If you see `SimUI static bundle missing at .../static/app.js`, build the frontend with `python -m biosim.simui.build` (requires Node/npm) before launching. End users installing a release wheel won't see this.
+- If you see `SimUI static bundle missing at .../static/app.js`, build the frontend with `python -m biosimulant.simui.build` (requires Node/npm) before launching. End users installing a release wheel won't see this.
 
 ### SimUI Design Notes
 - Transport: SSE (Server-Sent Events). The SPA connects to `/api/stream` for real-time updates. Polling endpoints (`/api/status`, `/api/visuals`, `/api/events`) remain available for fallback/debugging.
@@ -349,7 +357,7 @@ Troubleshooting:
 
 ## Terminology
 
-Understanding the core concepts is essential for working with biosim effectively.
+Understanding the core concepts is essential for working with Biosimulant effectively.
 
 | Term | Description |
 |------|-------------|

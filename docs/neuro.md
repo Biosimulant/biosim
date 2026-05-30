@@ -68,7 +68,7 @@ python labs/neuro-microcircuit/simui_local.py
 **Config-driven runs (no code changes):**
 ```bash
 python -c "
-import biosim
+import biosimulant as biosim
 w = biosim.BioWorld(communication_step=0.001)
 biosim.load_wiring(w, 'labs/neuro-single-neuron/wiring.yaml')
 w.run(duration=0.5)
@@ -291,7 +291,7 @@ The neuro packs use typed signals with explicit `SignalSpec` declarations on eve
 ### Spike signals (`EventSignal`)
 Emitted by populations and input generators. The `value` field contains the neuron indices that spiked during the current communication window:
 ```python
-from biosim import EventSignal, SignalSpec
+from biosimulant import EventSignal, SignalSpec
 
 spike_spec = SignalSpec.event(description="Neuron indices that spiked in this boundary")
 EventSignal(
@@ -306,7 +306,7 @@ EventSignal(
 ### Current signals (`ScalarSignal` / `ArraySignal`)
 Injected current can be broadcast as a scalar or provided per neuron as an array:
 ```python
-from biosim import ArraySignal, ScalarSignal, SignalSpec
+from biosimulant import ArraySignal, ScalarSignal, SignalSpec
 
 scalar_current_spec = SignalSpec.scalar(dtype="float64", emitted_unit="nA")
 ScalarSignal(
@@ -330,7 +330,7 @@ ArraySignal(
 ### State signals (`RecordSignal`)
 Neuron state for monitoring and visualization is carried as a schema-bound record:
 ```python
-from biosim import RecordSignal, SignalSpec
+from biosimulant import RecordSignal, SignalSpec
 
 state_spec = SignalSpec.record(
     schema={"t": "float64", "indices": "list[int]", "v": "list[float64]", "u": "list[float64]"},
@@ -469,7 +469,7 @@ Example wiring specs are in `models/labs/` (lab manifests):
 
 Load and run:
 ```python
-import biosim
+import biosimulant as biosim
 world = biosim.BioWorld(communication_step=0.0001)
 biosim.load_wiring(world, "labs/neuro-single-neuron/wiring.yaml")
 world.run(duration=0.3)
@@ -477,7 +477,7 @@ world.run(duration=0.3)
 
 ## See Also
 
-- [biosim README](../README.md) - VisualSpec types, SimUI API reference
+- [Biosimulant README](../README.md) - VisualSpec types, SimUI API reference
 - [Wiring docs](wiring.md) - WiringBuilder and loader API
 - [Config docs](config.md) - YAML/TOML config file format
 - [models STANDARDS.md](https://github.com/Biosimulant/models/blob/main/STANDARDS.md) - Model contribution guidelines

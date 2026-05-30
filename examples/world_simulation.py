@@ -11,7 +11,7 @@ Or without installing:
 
 from __future__ import annotations
 
-import biosim
+import biosimulant as biosim
 
 
 def print_listener(event: biosim.WorldEvent, payload: dict) -> None:

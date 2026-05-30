@@ -6,7 +6,7 @@
 
 Install optional dependencies first:
 
-    pip install 'biosim[cellml]'
+    pip install 'biosimulant[cellml]'
 
 Run the bundled fixture:
 
@@ -24,7 +24,7 @@ import json
 from pathlib import Path
 import sys
 
-from biosim.contrib.cellml import CellMLRuntimeError, LibCellMLBioModule
+from biosimulant.contrib.cellml import CellMLRuntimeError, LibCellMLBioModule
 
 
 class SmallDecayModel(LibCellMLBioModule):

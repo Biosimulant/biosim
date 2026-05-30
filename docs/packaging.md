@@ -94,7 +94,7 @@ compatibility by building into a temporary directory.
 
 ## Runtime Compatibility
 
-Package execution uses the provisional `biosim.runtime` helpers for behavior that must match other Biosimulant runtimes:
+Package execution uses the provisional `biosimulant.runtime` helpers for behavior that must match other Biosimulant runtimes:
 
 - entrypoints are loaded from the model directory with file-spec loading when possible, so multiple models can each use a `src/` namespace-style layout in one process
 - `runtime.initial_inputs` are coerced into typed `BioSignal` objects against each module's declared `inputs()`
@@ -102,7 +102,7 @@ Package execution uses the provisional `biosim.runtime` helpers for behavior tha
 - `settle_steps` is resolved with the same runtime precedence and defaults to `0`
 - nested child labs are flattened with canonical alias scoping and `io.maps_to` remapping
 
-The `biosim.runtime` API is public but provisional for this minor release.
+The `biosimulant.runtime` API is public but provisional for this minor release. The `biosim.runtime` path remains available for compatibility.
 
 ## Source Layout
 

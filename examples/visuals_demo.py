@@ -14,10 +14,10 @@ from __future__ import annotations
 import sys
 
 try:
-    import biosim
+    import biosimulant as biosim
 except ModuleNotFoundError:
     sys.stderr.write(
-        "Could not import 'biosim'. Did you run 'pip install -e .'?\n"
+        "Could not import 'biosimulant'. Did you run 'pip install -e .'?\n"
         "Alternatively, run with 'PYTHONPATH=src'.\n"
     )
     raise

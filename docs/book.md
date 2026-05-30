@@ -1,12 +1,12 @@
 ---
 title: "biosimulant Documentation"
-author: "biosim project"
+author: "Biosimulant"
 date: "\today"
 ---
 
 # Preface
 
-This document compiles the biosim repository guides into a single reference.
+This document compiles the Biosimulant repository guides into a single reference.
 
 \newpage
 

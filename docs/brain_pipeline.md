@@ -4,7 +4,7 @@ This example shows a simple visual pathway using directed biosignals.
 
 Code
 ```python
-import biosim
+import biosimulant as biosim
 from examples.wiring_builder_demo import Eye, LGN, SC
 
 world = biosim.BioWorld(communication_step=0.1)

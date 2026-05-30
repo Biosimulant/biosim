@@ -27,8 +27,8 @@ The runtime prepares a CellML model in five steps:
 
 Generated Python is stored in a runtime cache, never in model repositories by
 default. Cache keys are deterministic and include the CellML file content,
-libCellML version, and Biosim adapter version. Override the cache location with
-`BIOSIM_CELLML_CACHE`; otherwise Biosim uses the platform cache directory.
+libCellML version, and Biosimulant adapter version. Override the cache location with
+`BIOSIM_CELLML_CACHE`; otherwise Biosimulant uses the platform cache directory.
 
 Simulation uses `scipy.integrate.solve_ivp`. The generated `compute_rates` or
 `computeRates` function supplies the right-hand side, and generated
@@ -40,7 +40,7 @@ sample points.
 CellML wrappers should be metadata subclasses:
 
 ```python
-from biosim.contrib.cellml import LibCellMLBioModule
+from biosimulant.contrib.cellml import LibCellMLBioModule
 
 
 class SmallCellMLModel(LibCellMLBioModule):
@@ -109,7 +109,7 @@ print(model.get_outputs()["state"].value)
 ```
 
 The model repository keeps the original CellML artifact and upstream metadata;
-Biosim generates and caches executable code at runtime.
+Biosimulant generates and caches executable code at runtime.
 
 ## Limitations
 
@@ -119,5 +119,5 @@ analysis failures, generator failures, and solver failures raise
 `CellMLRuntimeError` with stage-specific context.
 
 OpenCOR is intentionally not a runtime dependency. Its CLI can be used later as a
-validation or parity tool, but embeddable Biosim library code should depend on
+validation or parity tool, but embeddable Biosimulant library code should depend on
 libCellML and SciPy only.

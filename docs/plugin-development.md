@@ -12,7 +12,7 @@ Plugins and first-party modules should target the communication-step kernel cont
 ## Example
 
 ```python
-import biosim
+import biosimulant as biosim
 
 
 class Gain(biosim.BioModule):
