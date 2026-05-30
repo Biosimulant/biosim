@@ -1,5 +1,5 @@
 ---
-title: "biosim Documentation"
+title: "biosimulant Documentation"
 author: "biosim project"
 date: "\today"
 ---

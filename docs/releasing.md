@@ -1,22 +1,41 @@
-# Releasing biosim to PyPI
+# Releasing biosimulant to PyPI
 
 This repository publishes to PyPI using GitHub Trusted Publishing.
 
+The primary distribution name is `biosimulant`. The wheel still includes the
+`biosim` import path and `python -m biosim` compatibility command.
+
 ## Release workflow
 
-1. Update `src/biosim/__about__.py` with a new version (example: `0.0.5`).
-2. Commit and push the version bump to `main`.
-3. Create and push a matching tag (`v0.0.5`).
-4. Verify GitHub Actions `Publish to PyPI` finishes successfully.
+1. Confirm the PyPI Trusted Publisher is configured for the `biosimulant` project.
+2. Update `src/biosim/__about__.py` with a new version (example: `0.0.10`).
+3. Commit and push the version bump to `main`.
+4. Create and push a matching tag (`v0.0.10`).
+5. Verify GitHub Actions `Publish to PyPI` finishes successfully.
+6. Verify a fresh install from PyPI:
+
+```bash
+python -m venv /tmp/biosimulant-release-check
+/tmp/biosimulant-release-check/bin/python -m pip install biosimulant
+/tmp/biosimulant-release-check/bin/biosimulant --help
+/tmp/biosimulant-release-check/bin/python -m biosim --help
+```
+
+## Command collision note
+
+The Python package installs a `biosimulant` console script. Machines that also
+install the Desktop/product CLI can have another `biosimulant` binary on `PATH`.
+Use `python -m biosimulant ...` to explicitly run the Python package CLI during
+release verification and debugging.
 
 ## Manual commands
 
 ```bash
 git add src/biosim/__about__.py
-git commit -m "Bump version to 0.0.5"
+git commit -m "Bump version to 0.0.10"
 git push origin main
-git tag v0.0.5
-git push origin v0.0.5
+git tag v0.0.10
+git push origin v0.0.10
 ```
 
 ## Automation script
@@ -35,5 +54,5 @@ Behavior:
 
 Options:
 
-- Explicit version: `bash scripts/release_pypi.sh 0.0.5`
+- Explicit version: `bash scripts/release_pypi.sh 0.0.10`
 - Local tag only (no push): `bash scripts/release_pypi.sh --no-push`

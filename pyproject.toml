@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "biosim"
+name = "biosimulant"
 dynamic = ["version"]
-description = "Core simulation library for Biosimulant"
+description = "Open-source local simulation runtime and CLI for Biosimulant"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
@@ -31,6 +31,9 @@ Documentation = "https://github.com/Biosimulant/biosim#readme"
 Issues = "https://github.com/Biosimulant/biosim/issues"
 Source = "https://github.com/Biosimulant/biosim"
 
+[project.scripts]
+biosimulant = "biosimulant.__main__:main"
+
 [tool.hatch.version]
 path = "src/biosim/__about__.py"
 
@@ -42,7 +45,7 @@ extra-dependencies = [
 check = "mypy --install-types --non-interactive {args:src/biosim tests}"
 
 [tool.coverage.run]
-source_pkgs = ["biosim"]
+source_pkgs = ["biosim", "biosimulant"]
 branch = true
 parallel = true
 omit = [
@@ -52,6 +55,7 @@ omit = [
 
 [tool.coverage.paths]
 biosim = ["src/biosim", "*/biosim/src/biosim"]
+biosimulant = ["src/biosimulant", "*/biosim/src/biosimulant"]
 
 [tool.coverage.report]
 exclude_lines = [
@@ -97,23 +101,25 @@ cellml = [
 ]
 # Everything
 all = [
-  "biosim[dev,ui,ml,cellml]",
+  "biosimulant[dev,ui,ml,cellml]",
 ]
 
 [tool.hatch.build]
 include = [
   "src/biosim/simui/static/**",
+  "src/biosimulant/**",
 ]
 exclude = [
   "src/biosim/simui/_frontend/**",
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/biosim"]
+packages = ["src/biosim", "src/biosimulant"]
 
 [tool.hatch.build.targets.sdist]
 include = [
   "src/biosim/**",
+  "src/biosimulant/**",
   "tests/**",
   "docs/**",
   "examples/**",

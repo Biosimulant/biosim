@@ -1,8 +1,8 @@
 # Neuro Pack: Computational Neuroscience Modules
 
-This document describes the neuro model packs in the companion `models` repository, a reference implementation for simulating spiking neural networks with `biosim`.
+This document describes the neuro model packs in the companion `models` repository, a reference implementation for simulating spiking neural networks with `biosimulant`.
 
-> **Important**: The neuro modules are **not** bundled inside the `biosim` core library. They live as separate model packs in the [`Biosimulant/models`](https://github.com/Biosimulant/models) repo under `models/models/neuro-*`.
+> **Important**: The neuro modules are **not** bundled inside the `biosimulant` core library. They live as separate model packs in the [`Biosimulant/models`](https://github.com/Biosimulant/models) repo under `models/models/neuro-*`.
 
 ## Overview
 
@@ -31,12 +31,12 @@ The neuro packs provide a minimal but composable set of `BioModule`s for:
 
 ### Installation
 
-Clone the models repository alongside biosim:
+Clone the models repository alongside biosimulant:
 
 ```bash
 git clone https://github.com/Biosimulant/models.git
 cd models
-pip install -e ../biosim            # Install biosim core
+pip install -e ../biosim            # Install biosimulant core from the local repo
 pip install -e ../biosim'[ui]'      # Optional: for SimUI
 ```
 
@@ -46,17 +46,17 @@ Pre-composed simulation labs are in `models/labs/`:
 
 **Single neuron lab:**
 ```bash
-python -m biosim labs/neuro-single-neuron/wiring.yaml
+biosimulant labs/neuro-single-neuron/wiring.yaml
 ```
 
 **E/I microcircuit lab (50 neurons):**
 ```bash
-python -m biosim labs/neuro-microcircuit/wiring.yaml
+biosimulant labs/neuro-microcircuit/wiring.yaml
 ```
 
 **Hodgkin-Huxley single neuron:**
 ```bash
-python -m biosim labs/neuro-hodgkin-huxley-neuron/wiring.yaml
+biosimulant labs/neuro-hodgkin-huxley-neuron/wiring.yaml
 ```
 
 **Local SimUI (optional):**

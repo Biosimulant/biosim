@@ -43,7 +43,7 @@ class CellMLRuntimeError(RuntimeError):
 def _optional_import_error(package: str, extra: str = "cellml") -> CellMLRuntimeError:
     return CellMLRuntimeError(
         f"Optional dependency '{package}' is required for CellML simulation. "
-        f"Install it with: pip install 'biosim[{extra}]'."
+        f"Install it with: pip install 'biosimulant[{extra}]'."
     )
 
 

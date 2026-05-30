@@ -3,7 +3,7 @@
 ## Install
 
 ```bash
-pip install -e '.[dev]'
+pip install 'biosimulant[ui]'
 ```
 
 ## Minimal 1.5 example

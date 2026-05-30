@@ -1,9 +1,13 @@
-# biosim
+# biosimulant
 
-[![PyPI - Version](https://img.shields.io/pypi/v/biosim.svg)](https://pypi.org/project/biosim)
-[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/biosim.svg)](https://pypi.org/project/biosim)
+[![PyPI - Version](https://img.shields.io/pypi/v/biosimulant.svg)](https://pypi.org/project/biosimulant)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/biosimulant.svg)](https://pypi.org/project/biosimulant)
 
 Composable simulation runtime + UI layer for orchestrating runnable biomodules.
+
+`biosimulant` is the primary package and CLI name. The existing `biosim`
+Python import path and `python -m biosim` command remain supported for existing
+model packages during the migration.
 
 ---
 
@@ -31,20 +35,42 @@ Provide a small, stable composition layer for simulations: wire reusable compone
 Preferred (pinned GitHub ref):
 
 ```console
-pip install "biosim @ git+https://github.com/<org>/biosim.git@<ref>"
+pip install "biosimulant @ git+https://github.com/<org>/biosim.git@<ref>"
 ```
 
 Alternative (package index):
 
 ```console
-pip install biosim
+pip install biosimulant
 ```
 
 For the shared ONNX biomodule helpers:
 
 ```console
-pip install "biosim[ml]"
+pip install "biosimulant[ml]"
 ```
+
+### Compatibility and command ownership
+
+The `biosimulant` package still ships the `biosim` Python import path so existing
+model packages keep working:
+
+```python
+import biosim
+```
+
+Use `biosimulant` for new CLI examples:
+
+```bash
+biosimulant --help
+python -m biosimulant --help
+```
+
+`python -m biosim` remains available as a compatibility command. If a machine
+also has the Desktop/product CLI installed, `PATH` decides which `biosimulant`
+binary runs. Use `python -m biosimulant ...` to force the Python package CLI.
+The Python package owns local open-source workflows; Desktop/product extensions
+own Hub, auth, cloud, app state, and managed-service workflows.
 
 ## Publishing to PyPI
 
@@ -58,13 +84,13 @@ Common commands:
 
 ```bash
 # Build a package from a directory that contains model.yaml or lab.yaml
-python -m biosim pack build path/to/model-or-lab
+biosimulant pack build path/to/model-or-lab
 
 # Validate an existing package file
-python -m biosim pack validate dist/local__counter-1.0.0.bsimodel
+biosimulant pack validate dist/local__counter-1.0.0.bsimodel
 
 # Build a self-contained lab package (.bsilab)
-python -m biosim pack build path/to/lab
+biosimulant pack build path/to/lab
 ```
 
 Notes:
@@ -237,7 +263,7 @@ the shared library.
 SimUI lets you build and launch a small web UI entirely from Python (similar to Gradio's ergonomics), backed by FastAPI and a prebuilt React SPA that renders visuals from JSON. The frontend uses Server-Sent Events (SSE) for real-time updates.
 
 - User usage (no Node/npm required):
-  - Install UI extras: `pip install -e '.[ui]'`
+  - Install UI extras: `pip install 'biosimulant[ui]'`
   - Try the demo: `python examples/ui_demo.py` then open `http://127.0.0.1:7860/ui/`.
   - From your own code:
 

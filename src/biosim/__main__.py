@@ -121,7 +121,7 @@ def run_simui(
         from biosim.simui import Interface, Number, Button, EventLog, VisualsPanel
     except ImportError as e:
         print(f"Error: SimUI requires additional dependencies: {e}", file=sys.stderr)
-        print("Install with: pip install 'biosim[ui]' or pip install fastapi uvicorn", file=sys.stderr)
+        print("Install with: pip install 'biosimulant[ui]' or pip install fastapi uvicorn", file=sys.stderr)
         sys.exit(1)
 
     meta = config.get("meta", {})
@@ -153,20 +153,21 @@ def run_simui(
     ui.launch(host=host, port=port, open_browser=open_browser)
 
 
-def main() -> None:
-    if len(sys.argv) > 1 and sys.argv[1] == "pack":
-        _main_pack(sys.argv[2:])
+def main(argv: list[str] | None = None, *, prog: str = "python -m biosim") -> None:
+    args_list = list(sys.argv[1:] if argv is None else argv)
+    if args_list and args_list[0] == "pack":
+        _main_pack(args_list[1:], prog=f"{prog} pack")
         return
 
     parser = argparse.ArgumentParser(
-        prog="python -m biosim",
+        prog=prog,
         description="Run biosim simulations from YAML/TOML config files.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
+        epilog=f"""
 Examples:
-  python -m biosim wiring.yaml --simui
-  python -m biosim config.yaml --duration 10.0
-  python -m biosim config.yaml --simui --port 8080 --open
+  {prog} wiring.yaml --simui
+  {prog} config.yaml --duration 10.0
+  {prog} config.yaml --simui --port 8080 --open
         """,
     )
 
@@ -211,7 +212,7 @@ Examples:
         help="Open browser automatically when starting SimUI",
     )
 
-    args = parser.parse_args()
+    args = parser.parse_args(args_list)
 
     if not args.config.exists():
         print(f"Error: Config file not found: {args.config}", file=sys.stderr)
@@ -246,9 +247,9 @@ Examples:
         run_headless(world, duration=args.duration)
 
 
-def _main_pack(argv: list[str]) -> None:
+def _main_pack(argv: list[str], *, prog: str = "python -m biosim pack") -> None:
     parser = argparse.ArgumentParser(
-        prog="python -m biosim pack",
+        prog=prog,
         description="Build, validate, fetch, and run BioSim package files.",
     )
     parser.add_argument(

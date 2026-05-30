@@ -1,6 +1,8 @@
 # Packaging
 
-`biosim` supports single-file package archives for both models and labs.
+`biosimulant` supports single-file package archives for both models and labs.
+The `biosim` package/import name remains available for compatibility with
+existing model code.
 
 Package unit:
 - one model package wraps one `model.yaml` into a `.bsimodel`
@@ -17,28 +19,28 @@ Typical use cases:
 Build a package from a model or lab directory:
 
 ```bash
-python -m biosim pack build path/to/model-or-lab
+biosimulant pack build path/to/model-or-lab
 ```
 
 Validate a package file:
 
 ```bash
-python -m biosim pack validate path/to/model.bsimodel
+biosimulant pack validate path/to/model.bsimodel
 ```
 
 Fetch a package from the configured local registry into cache:
 
 ```bash
-python -m biosim pack fetch owner/model-name@1.0.0
+biosimulant pack fetch owner/model-name@1.0.0
 ```
 
 Run a package locally:
 
 ```bash
-python -m biosim pack run path/to/model.bsimodel
+biosimulant pack run path/to/model.bsimodel
 ```
 
-Use `--json` with any `biosim pack` command when you need machine-readable output.
+Use `--json` with any `biosimulant pack` command when you need machine-readable output.
 
 ## Runtime Compatibility
 
@@ -105,21 +107,21 @@ package: biosimulant/example-counter
 version: 1.2.0
 ```
 
-then `biosim pack build` uses those values by default.
+then `biosimulant pack build` uses those values by default.
 
-If they are not declared, `biosim` falls back to:
+If they are not declared, `biosimulant` falls back to:
 - package: `local/<directory-name>`
 - version: `0.1.0`
 
 You can also override both at the CLI:
 
 ```bash
-python -m biosim pack build path/to/model --package biosimulant/example-counter --version 1.2.0
+biosimulant pack build path/to/model --package biosimulant/example-counter --version 1.2.0
 ```
 
 ## Validation Rules
 
-`biosim pack validate` checks:
+`biosimulant pack validate` checks:
 - required archive files exist
 - no invalid archive paths
 - checksums match
@@ -139,14 +141,14 @@ The command is meant to be operator-friendly:
 
 The open-source CLI and Biosimulant platform share package interpretation semantics, but they do not share every execution policy:
 
-- `biosim pack run` installs exact-pinned manifest dependencies into the current Python environment when dependency installation is enabled
+- `biosimulant pack run` installs exact-pinned manifest dependencies into the current Python environment when dependency installation is enabled
 - platform and desktop executors install payload dependencies into isolated per-lock-hash environments with allow/deny policy
-- `biosim pack run` returns a compact CLI-oriented summary
+- `biosimulant pack run` returns a compact CLI-oriented summary
 - platform and desktop runs return full per-module outputs, state, visuals, and run metadata for UI consumers
 
 ## Registries And Cache
 
-`biosim` supports a simple local package registry and cache through environment variables:
+`biosimulant` supports a simple local package registry and cache through environment variables:
 
 - `BIOSIM_PACKAGE_REGISTRY_DIR`
 - `BIOSIM_PACKAGE_CACHE_DIR`
@@ -161,7 +163,7 @@ export BIOSIM_PACKAGE_CACHE_DIR=/tmp/biosim-cache
 Then publish or fetch packages programmatically through the Python API, and use:
 
 ```bash
-python -m biosim pack fetch owner/model-name@1.0.0
+biosimulant pack fetch owner/model-name@1.0.0
 ```
 
 ## Labs
@@ -172,7 +174,7 @@ models:
     alias: counter
 ```
 
-`biosim pack build path/to/lab` always emits a self-contained `.bsilab`. The packaged
+`biosimulant pack build path/to/lab` always emits a self-contained `.bsilab`. The packaged
 payload preserves the runnable source tree exactly as it exists on disk under `payload/`.
 
 Lab-local visualisation modules should remain inside each lab when portability is

@@ -1,6 +1,9 @@
-# biosim Documentation
+# biosimulant Documentation
 
-Welcome to the biosim documentation. This guide explains the core concepts, APIs, and practical wiring patterns for building modular biological simulations.
+Welcome to the biosimulant documentation. This guide explains the core concepts, APIs, and practical wiring patterns for building modular biological simulations.
+
+`biosimulant` is the primary package and CLI name. The `biosim` import path and
+`python -m biosim` command remain supported for existing model packages.
 
 ## Contents
 

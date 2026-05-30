@@ -1,17 +1,17 @@
 # CellML Runtime
 
-`biosim.contrib.cellml.LibCellMLBioModule` is the optional CellML equivalent of
-`biosim.contrib.sbml.TelluriumSBMLBioModule`. It uses only open-source runtime
+`biosimulant.contrib.cellml.LibCellMLBioModule` is the optional CellML equivalent of
+`biosimulant.contrib.sbml.TelluriumSBMLBioModule`. It uses only open-source runtime
 dependencies: libCellML for CellML parsing, validation, analysis, and Python code
 generation, and SciPy/NumPy for numerical integration.
 
 Install the optional runtime with:
 
 ```bash
-pip install 'biosim[cellml]'
+pip install 'biosimulant[cellml]'
 ```
 
-The base `biosim` package does not import `libcellml` or `scipy` at module import
+The base `biosimulant` package does not import `libcellml` or `scipy` at module import
 time. They are loaded lazily when a CellML wrapper prepares or simulates a model.
 
 ## Architecture

@@ -406,5 +406,5 @@ def test_missing_libcellml_dependency_error_is_actionable(tmp_path, monkeypatch)
 
     wrapper = LibCellMLBioModule(str(model_file))
 
-    with pytest.raises(CellMLRuntimeError, match=r"pip install 'biosim\[cellml\]'"):
+    with pytest.raises(CellMLRuntimeError, match=r"pip install 'biosimulant\[cellml\]'"):
         wrapper.setup()
