@@ -68,6 +68,10 @@ commands when you need machine-readable output.
 `biosimulant packages` is the open-source package repository surface. `biosimulant pack`
 remains the lower-level compatibility command for building or validating a single archive.
 
+Publishing, Hub download/sync, cloud runs, Desktop state, and self-update commands
+are not part of the OSS local workflow. They are routed through the product
+extension boundary described in [CLI Extensions](extensions.md).
+
 ## Package Repository Manifest
 
 A package repository manifest declares one or more top-level packages to build:

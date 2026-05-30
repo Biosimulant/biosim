@@ -31,6 +31,7 @@ _ALIASED_SUBMODULES = (
     "contrib",
     "contrib.cellml",
     "contrib.sbml",
+    "extensions",
     "modules",
     "onnx",
     "pack",

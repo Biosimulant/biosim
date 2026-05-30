@@ -20,6 +20,7 @@ Welcome to the biosimulant documentation. This guide explains the core concepts,
 - [Neuro packs](neuro.md): computational neuroscience modules (Izhikevich, Hodgkin-Huxley, Poisson input, synapses, monitors) — lives in the companion [`models`](https://github.com/Biosimulant/models) repo
 - [Plugin Development](plugin-development.md): creating and distributing custom biomodules
 - [Packaging](packaging.md): building, validating, fetching, and exporting `.bsimodel` and `.bsilab` artifacts
+- [CLI Extensions](extensions.md): OSS/product command ownership and extension integration contract
 - [Releasing](releasing.md): PyPI release/tag workflow and helper script
 
 See the files in this folder for a textbook-style walkthrough with code and concrete data examples.

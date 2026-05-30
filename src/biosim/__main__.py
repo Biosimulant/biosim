@@ -35,6 +35,13 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict
 
+from .extensions import (
+    ExtensionUnavailableError,
+    extension_error_payload,
+    get_extension_command_spec,
+    is_extension_command_path,
+    run_extension_command,
+)
 from .package_repo import build_package_repo, validate_package_repo
 from .pack import (
     PACKAGE_EXTENSIONS,
@@ -168,6 +175,9 @@ def main(argv: list[str] | None = None, *, prog: str = "python -m biosim") -> No
     if args_list and args_list[0] == "labs":
         _main_labs(args_list[1:], prog=f"{prog} labs")
         return
+    if args_list and is_extension_command_path(args_list[0]):
+        _run_extension_or_exit(args_list[0], args_list[1:], prog=f"{prog} {args_list[0]}")
+        return
 
     parser = argparse.ArgumentParser(
         prog=prog,
@@ -293,7 +303,30 @@ def _main_labs(argv: list[str], *, prog: str = "python -m biosim labs") -> None:
     serve_parser.add_argument("--no-install-deps", action="store_true")
     serve_parser.add_argument("--json", action="store_true", dest="json_output")
 
+    for name in (
+        "list",
+        "get",
+        "create",
+        "import",
+        "pull",
+        "save",
+        "rename",
+        "delete",
+        "open",
+        "vendor-model",
+        "change-model",
+        "inspect-owned",
+        "add-model",
+        "export",
+        "publish",
+    ):
+        _add_extension_subcommand(subparsers, name, f"labs {name}")
+
     args = parser.parse_args(argv)
+    if extension_command := getattr(args, "extension_command_path", None):
+        _run_extension_or_exit(extension_command, argv, prog=prog)
+        return
+
     try:
         if args.command == "init":
             payload = _init_lab_project(
@@ -375,7 +408,14 @@ def _main_packages(argv: list[str], *, prog: str = "python -m biosim packages") 
     run_parser.add_argument("--no-install-deps", action="store_true")
     run_parser.add_argument("--json", action="store_true", dest="json_output")
 
+    for name in ("preview", "import", "export-model", "export-lab", "publish", "ci"):
+        _add_extension_subcommand(subparsers, name, f"packages {name}")
+
     args = parser.parse_args(argv)
+    if extension_command := getattr(args, "extension_command_path", None):
+        _run_extension_or_exit(extension_command, argv, prog=prog)
+        return
+
     try:
         if args.command == "validate":
             if args.target.suffix in PACKAGE_EXTENSIONS:
@@ -636,6 +676,48 @@ def json_dumps(value: Any) -> str:
     import json
 
     return json.dumps(value, sort_keys=True)
+
+
+def _add_extension_subcommand(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+    name: str,
+    command_path: str,
+) -> None:
+    spec = get_extension_command_spec(command_path)
+    summary = spec.summary if spec else "Product extension command"
+    parser = subparsers.add_parser(name, help=f"{summary} (requires product extension)")
+    parser.add_argument("extension_args", nargs=argparse.REMAINDER)
+    parser.set_defaults(extension_command_path=command_path)
+
+
+def _run_extension_or_exit(command: str, argv: list[str], *, prog: str) -> None:
+    try:
+        exit_code = run_extension_command(command, argv, prog=prog)
+    except ExtensionUnavailableError as exc:
+        _print_extension_unavailable(exc, json_output="--json" in argv)
+        raise SystemExit(1) from exc
+    if exit_code:
+        raise SystemExit(exit_code)
+
+
+def _print_extension_unavailable(exc: ExtensionUnavailableError, *, json_output: bool) -> None:
+    if json_output:
+        print(json_dumps(extension_error_payload(exc)), file=sys.stderr)
+        return
+
+    payload = extension_error_payload(exc)
+    print("Biosimulant product extension required.", file=sys.stderr)
+    print(f"Command: {payload['invocation']}", file=sys.stderr)
+    print(f"Category: {payload['category']}", file=sys.stderr)
+    print(f"Extension: {payload['extension']}", file=sys.stderr)
+    print(f"Reason: {payload['summary']}", file=sys.stderr)
+    print(f"Next step: {payload['install_hint']}", file=sys.stderr)
+    print(
+        "Open-source local commands remain available: "
+        "biosimulant labs init|validate|run|serve; "
+        "biosimulant packages validate|build|run.",
+        file=sys.stderr,
+    )
 
 
 def _print_lab_init_success(payload: dict[str, Any], *, json_output: bool) -> None:
