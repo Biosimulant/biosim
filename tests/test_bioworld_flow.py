@@ -98,4 +98,3 @@ def test_request_pause_blocks_until_resume(biosim):
 
     world.request_resume()
     assert done.wait(timeout=2.0)
-

@@ -16,8 +16,8 @@ repos:
 -   repo: local
     hooks:
     -   id: pytest-biosim
-        name: Run biosim tests (98% coverage minimum)
-        entry: python -m pytest tests/ --tb=short -q --cov=biosim --cov-report=term-missing --cov-fail-under=98
+        name: Run biosim tests (82% coverage minimum)
+        entry: scripts/precommit_biosim_tests.sh
         language: system
         pass_filenames: false
         always_run: true

@@ -1429,14 +1429,15 @@ def _validate_lab_manifest(manifest: Mapping[str, Any]) -> None:
     if communication_step is None:
         raise PackageError("Lab manifest must contain runtime.communication_step")
     try:
-        if float(communication_step) <= 0:
-            raise PackageError(
-                "Lab manifest runtime.communication_step must be positive"
-            )
+        communication_step_value = float(communication_step)
     except (TypeError, ValueError) as exc:
         raise PackageError(
             "Lab manifest runtime.communication_step must be numeric"
         ) from exc
+    if communication_step_value <= 0:
+        raise PackageError(
+            "Lab manifest runtime.communication_step must be positive"
+        )
     extract_settle_steps(None, runtime, error_cls=PackageError)
 
 

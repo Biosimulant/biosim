@@ -22,6 +22,8 @@ def test_biosimulant_reexports_biosim_runtime_api() -> None:
     import biosimulant
     import biosimulant.package_repo
     import biosimulant.signals
+    import biosimulant.simui
+    import biosimulant.simui.runner
     import biosimulant.world
 
     assert biosimulant.__version__ == biosim.__version__
@@ -31,6 +33,8 @@ def test_biosimulant_reexports_biosim_runtime_api() -> None:
     assert biosimulant.package_repo.validate_package_repo is not None
     assert biosimulant.world.BioWorld is biosim.BioWorld
     assert biosimulant.signals.SignalSpec is biosim.SignalSpec
+    assert biosimulant.simui.runner.SimulationManager is not None
+    assert "simui" in dir(biosimulant)
 
 
 def test_biosimulant_cli_help_uses_primary_command_name(capsys) -> None:

@@ -65,4 +65,3 @@ def test_branch_round_trip_restores_module_state(biosim):
 
     assert world.get_outputs("counter")["count"].value == 3
     assert branched.get_outputs("counter")["count"].value == 2
-

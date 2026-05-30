@@ -2,13 +2,17 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from zipfile import ZipFile
 
 import pytest
 
+from biosim import pack as pack_module
 from biosim.pack import (
     PackageError,
     build_package,
     export_lab_package,
+    fetch_package,
+    prepare_lab_package,
     publish_package,
     run_package,
     unpack_package,
@@ -651,3 +655,168 @@ class Bad(BioModule):
     )
     with pytest.raises(PackageError):
         build_package(model_dir)
+
+
+def test_build_rejects_missing_source_and_non_directory_tree(tmp_path: Path) -> None:
+    with pytest.raises(PackageError, match="Package source must be a directory"):
+        build_package(tmp_path / "missing")
+
+    model_dir = tmp_path / "bad-tree"
+    _write_counter_model(model_dir)
+    (model_dir / "data").write_text("not a directory", encoding="utf-8")
+
+    with pytest.raises(PackageError, match="Expected directory"):
+        build_package(model_dir)
+
+
+def test_package_private_helpers_cover_source_and_alias_edges(tmp_path: Path) -> None:
+    assert pack_module._package_slug("demo/pkg") == "demo__pkg"
+    assert pack_module._sanitize_package_source(None) == {}
+    assert pack_module._sanitize_package_source({"path": "models/a", "empty": None}) == {"path": "models/a"}
+
+    with pytest.raises(PackageError, match="must not be empty"):
+        pack_module._package_slug("")
+    with pytest.raises(PackageError, match="source metadata must be a mapping"):
+        pack_module._sanitize_package_source(["bad"])  # type: ignore[arg-type]
+
+    assert pack_module._select_alias_override(None, "model") == {}
+    assert pack_module._select_alias_override({"model": {"x": 1}}, "model") == {"x": 1}
+    assert pack_module._select_alias_override({"x": 1}, "model", allow_global=True) == {"x": 1}
+    assert pack_module._select_alias_override(
+        {"model": {"x": 2}, "x": 1},
+        "model",
+        allow_global=True,
+    ) == {"x": 2}
+
+    remap = pack_module._port_remap_for_child(
+        prefix="outer.",
+        child_alias="child",
+        child_manifest={
+            "io": {
+                "inputs": [{"name": "in", "maps_to": "inner.in"}],
+                "outputs": [{"name": "out", "maps_to": "inner.out"}],
+            }
+        },
+    )
+    assert remap == {
+        "outer.child.in": "outer.child.inner.in",
+        "outer.child.out": "outer.child.inner.out",
+    }
+
+
+def test_validate_package_reports_archive_structure_errors(tmp_path: Path) -> None:
+    assert not validate_package(tmp_path / "not-a-package.txt").valid
+    missing = validate_package(tmp_path / "missing.bsimodel")
+    assert missing.errors and "not found" in missing.errors[0]
+
+    no_manifest = tmp_path / "no-manifest.bsimodel"
+    with ZipFile(no_manifest, "w") as zipf:
+        zipf.writestr("payload/model.yaml", "biosim: {}\n")
+    assert "missing package.yaml" in validate_package(no_manifest).errors[0]
+
+    bad_path = tmp_path / "bad-path.bsimodel"
+    with ZipFile(bad_path, "w") as zipf:
+        zipf.writestr("../evil", "bad")
+        zipf.writestr("package.yaml", "package_type: model\n")
+        zipf.writestr("integrity/sha256sums.txt", "")
+    assert "Invalid archive path" in validate_package(bad_path).errors[0]
+
+    bad_checksum = tmp_path / "bad-checksum.bsimodel"
+    with ZipFile(bad_checksum, "w") as zipf:
+        zipf.writestr(
+            "package.yaml",
+            """
+package_type: model
+entry_manifest: payload/model.yaml
+sha256: bad
+""",
+        )
+        zipf.writestr("payload/model.yaml", "biosim:\n  entrypoint: src.counter:Counter\n")
+        zipf.writestr("integrity/sha256sums.txt", "abc  missing.txt\n")
+    assert "missing file" in validate_package(bad_checksum).errors[0]
+
+
+def test_publish_fetch_and_prepare_error_paths(tmp_path: Path, monkeypatch) -> None:
+    model_dir = _write_counter_model(tmp_path / "counter")
+    package_path = build_package(model_dir, package_name="demo/counter", version="1.0.0")
+
+    monkeypatch.delenv("BIOSIM_PACKAGE_REGISTRY_DIR", raising=False)
+    with pytest.raises(PackageError, match="Set BIOSIM_PACKAGE_REGISTRY_DIR"):
+        publish_package(package_path)
+
+    published = publish_package(package_path, registry_dir=tmp_path / "registry")
+    assert published.exists()
+
+    cached = fetch_package(
+        "demo/counter",
+        "1.0.0",
+        registry_dir=tmp_path / "registry",
+        cache_dir=tmp_path / "cache",
+    )
+    assert cached.exists()
+    assert fetch_package("demo/counter", "1.0.0", cache_dir=tmp_path / "cache") == cached
+
+    with pytest.raises(PackageError, match="no registry is configured"):
+        fetch_package("demo/missing", "1.0.0", cache_dir=tmp_path / "empty-cache")
+    with pytest.raises(PackageError, match="was not found"):
+        fetch_package(
+            "demo/missing",
+            "1.0.0",
+            registry_dir=tmp_path / "registry",
+            cache_dir=tmp_path / "other-cache",
+        )
+    with pytest.raises(PackageError, match="Expected a lab package"):
+        prepare_lab_package(package_path, install_deps=False)
+
+
+def test_install_declared_dependencies_validation_and_command(monkeypatch) -> None:
+    calls = []
+
+    def fake_run(args, **kwargs):
+        calls.append((args, kwargs))
+
+    pack_module._install_declared_dependencies({})
+    pack_module._install_declared_dependencies({"runtime": {"dependencies": {"packages": []}}})
+
+    with pytest.raises(PackageError, match="exact pins"):
+        pack_module._install_declared_dependencies({"runtime": {"dependencies": {"packages": ["numpy>=1"]}}})
+
+    monkeypatch.setattr(pack_module.subprocess, "run", fake_run)
+    pack_module._install_declared_dependencies({"runtime": {"dependencies": {"packages": ["numpy==1.26.0"]}}})
+    assert calls[0][0][2:] == ["pip", "install", "numpy==1.26.0"]
+
+
+@pytest.mark.parametrize(
+    "manifest, match",
+    [
+        ({"models": [], "wiring": [], "runtime": {"communication_step": 0.1}}, "non-empty models"),
+        ({"models": ["bad"], "wiring": [], "runtime": {"communication_step": 0.1}}, "model entries"),
+        ({"models": [{"path": "models/a"}], "wiring": [], "runtime": {"communication_step": 0.1}}, "define alias"),
+        ({"models": [{"alias": "a"}], "wiring": [], "runtime": {"communication_step": 0.1}}, "path reference"),
+        (
+            {"models": [{"alias": "a", "path": "models/a"}, {"alias": "a", "path": "models/b"}], "wiring": [], "runtime": {"communication_step": 0.1}},
+            "Duplicate lab model alias",
+        ),
+        ({"models": [{"alias": "a", "repo": "old", "path": "models/a"}], "wiring": [], "runtime": {"communication_step": 0.1}}, "repo"),
+        ({"models": [{"alias": "a", "package": "old", "path": "models/a"}], "wiring": [], "runtime": {"communication_step": 0.1}}, "path references only"),
+        ({"children": "bad", "models": [{"alias": "a", "path": "models/a"}], "wiring": [], "runtime": {"communication_step": 0.1}}, "children entries"),
+        ({"children": ["bad"], "models": [], "wiring": [], "runtime": {"communication_step": 0.1}}, "child entries"),
+        ({"children": [{"path": "labs/a"}], "models": [], "wiring": [], "runtime": {"communication_step": 0.1}}, "define alias"),
+        ({"children": [{"alias": "a"}], "models": [], "wiring": [], "runtime": {"communication_step": 0.1}}, "path reference"),
+        (
+            {"children": [{"alias": "a", "path": "labs/a"}, {"alias": "a", "path": "labs/b"}], "models": [], "wiring": [], "runtime": {"communication_step": 0.1}},
+            "Duplicate lab child alias",
+        ),
+        ({"children": [{"alias": "a", "repo": "old", "path": "labs/a"}], "models": [], "wiring": [], "runtime": {"communication_step": 0.1}}, "repo"),
+        ({"children": [{"alias": "a", "package": "old", "path": "labs/a"}], "models": [], "wiring": [], "runtime": {"communication_step": 0.1}}, "path references only"),
+        ({"models": [{"alias": "a", "path": "models/a"}], "runtime": {"communication_step": 0.1}}, "wiring list"),
+        ({"models": [{"alias": "a", "path": "models/a"}], "wiring": [], "runtime": "bad"}, "runtime mapping"),
+        ({"models": [{"alias": "a", "path": "models/a"}], "wiring": [], "runtime": {"tick_dt": 0.1, "communication_step": 0.1}}, "tick_dt"),
+        ({"models": [{"alias": "a", "path": "models/a"}], "wiring": [], "runtime": {}}, "communication_step"),
+        ({"models": [{"alias": "a", "path": "models/a"}], "wiring": [], "runtime": {"communication_step": 0}}, "positive"),
+        ({"models": [{"alias": "a", "path": "models/a"}], "wiring": [], "runtime": {"communication_step": "fast"}}, "numeric"),
+    ],
+)
+def test_validate_lab_manifest_error_matrix(manifest, match: str) -> None:
+    with pytest.raises(PackageError, match=match):
+        pack_module._validate_lab_manifest(manifest)

@@ -59,3 +59,72 @@ def test_flatten_lab_tree_rejects_excessive_depth() -> None:
 
     with pytest.raises(RuntimeError, match="maximum depth"):
         flatten_lab_tree(root, max_depth=5)
+
+
+def test_flatten_lab_tree_preserves_model_ref_and_config_and_child_io_override() -> None:
+    child = LabTree(
+        models=[
+            LabTreeModel(
+                alias="m",
+                ref="plain-ref",
+                parameters={"alpha": 1},
+                module_config={"seed": 2},
+            )
+        ],
+        wiring=[LabTreeWire(from_ref="m.out", to_refs=["m.in"])],
+    )
+    root = LabTree(
+        children=[
+            LabTreeChild(
+                alias="child",
+                tree=child,
+                io=LabTreeIO(inputs=[LabTreePort(name="external_in", maps_to="m.in")]),
+            )
+        ],
+        wiring=[LabTreeWire(from_ref="child.external_in", to_refs=["child.m.out"])],
+    )
+
+    flat = flatten_lab_tree(root)
+
+    assert flat.models == [
+        {
+            "alias": "child.m",
+            "ref": "plain-ref",
+            "parameters": {"alpha": 1},
+            "module_config": {"seed": 2},
+        }
+    ]
+    assert {"from": "child.m.in", "to": ["child.m.out"]} in flat.wiring
+
+
+@pytest.mark.parametrize(
+    "tree, match",
+    [
+        (LabTree(models=[LabTreeModel(alias="", ref={})]), "non-empty alias"),
+        (LabTree(children=[LabTreeChild(alias="", tree=LabTree())]), "child entries"),
+        (LabTree(wiring=[LabTreeWire(from_ref="", to_refs=["a.b"])]), "from ref"),
+        (LabTree(wiring=[LabTreeWire(from_ref="a.b", to_refs=[""])]), "targets"),
+    ],
+)
+def test_flatten_lab_tree_rejects_invalid_aliases_and_wiring(tree: LabTree, match: str) -> None:
+    with pytest.raises(RuntimeError, match=match):
+        flatten_lab_tree(tree)
+
+
+def test_lab_io_from_mapping_ignores_invalid_entries() -> None:
+    from biosim.runtime.flatten import lab_io_from_mapping
+
+    io = lab_io_from_mapping(
+        {
+            "inputs": [
+                LabTreePort(name="as-dataclass", maps_to="m.in"),
+                {"name": "as-mapping", "maps_to": "m.other"},
+                {"name": 1, "maps_to": "bad"},
+                "bad",
+            ],
+            "outputs": "bad",
+        }
+    )
+
+    assert [port.name for port in io.inputs] == ["as-dataclass", "as-mapping"]
+    assert io.outputs == []
