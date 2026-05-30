@@ -185,6 +185,15 @@ def _typed_input_signal_spec(
         stale_policy=declared_spec.stale_policy,
         schema=resolved_schema,
         description=declared_spec.description,
+        value_type=getattr(declared_spec, "value_type", None),
+        format=getattr(declared_spec, "format", None),
+        required=getattr(declared_spec, "required", None),
+        default=getattr(declared_spec, "default", None),
+        advanced=getattr(declared_spec, "advanced", None),
+        examples=getattr(declared_spec, "examples", None),
+        allowed_values=getattr(declared_spec, "allowed_values", None),
+        file=getattr(declared_spec, "file", None),
+        ui=getattr(declared_spec, "ui", None),
     )
 
 

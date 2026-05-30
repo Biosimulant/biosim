@@ -21,6 +21,7 @@ SignalType = Literal["scalar", "array", "record", "event"]
 SignalKind = Literal["state", "event"]
 InterpolationPolicy = Literal["zoh", "linear", "none"]
 StalePolicy = Literal["ignore", "warn", "error"]
+InputValueType = Literal["string", "number", "integer", "boolean", "record", "array", "file"]
 
 _NUMERIC_DTYPES = {
     "float16",
@@ -36,6 +37,8 @@ _NUMERIC_DTYPES = {
     "uint64",
 }
 
+_INPUT_VALUE_TYPES = {"string", "number", "integer", "boolean", "record", "array", "file"}
+
 
 def _ensure_json_serializable(value: Any) -> None:
     try:
@@ -48,6 +51,44 @@ def _normalize_dtype(dtype: Optional[str]) -> Optional[str]:
     if dtype is None:
         return None
     return str(dtype)
+
+
+def _normalize_input_value_type(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    normalized = str(value).strip().lower()
+    if not normalized:
+        return None
+    if normalized not in _INPUT_VALUE_TYPES:
+        raise ValueError(f"value_type must be one of {sorted(_INPUT_VALUE_TYPES)}")
+    return normalized
+
+
+def _normalize_input_format(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    normalized = str(value).strip()
+    return normalized or None
+
+
+def _normalize_json_mapping(value: Optional[Mapping[str, Any]], *, field: str) -> Optional[dict[str, Any]]:
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        raise TypeError(f"{field} must be a mapping")
+    normalized = dict(value)
+    _ensure_json_serializable(normalized)
+    return normalized
+
+
+def _normalize_json_sequence(value: Optional[list[Any] | tuple[Any, ...]], *, field: str) -> Optional[tuple[Any, ...]]:
+    if value is None:
+        return None
+    if not isinstance(value, (list, tuple)):
+        raise TypeError(f"{field} must be a sequence")
+    normalized = tuple(value)
+    _ensure_json_serializable(normalized)
+    return normalized
 
 
 def _coerce_init_args(args: tuple[Any, ...], kwargs: dict[str, Any]) -> tuple[str, str, Any, float, Optional[SignalSpec | Mapping[str, Any]], Any]:
@@ -248,6 +289,15 @@ class SignalSpec:
     stale_policy: StalePolicy = "warn"
     schema: Optional[dict[str, str]] = None
     description: Optional[str] = None
+    value_type: Optional[InputValueType] = None
+    format: Optional[str] = None
+    required: Optional[bool] = None
+    default: Any = None
+    advanced: Optional[bool] = None
+    examples: Optional[tuple[Any, ...]] = None
+    allowed_values: Optional[tuple[Any, ...]] = None
+    file: Optional[dict[str, Any]] = None
+    ui: Optional[dict[str, Any]] = None
 
     def __post_init__(self) -> None:
         shape = self.shape
@@ -284,6 +334,8 @@ class SignalSpec:
             object.__setattr__(self, "emitted_unit", clean_emitted_unit)
 
         object.__setattr__(self, "dtype", _normalize_dtype(self.dtype))
+        object.__setattr__(self, "value_type", _normalize_input_value_type(self.value_type))
+        object.__setattr__(self, "format", _normalize_input_format(self.format))
 
         if self.max_age is not None and self.max_age < 0:
             raise ValueError("max_age must be non-negative")
@@ -317,6 +369,17 @@ class SignalSpec:
             if self.dtype not in _NUMERIC_DTYPES:
                 raise ValueError("linear interpolation requires a numeric dtype")
 
+        if self.default is not None:
+            _ensure_json_serializable(self.default)
+        object.__setattr__(self, "examples", _normalize_json_sequence(self.examples, field="examples"))
+        object.__setattr__(
+            self,
+            "allowed_values",
+            _normalize_json_sequence(self.allowed_values, field="allowed_values"),
+        )
+        object.__setattr__(self, "file", _normalize_json_mapping(self.file, field="file"))
+        object.__setattr__(self, "ui", _normalize_json_mapping(self.ui, field="ui"))
+
     @classmethod
     def scalar(
         cls,
@@ -328,6 +391,15 @@ class SignalSpec:
         max_age: Optional[float] = None,
         stale_policy: StalePolicy = "warn",
         description: Optional[str] = None,
+        value_type: Optional[InputValueType] = None,
+        format: Optional[str] = None,
+        required: Optional[bool] = None,
+        default: Any = None,
+        advanced: Optional[bool] = None,
+        examples: Optional[list[Any] | tuple[Any, ...]] = None,
+        allowed_values: Optional[list[Any] | tuple[Any, ...]] = None,
+        file: Optional[Mapping[str, Any]] = None,
+        ui: Optional[Mapping[str, Any]] = None,
     ) -> "SignalSpec":
         return cls(
             signal_type="scalar",
@@ -339,6 +411,15 @@ class SignalSpec:
             max_age=max_age,
             stale_policy=stale_policy,
             description=description,
+            value_type=value_type,
+            format=format,
+            required=required,
+            default=default,
+            advanced=advanced,
+            examples=tuple(examples) if examples is not None else None,
+            allowed_values=tuple(allowed_values) if allowed_values is not None else None,
+            file=dict(file) if file is not None else None,
+            ui=dict(ui) if ui is not None else None,
         )
 
     @classmethod
@@ -353,6 +434,15 @@ class SignalSpec:
         max_age: Optional[float] = None,
         stale_policy: StalePolicy = "warn",
         description: Optional[str] = None,
+        value_type: Optional[InputValueType] = None,
+        format: Optional[str] = None,
+        required: Optional[bool] = None,
+        default: Any = None,
+        advanced: Optional[bool] = None,
+        examples: Optional[list[Any] | tuple[Any, ...]] = None,
+        allowed_values: Optional[list[Any] | tuple[Any, ...]] = None,
+        file: Optional[Mapping[str, Any]] = None,
+        ui: Optional[Mapping[str, Any]] = None,
     ) -> "SignalSpec":
         return cls(
             signal_type="array",
@@ -365,6 +455,15 @@ class SignalSpec:
             max_age=max_age,
             stale_policy=stale_policy,
             description=description,
+            value_type=value_type,
+            format=format,
+            required=required,
+            default=default,
+            advanced=advanced,
+            examples=tuple(examples) if examples is not None else None,
+            allowed_values=tuple(allowed_values) if allowed_values is not None else None,
+            file=dict(file) if file is not None else None,
+            ui=dict(ui) if ui is not None else None,
         )
 
     @classmethod
@@ -377,6 +476,15 @@ class SignalSpec:
         max_age: Optional[float] = None,
         stale_policy: StalePolicy = "warn",
         description: Optional[str] = None,
+        value_type: Optional[InputValueType] = None,
+        format: Optional[str] = None,
+        required: Optional[bool] = None,
+        default: Any = None,
+        advanced: Optional[bool] = None,
+        examples: Optional[list[Any] | tuple[Any, ...]] = None,
+        allowed_values: Optional[list[Any] | tuple[Any, ...]] = None,
+        file: Optional[Mapping[str, Any]] = None,
+        ui: Optional[Mapping[str, Any]] = None,
     ) -> "SignalSpec":
         return cls(
             signal_type="record",
@@ -387,6 +495,15 @@ class SignalSpec:
             max_age=max_age,
             stale_policy=stale_policy,
             description=description,
+            value_type=value_type,
+            format=format,
+            required=required,
+            default=default,
+            advanced=advanced,
+            examples=tuple(examples) if examples is not None else None,
+            allowed_values=tuple(allowed_values) if allowed_values is not None else None,
+            file=dict(file) if file is not None else None,
+            ui=dict(ui) if ui is not None else None,
         )
 
     @classmethod
@@ -399,6 +516,15 @@ class SignalSpec:
         max_age: Optional[float] = None,
         stale_policy: StalePolicy = "warn",
         description: Optional[str] = None,
+        value_type: Optional[InputValueType] = None,
+        format: Optional[str] = None,
+        required: Optional[bool] = None,
+        default: Any = None,
+        advanced: Optional[bool] = None,
+        examples: Optional[list[Any] | tuple[Any, ...]] = None,
+        allowed_values: Optional[list[Any] | tuple[Any, ...]] = None,
+        file: Optional[Mapping[str, Any]] = None,
+        ui: Optional[Mapping[str, Any]] = None,
     ) -> "SignalSpec":
         return cls(
             signal_type="event",
@@ -410,6 +536,15 @@ class SignalSpec:
             max_age=max_age,
             stale_policy=stale_policy,
             description=description,
+            value_type=value_type,
+            format=format,
+            required=required,
+            default=default,
+            advanced=advanced,
+            examples=tuple(examples) if examples is not None else None,
+            allowed_values=tuple(allowed_values) if allowed_values is not None else None,
+            file=dict(file) if file is not None else None,
+            ui=dict(ui) if ui is not None else None,
         )
 
     @property
@@ -450,6 +585,15 @@ class SignalSpec:
             "stale_policy": self.stale_policy,
             "schema": dict(self.schema) if self.schema is not None else None,
             "description": self.description,
+            "value_type": self.value_type,
+            "format": self.format,
+            "required": self.required,
+            "default": self.default,
+            "advanced": self.advanced,
+            "examples": list(self.examples) if self.examples is not None else None,
+            "allowed_values": list(self.allowed_values) if self.allowed_values is not None else None,
+            "file": dict(self.file) if self.file is not None else None,
+            "ui": dict(self.ui) if self.ui is not None else None,
         }
 
     @classmethod
@@ -468,6 +612,15 @@ class SignalSpec:
             stale_policy=data.get("stale_policy", "warn"),
             schema=dict(data["schema"]) if data.get("schema") is not None else None,
             description=data.get("description"),
+            value_type=data.get("value_type") or data.get("type"),
+            format=data.get("format"),
+            required=data.get("required"),
+            default=data.get("default"),
+            advanced=data.get("advanced"),
+            examples=tuple(data["examples"]) if data.get("examples") is not None else None,
+            allowed_values=tuple(data["allowed_values"]) if data.get("allowed_values") is not None else None,
+            file=dict(data["file"]) if data.get("file") is not None else None,
+            ui=dict(data["ui"]) if data.get("ui") is not None else None,
         )
 
 

@@ -27,6 +27,36 @@ def test_signal_spec_shape_list_to_tuple() -> None:
     assert spec.shape == (3, 4)
 
 
+def test_signal_spec_preserves_typed_input_metadata() -> None:
+    spec = SignalSpec.record(
+        schema={"payload": "json"},
+        description="Boltz run options",
+        value_type="record",
+        format="json",
+        required=False,
+        default={"use_msa_server": True},
+        advanced=True,
+        examples=[{"sampling_steps": 50}],
+        allowed_values=None,
+        ui={"control": "json"},
+    )
+
+    restored = SignalSpec.from_dict(spec.to_dict())
+
+    assert restored.value_type == "record"
+    assert restored.format == "json"
+    assert restored.required is False
+    assert restored.default == {"use_msa_server": True}
+    assert restored.advanced is True
+    assert restored.examples == ({"sampling_steps": 50},)
+    assert restored.ui == {"control": "json"}
+
+
+def test_signal_spec_rejects_unknown_input_value_type() -> None:
+    with pytest.raises(ValueError, match="value_type"):
+        SignalSpec.scalar(value_type="toggle")  # type: ignore[arg-type]
+
+
 def test_signal_spec_rejects_invalid_linear_interpolation() -> None:
     with pytest.raises(ValueError, match="linear interpolation is only valid"):
         SignalSpec.record(schema={"value": "str"}, description="bad").__class__(
