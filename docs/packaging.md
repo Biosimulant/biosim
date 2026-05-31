@@ -19,58 +19,78 @@ Typical use cases:
 Initialize, validate, run, and serve a local lab without Desktop:
 
 ```bash
-biosimulant labs init ./my-lab --name "My Lab"
+biosimulant labs create ./my-lab --name "My Lab"
 biosimulant labs validate ./my-lab
 biosimulant labs run ./my-lab --no-install-deps
 biosimulant labs serve ./my-lab
 ```
 
+Manage a local lab source tree without Desktop:
+
+```bash
+biosimulant labs list .
+biosimulant labs get ./my-lab
+biosimulant labs save ./my-lab
+biosimulant labs add-model models/example --lab ./my-lab --alias example
+biosimulant labs vendor-model ../model-source --lab ./my-lab --alias vendored
+biosimulant labs inspect-owned ./my-lab
+biosimulant labs package ./my-lab --out dist
+```
+
+Local workspace identity is stored in `.biosimulant/lab.json`; `lab.yaml`
+remains the portable lab manifest embedded in exported `.bsilab` files.
+
 Build all packages declared in a package repository manifest:
 
 ```bash
-biosimulant packages validate biosimulant-packages.yaml
-biosimulant packages build biosimulant-packages.yaml --out dist/biosimulant-packages
+biosimulant labs release validate biosimulant-packages.yaml
+biosimulant labs release build biosimulant-packages.yaml --out dist/biosimulant-packages
 ```
 
-Run a package archive locally:
+Discover and pull public registry labs:
 
 ```bash
-biosimulant packages run path/to/lab.bsilab --no-install-deps
+biosimulant labs search immune
+biosimulant labs info owner/lab-name@1.0.0
+biosimulant labs versions owner/lab-name
+biosimulant labs pull owner/lab-name@1.0.0 --target ./labs/lab-name
 ```
 
-Build a package from a model or lab directory:
+Build a lab archive:
 
 ```bash
-biosimulant pack build path/to/model-or-lab
+biosimulant labs package path/to/lab --out dist
 ```
 
-Validate a package file:
+Validate or run a lab source tree or `.bsilab`:
 
 ```bash
-biosimulant pack validate path/to/model.bsimodel
+biosimulant labs validate path/to/lab
+biosimulant labs run path/to/lab.bsilab --no-install-deps
 ```
 
-Fetch a package from the configured local registry into cache:
+Use `--json` with `biosimulant labs` commands when you need machine-readable output.
+
+`biosimulant pack`, `biosimulant packages`, `biosimulant hub`, and standalone
+`biosimulant models` are no longer public CLI surfaces. The library-level
+package helpers remain available as Python APIs for internal tooling and
+compatibility code.
+
+Publishing, private Hub download/sync, cloud runs, Desktop state, and
+self-update commands are routed through the product extension boundary described
+in [CLI Extensions](extensions.md).
+
+## Public Registry
 
 ```bash
-biosimulant pack fetch owner/model-name@1.0.0
+biosimulant labs search [query]
+biosimulant labs info namespace/name[@version]
+biosimulant labs versions namespace/name
+biosimulant labs pull namespace/name[@version] --target ./local-lab
 ```
 
-Run a package locally:
-
-```bash
-biosimulant pack run path/to/model.bsimodel
-```
-
-Use `--json` with `biosimulant labs`, `biosimulant packages`, or `biosimulant pack`
-commands when you need machine-readable output.
-
-`biosimulant packages` is the open-source package repository surface. `biosimulant pack`
-remains the lower-level compatibility command for building or validating a single archive.
-
-Publishing, Hub download/sync, cloud runs, Desktop state, and self-update commands
-are not part of the OSS local workflow. They are routed through the product
-extension boundary described in [CLI Extensions](extensions.md).
+Anonymous public reads are supported first. Private assets should fail with a
+clean auth-required error until a product extension supplies credentials.
 
 ## Package Repository Manifest
 
@@ -88,7 +108,7 @@ packages:
     visibility: public
 ```
 
-`packages validate` checks the manifest shape, package identity, SemVer versions,
+`labs release validate` checks the manifest shape, package identity, SemVer versions,
 source paths, package type, dependency pins, embedded lab/model paths, and archive
 compatibility by building into a temporary directory.
 
@@ -157,7 +177,7 @@ package: biosimulant/example-counter
 version: 1.2.0
 ```
 
-then `biosimulant pack build` uses those values by default.
+then `biosimulant labs package` uses those values by default.
 
 If they are not declared, `biosimulant` falls back to:
 - package: `local/<directory-name>`
@@ -166,12 +186,12 @@ If they are not declared, `biosimulant` falls back to:
 You can also override both at the CLI:
 
 ```bash
-biosimulant pack build path/to/model --package biosimulant/example-counter --version 1.2.0
+biosimulant labs package path/to/lab --package biosimulant/example-lab --version 1.2.0
 ```
 
 ## Validation Rules
 
-`biosimulant pack validate` checks:
+`biosimulant labs validate` checks source-tree labs and `.bsilab` archives:
 - required archive files exist
 - no invalid archive paths
 - checksums match
@@ -191,14 +211,14 @@ The command is meant to be operator-friendly:
 
 The open-source CLI and Biosimulant platform share package interpretation semantics, but they do not share every execution policy:
 
-- `biosimulant pack run` installs exact-pinned manifest dependencies into the current Python environment when dependency installation is enabled
+- `biosimulant labs run` installs exact-pinned manifest dependencies into the current Python environment when dependency installation is enabled
 - platform and desktop executors install payload dependencies into isolated per-lock-hash environments with allow/deny policy
-- `biosimulant pack run` returns a compact CLI-oriented summary
+- `biosimulant labs run` returns a compact CLI-oriented summary
 - platform and desktop runs return full per-module outputs, state, visuals, and run metadata for UI consumers
 
 ## Registries And Cache
 
-`biosimulant` supports a simple local package registry and cache through environment variables:
+The Python package still includes simple local package registry and cache helpers for API consumers:
 
 - `BIOSIM_PACKAGE_REGISTRY_DIR`
 - `BIOSIM_PACKAGE_CACHE_DIR`
@@ -210,11 +230,8 @@ export BIOSIM_PACKAGE_REGISTRY_DIR=/tmp/biosim-registry
 export BIOSIM_PACKAGE_CACHE_DIR=/tmp/biosim-cache
 ```
 
-Then publish or fetch packages programmatically through the Python API, and use:
-
-```bash
-biosimulant pack fetch owner/model-name@1.0.0
-```
+Publish or fetch packages programmatically through the Python API when internal
+tooling needs local cache behavior.
 
 ## Labs
 
@@ -224,7 +241,7 @@ models:
     alias: counter
 ```
 
-`biosimulant pack build path/to/lab` always emits a self-contained `.bsilab`. The packaged
+`biosimulant labs package path/to/lab` always emits a self-contained `.bsilab`. The packaged
 payload preserves the runnable source tree exactly as it exists on disk under `payload/`.
 
 Lab-local visualisation modules should remain inside each lab when portability is

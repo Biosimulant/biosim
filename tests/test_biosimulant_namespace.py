@@ -49,16 +49,17 @@ def test_biosimulant_cli_help_uses_primary_command_name(capsys) -> None:
     assert "python -m biosim" not in captured.out
 
 
-def test_biosimulant_pack_help_uses_primary_command_name(capsys) -> None:
+def test_biosimulant_pack_surface_is_removed_with_primary_command_guidance(capsys) -> None:
     from biosimulant.__main__ import main
 
     with pytest.raises(SystemExit) as exc_info:
         main(["pack", "--help"])
 
-    assert exc_info.value.code == 0
+    assert exc_info.value.code == 2
     captured = capsys.readouterr()
-    assert "usage: biosimulant pack" in captured.out
-    assert "python -m biosim pack" not in captured.out
+    assert "Command removed: biosimulant pack" in captured.err
+    assert "biosimulant labs package" in captured.err
+    assert "python -m biosim pack" not in captured.err
 
 
 def test_pyproject_declares_biosimulant_distribution_and_console_script() -> None:

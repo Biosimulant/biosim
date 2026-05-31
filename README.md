@@ -84,11 +84,14 @@ See the release guide: [`docs/releasing.md`](docs/releasing.md).
 
 ## Local Labs
 
-The open-source Python CLI can create, validate, run, and serve local labs
-without Desktop or Hub:
+The open-source Python CLI can create, manage, validate, run, and serve local
+lab source trees without Desktop or Hub:
 
 ```bash
-biosimulant labs init ./my-lab --name "My Lab"
+biosimulant labs create ./my-lab --name "My Lab"
+biosimulant labs list .
+biosimulant labs get ./my-lab
+biosimulant labs package ./my-lab --out dist
 biosimulant labs validate ./my-lab
 biosimulant labs run ./my-lab --no-install-deps
 biosimulant labs serve ./my-lab
@@ -96,33 +99,36 @@ biosimulant labs serve ./my-lab
 
 `labs init` creates a runnable starter lab by default. Use `--empty` when you
 want only a bare `lab.yaml` scaffold.
+Managed local lab identity lives in `.biosimulant/lab.json`; exported labs use
+the portable `lab.yaml` source manifest.
 
 ## Packaging Models And Labs
 
-`biosimulant` can package one model or one lab into a single archive for portability, upload, caching, and validation.
+`biosimulant` packages labs through the `labs` command group. Standalone model
+package helpers remain Python APIs, but the public CLI object is the lab.
 
 Common commands:
 
 ```bash
 # Validate and build a package repository manifest
-biosimulant packages validate biosimulant-packages.yaml
-biosimulant packages build biosimulant-packages.yaml --out dist/biosimulant-packages
-
-# Run a local package archive
-biosimulant packages run dist/local__source-lab-1.0.0.bsilab --no-install-deps
-
-# Build a package from a directory that contains model.yaml or lab.yaml
-biosimulant pack build path/to/model-or-lab
-
-# Validate an existing package file
-biosimulant pack validate dist/local__counter-1.0.0.bsimodel
+biosimulant labs release validate biosimulant-packages.yaml
+biosimulant labs release build biosimulant-packages.yaml --out dist/biosimulant-packages
 
 # Build a self-contained lab package (.bsilab)
-biosimulant pack build path/to/lab
+biosimulant labs package path/to/lab --out dist
+
+# Discover and pull public registry labs
+biosimulant labs search immune
+biosimulant labs info owner/lab-name@1.0.0
+biosimulant labs pull owner/lab-name@1.0.0 --target ./labs/lab-name
+
+# Validate or run a lab source tree or .bsilab
+biosimulant labs validate path/to/lab
+biosimulant labs run dist/local__source-lab-1.0.0.bsilab --no-install-deps
 ```
 
 Notes:
-- `build` prefers `package:` and `version:` from `model.yaml` or `lab.yaml` when present.
+- `labs package` uses `package:` and `version:` from `lab.yaml` unless explicitly overridden with `--package` or `--version`.
 - model dependencies in manifests must use exact `==` pins.
 - lab builds are always self-contained and preserve the full runnable source tree inside the `.bsilab`.
 - nested lab dependencies must use relative `path` refs and must already exist inside the packaged lab directory.

@@ -30,8 +30,12 @@ YAML config format (simplified):
 from __future__ import annotations
 
 import argparse
+import hashlib
+import shutil
 import sys
 import tempfile
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Dict
 
@@ -48,9 +52,30 @@ from .pack import (
     PackageError,
     build_package,
     fetch_package,
+    _package_slug,
     prepare_lab_package,
     run_package,
+    unpack_package,
+    validate_lab_source,
     validate_package,
+)
+from .registry import (
+    PublicRegistryClient,
+    cached_lab_destination_for_reference,
+    lab_destination_for_reference,
+    parse_package_reference,
+)
+from .workspace import (
+    add_model as workspace_add_model,
+    change_model as workspace_change_model,
+    create_lab as workspace_create_lab,
+    delete_lab as workspace_delete_lab,
+    get_lab as workspace_get_lab,
+    inspect_owned as workspace_inspect_owned,
+    list_labs as workspace_list_labs,
+    rename_lab as workspace_rename_lab,
+    save_lab as workspace_save_lab,
+    vendor_model as workspace_vendor_model,
 )
 
 
@@ -166,12 +191,8 @@ def run_simui(
 
 def main(argv: list[str] | None = None, *, prog: str = "python -m biosim") -> None:
     args_list = list(sys.argv[1:] if argv is None else argv)
-    if args_list and args_list[0] == "pack":
-        _main_pack(args_list[1:], prog=f"{prog} pack")
-        return
-    if args_list and args_list[0] == "packages":
-        _main_packages(args_list[1:], prog=f"{prog} packages")
-        return
+    if args_list and args_list[0] in {"pack", "packages", "hub", "models"}:
+        _removed_command_or_exit(args_list[0], prog=prog, json_output="--json" in args_list)
     if args_list and args_list[0] == "labs":
         _main_labs(args_list[1:], prog=f"{prog} labs")
         return
@@ -187,7 +208,7 @@ def main(argv: list[str] | None = None, *, prog: str = "python -m biosim") -> No
 Examples:
   {prog} labs init ./my-lab --name "My Lab"
   {prog} labs validate ./my-lab
-  {prog} packages build biosimulant-packages.yaml
+  {prog} labs package ./my-lab --out dist/
   {prog} wiring.yaml --simui
   {prog} config.yaml --duration 10.0
   {prog} config.yaml --simui --port 8080 --open
@@ -270,7 +291,47 @@ Examples:
         run_headless(world, duration=args.duration)
 
 
+def _removed_command_or_exit(command: str, *, prog: str, json_output: bool) -> None:
+    replacements = {
+        "pack": "Use `biosimulant labs package`, `biosimulant labs validate`, `biosimulant labs run`, or `biosimulant labs pull`.",
+        "packages": "Use `biosimulant labs package` or `biosimulant labs release ...`.",
+        "hub": "Use object commands such as `biosimulant labs search`, `biosimulant labs info`, `biosimulant labs publish`, or `biosimulant runs remote ...`.",
+        "models": "Use lab-scoped model commands: `biosimulant labs add-model`, `biosimulant labs vendor-model`, and `biosimulant labs change-model`.",
+    }
+    payload = {
+        "error": "command_removed",
+        "command": command,
+        "replacement": replacements[command],
+    }
+    if json_output:
+        print(json_dumps(payload), file=sys.stderr)
+    else:
+        print(f"Command removed: {prog} {command}", file=sys.stderr)
+        print(replacements[command], file=sys.stderr)
+    raise SystemExit(2)
+
+
+def _removed_labs_command_or_exit(command: str, *, prog: str, json_output: bool) -> None:
+    replacements = {
+        "export": "Use `biosimulant labs package [lab] --out <path>`.",
+    }
+    payload = {
+        "error": "command_removed",
+        "command": f"labs {command}",
+        "replacement": replacements[command],
+    }
+    if json_output:
+        print(json_dumps(payload), file=sys.stderr)
+    else:
+        print(f"Command removed: {prog} {command}", file=sys.stderr)
+        print(replacements[command], file=sys.stderr)
+    raise SystemExit(2)
+
+
 def _main_labs(argv: list[str], *, prog: str = "python -m biosim labs") -> None:
+    if argv and argv[0] == "export":
+        _removed_labs_command_or_exit("export", prog=prog, json_output="--json" in argv)
+
     parser = argparse.ArgumentParser(
         prog=prog,
         description="Initialize, validate, run, and serve local Biosimulant labs.",
@@ -289,37 +350,145 @@ def _main_labs(argv: list[str], *, prog: str = "python -m biosim labs") -> None:
     validate_parser.add_argument("lab", type=Path, nargs="?", default=Path("."))
     validate_parser.add_argument("--json", action="store_true", dest="json_output")
 
-    run_parser = subparsers.add_parser("run", help="Run a local lab source tree or .bsilab")
+    run_parser = subparsers.add_parser("run", help="Run a local lab source tree, .bsilab, or registry ref")
     run_parser.add_argument("lab", type=Path, nargs="?", default=Path("."))
+    run_parser.add_argument("--target", type=Path, default=None, help="Destination for auto-pulled registry refs")
+    run_parser.add_argument("--force", action="store_true", help="Replace an existing auto-pull target")
+    run_parser.add_argument("--registry-url", default=None)
     run_parser.add_argument("--no-install-deps", action="store_true")
     run_parser.add_argument("--results-file", type=Path, default=None)
     run_parser.add_argument("--json", action="store_true", dest="json_output")
 
-    serve_parser = subparsers.add_parser("serve", help="Serve a local lab through SimUI")
+    serve_parser = subparsers.add_parser("serve", help="Serve a local lab or registry ref through SimUI")
     serve_parser.add_argument("lab", type=Path, nargs="?", default=Path("."))
+    serve_parser.add_argument("--target", type=Path, default=None, help="Destination for auto-pulled registry refs")
+    serve_parser.add_argument("--force", action="store_true", help="Replace an existing auto-pull target")
+    serve_parser.add_argument("--registry-url", default=None)
     serve_parser.add_argument("--host", default="127.0.0.1")
     serve_parser.add_argument("--port", type=int, default=8765)
     serve_parser.add_argument("--open", action="store_true", dest="open_browser")
     serve_parser.add_argument("--no-install-deps", action="store_true")
     serve_parser.add_argument("--json", action="store_true", dest="json_output")
 
-    for name in (
-        "list",
-        "get",
-        "create",
-        "import",
-        "pull",
-        "save",
-        "rename",
-        "delete",
-        "open",
-        "vendor-model",
-        "change-model",
-        "inspect-owned",
-        "add-model",
-        "export",
-        "publish",
-    ):
+    create_parser = subparsers.add_parser("create", help="Create a managed local lab source tree")
+    create_parser.add_argument("path", type=Path, nargs="?", default=Path("."))
+    create_parser.add_argument("--name", required=True)
+    create_parser.add_argument("--description", default=None)
+    create_parser.add_argument("--force", action="store_true")
+    create_parser.add_argument("--empty", action="store_true")
+    create_parser.add_argument("--id", default=None, help=argparse.SUPPRESS)
+    create_parser.add_argument("--json", action="store_true", dest="json_output")
+
+    list_parser = subparsers.add_parser("list", help="List local lab source trees under a root")
+    list_parser.add_argument("root", type=Path, nargs="?", default=Path("."))
+    list_parser.add_argument("--json", action="store_true", dest="json_output")
+
+    get_parser = subparsers.add_parser("get", help="Inspect a local lab source tree")
+    get_parser.add_argument("lab", nargs="?", default=".")
+    get_parser.add_argument("--root", type=Path, default=Path("."))
+    get_parser.add_argument("--json", action="store_true", dest="json_output")
+
+    save_parser = subparsers.add_parser("save", help="Validate and mark a local lab source tree as saved")
+    save_parser.add_argument("lab", type=Path, nargs="?", default=Path("."))
+    save_parser.add_argument("--root", type=Path, default=Path("."))
+    save_parser.add_argument("--manifest-file", type=Path, default=None)
+    save_parser.add_argument("--wiring-layout-file", type=Path, default=None)
+    save_parser.add_argument("--clear-wiring-layout", action="store_true")
+    save_parser.add_argument("--allow-draft", action="store_true", help=argparse.SUPPRESS)
+    save_parser.add_argument("--json", action="store_true", dest="json_output")
+
+    rename_parser = subparsers.add_parser("rename", help="Rename a local lab source tree title")
+    rename_parser.add_argument("target_or_name")
+    rename_parser.add_argument("name", nargs="?")
+    rename_parser.add_argument("--root", type=Path, default=Path("."))
+    rename_parser.add_argument("--json", action="store_true", dest="json_output")
+
+    delete_parser = subparsers.add_parser("delete", help="Delete a local lab source tree")
+    delete_parser.add_argument("lab", type=Path, nargs="?", default=Path("."))
+    delete_parser.add_argument("--root", type=Path, default=Path("."))
+    delete_parser.add_argument("--yes", action="store_true")
+    delete_parser.add_argument("--json", action="store_true", dest="json_output")
+
+    package_parser = subparsers.add_parser("package", help="Package a local lab source tree as a .bsilab")
+    package_parser.add_argument("lab", type=Path, nargs="?", default=Path("."))
+    package_parser.add_argument("--out", type=Path, default=None)
+    package_parser.add_argument("--package", dest="package_name", type=str, default=None)
+    package_parser.add_argument("--version", type=str, default=None)
+    package_parser.add_argument("--visibility", choices=("private", "public"), default="private")
+    package_parser.add_argument("--json", action="store_true", dest="json_output")
+
+    release_parser = subparsers.add_parser("release", help="Validate, build, and publish lab release manifests")
+    release_subparsers = release_parser.add_subparsers(dest="release_command", required=True)
+    release_validate_parser = release_subparsers.add_parser("validate", help="Validate a lab release manifest")
+    release_validate_parser.add_argument("manifest", type=Path)
+    release_validate_parser.add_argument("--json", action="store_true", dest="json_output")
+    release_build_parser = release_subparsers.add_parser("build", help="Build packages from a lab release manifest")
+    release_build_parser.add_argument("manifest", type=Path)
+    release_build_parser.add_argument("--out", type=Path, default=Path("dist/biosimulant-packages"))
+    release_build_parser.add_argument("--json", action="store_true", dest="json_output")
+    release_publish_parser = release_subparsers.add_parser("publish", help="Publish a lab release manifest")
+    release_publish_parser.add_argument("extension_args", nargs=argparse.REMAINDER)
+    release_publish_parser.set_defaults(extension_command_path="labs release publish")
+    release_ci_parser = release_subparsers.add_parser("ci", help="Run lab release CI")
+    release_ci_parser.add_argument("extension_args", nargs=argparse.REMAINDER)
+    release_ci_parser.set_defaults(extension_command_path="labs release ci")
+
+    search_parser = subparsers.add_parser("search", help="Search public registry labs")
+    search_parser.add_argument("query", nargs="?")
+    search_parser.add_argument("--page", type=int, default=1)
+    search_parser.add_argument("--page-size", type=int, default=20)
+    search_parser.add_argument("--tags", action="append", default=[])
+    search_parser.add_argument("--registry-url", default=None)
+    search_parser.add_argument("--json", action="store_true", dest="json_output")
+
+    info_parser = subparsers.add_parser("info", help="Inspect a public registry lab or lab package ref")
+    info_parser.add_argument("reference")
+    info_parser.add_argument("--registry-url", default=None)
+    info_parser.add_argument("--json", action="store_true", dest="json_output")
+
+    versions_parser = subparsers.add_parser("versions", help="List public registry versions for a lab")
+    versions_parser.add_argument("reference")
+    versions_parser.add_argument("--page", type=int, default=1)
+    versions_parser.add_argument("--page-size", type=int, default=20)
+    versions_parser.add_argument("--registry-url", default=None)
+    versions_parser.add_argument("--json", action="store_true", dest="json_output")
+
+    pull_parser = subparsers.add_parser("pull", help="Pull a public lab package into a local source tree")
+    pull_parser.add_argument("reference")
+    pull_parser.add_argument("--target", type=Path, default=None)
+    pull_parser.add_argument("--force", action="store_true")
+    pull_parser.add_argument("--no-deps", action="store_true")
+    pull_parser.add_argument("--registry-url", default=None)
+    pull_parser.add_argument("--json", action="store_true", dest="json_output")
+
+    add_model_parser = subparsers.add_parser("add-model", help="Add a lab-local model source tree")
+    add_model_parser.add_argument("model", type=Path)
+    add_model_parser.add_argument("--lab", type=Path, default=Path("."))
+    add_model_parser.add_argument("--root", type=Path, default=Path("."))
+    add_model_parser.add_argument("--alias", default=None)
+    add_model_parser.add_argument("--json", action="store_true", dest="json_output")
+
+    change_model_parser = subparsers.add_parser("change-model", help="Replace the path for a lab model alias")
+    change_model_parser.add_argument("alias")
+    change_model_parser.add_argument("model", type=Path)
+    change_model_parser.add_argument("--lab", type=Path, default=Path("."))
+    change_model_parser.add_argument("--root", type=Path, default=Path("."))
+    change_model_parser.add_argument("--json", action="store_true", dest="json_output")
+
+    vendor_model_parser = subparsers.add_parser("vendor-model", help="Copy a local model source tree into a lab")
+    vendor_model_parser.add_argument("model", type=Path)
+    vendor_model_parser.add_argument("--lab", type=Path, default=Path("."))
+    vendor_model_parser.add_argument("--root", type=Path, default=Path("."))
+    vendor_model_parser.add_argument("--alias", default=None)
+    vendor_model_parser.add_argument("--replace", action="store_true")
+    vendor_model_parser.add_argument("--json", action="store_true", dest="json_output")
+
+    inspect_owned_parser = subparsers.add_parser("inspect-owned", help="Inspect lab-local model ownership")
+    inspect_owned_parser.add_argument("lab", type=Path, nargs="?", default=Path("."))
+    inspect_owned_parser.add_argument("--root", type=Path, default=Path("."))
+    inspect_owned_parser.add_argument("--json", action="store_true", dest="json_output")
+
+    for name in ("import", "open", "publish", "sync-status"):
         _add_extension_subcommand(subparsers, name, f"labs {name}")
 
     args = parser.parse_args(argv)
@@ -338,6 +507,173 @@ def _main_labs(argv: list[str], *, prog: str = "python -m biosim labs") -> None:
             )
             _print_lab_init_success(payload, json_output=args.json_output)
             return
+        if args.command == "create":
+            payload = workspace_create_lab(
+                args.path,
+                name=args.name,
+                description=args.description,
+                force=args.force,
+                empty=args.empty,
+                local_id=args.id,
+            )
+            _print_workspace_result(payload, json_output=args.json_output)
+            return
+        if args.command == "list":
+            payload = {
+                "command": "labs.list",
+                "root": str(args.root.expanduser().resolve()),
+                "labs": workspace_list_labs(args.root),
+            }
+            _print_workspace_result(payload, json_output=args.json_output)
+            return
+        if args.command == "get":
+            payload = {
+                "command": "labs.get",
+                "lab": workspace_get_lab(args.lab, root=args.root).to_dict(),
+            }
+            _print_workspace_result(payload, json_output=args.json_output)
+            return
+        if args.command == "save":
+            save_kwargs: dict[str, Any] = {}
+            if args.manifest_file is not None:
+                manifest = _load_structured_file(args.manifest_file)
+                if not isinstance(manifest, dict):
+                    raise PackageError("Lab manifest file must contain a mapping")
+                save_kwargs["manifest"] = manifest
+            if args.wiring_layout_file is not None:
+                save_kwargs["wiring_layout"] = _load_structured_file(
+                    args.wiring_layout_file
+                )
+            elif args.clear_wiring_layout:
+                save_kwargs["wiring_layout"] = None
+            _print_workspace_result(
+                workspace_save_lab(
+                    args.lab,
+                    root=args.root,
+                    allow_draft=args.allow_draft,
+                    **save_kwargs,
+                ),
+                json_output=args.json_output,
+            )
+            return
+        if args.command == "rename":
+            target, name = _parse_lab_rename_args(args.target_or_name, args.name)
+            _print_workspace_result(
+                workspace_rename_lab(target, name=name, root=args.root),
+                json_output=args.json_output,
+            )
+            return
+        if args.command == "delete":
+            _print_workspace_result(
+                workspace_delete_lab(args.lab, yes=args.yes, root=args.root),
+                json_output=args.json_output,
+            )
+            return
+        if args.command == "package":
+            payload = _package_lab_source(
+                args.lab,
+                output=args.out,
+                package_name=args.package_name,
+                version=args.version,
+                visibility=args.visibility,
+            )
+            _print_lab_package_result(payload, json_output=args.json_output)
+            return
+        if args.command == "release":
+            if args.release_command == "validate":
+                manifest = validate_package_repo(args.manifest)
+                _print_package_repo_validation_success(manifest, json_output=args.json_output)
+                return
+            if args.release_command == "build":
+                built = build_package_repo(args.manifest, args.out)
+                _print_package_repo_build_success(built, json_output=args.json_output)
+                return
+        if args.command == "search":
+            payload = {
+                "command": "labs.search",
+                "registry_url": PublicRegistryClient(args.registry_url).base_url,
+                "result": PublicRegistryClient(args.registry_url).search_labs(
+                    args.query,
+                    page=args.page,
+                    page_size=args.page_size,
+                    tags=args.tags,
+                ),
+            }
+            _print_registry_result(payload, json_output=args.json_output)
+            return
+        if args.command == "info":
+            client = PublicRegistryClient(args.registry_url)
+            payload = {
+                "command": "labs.info",
+                "registry_url": client.base_url,
+                "reference": args.reference,
+                "result": client.lab_info(args.reference),
+            }
+            _print_registry_result(payload, json_output=args.json_output)
+            return
+        if args.command == "versions":
+            client = PublicRegistryClient(args.registry_url)
+            payload = {
+                "command": "labs.versions",
+                "registry_url": client.base_url,
+                "reference": args.reference,
+                "result": client.lab_versions(
+                    args.reference,
+                    page=args.page,
+                    page_size=args.page_size,
+                ),
+            }
+            _print_registry_result(payload, json_output=args.json_output)
+            return
+        if args.command == "pull":
+            payload = _pull_public_lab(
+                args.reference,
+                target=args.target,
+                force=args.force,
+                registry_url=args.registry_url,
+            )
+            _print_registry_result(payload, json_output=args.json_output)
+            return
+        if args.command == "add-model":
+            _print_workspace_result(
+                workspace_add_model(
+                    args.model,
+                    lab=args.lab,
+                    alias=args.alias,
+                    root=args.root,
+                ),
+                json_output=args.json_output,
+            )
+            return
+        if args.command == "change-model":
+            _print_workspace_result(
+                workspace_change_model(
+                    args.alias,
+                    args.model,
+                    lab=args.lab,
+                    root=args.root,
+                ),
+                json_output=args.json_output,
+            )
+            return
+        if args.command == "vendor-model":
+            _print_workspace_result(
+                workspace_vendor_model(
+                    args.model,
+                    lab=args.lab,
+                    alias=args.alias,
+                    replace=args.replace,
+                    root=args.root,
+                ),
+                json_output=args.json_output,
+            )
+            return
+        if args.command == "inspect-owned":
+            _print_workspace_result(
+                workspace_inspect_owned(args.lab, root=args.root),
+                json_output=args.json_output,
+            )
+            return
         if args.command == "validate":
             result = _validate_local_lab(args.lab)
             if not result.valid:
@@ -346,41 +682,63 @@ def _main_labs(argv: list[str], *, prog: str = "python -m biosim labs") -> None:
             _print_lab_validation_success(args.lab, result, json_output=args.json_output)
             return
         if args.command == "run":
-            package_file = _package_file_for_lab(args.lab)
-            result = run_package(package_file, install_deps=not args.no_install_deps)
-            if args.results_file:
-                args.results_file.parent.mkdir(parents=True, exist_ok=True)
-                args.results_file.write_text(json_dumps(result) + "\n", encoding="utf-8")
-            _print_run_result(package_file, result, json_output=args.json_output)
+            lab_path, _pull = _resolve_runtime_lab_path(
+                args.lab,
+                target=args.target,
+                force=args.force,
+                registry_url=args.registry_url,
+            )
+            with _package_file_for_lab(lab_path) as package_file:
+                result = run_package(package_file, install_deps=not args.no_install_deps)
+                if args.results_file:
+                    args.results_file.parent.mkdir(parents=True, exist_ok=True)
+                    args.results_file.write_text(
+                        json_dumps(result) + "\n",
+                        encoding="utf-8",
+                    )
+                _print_run_result(package_file, result, json_output=args.json_output)
             return
         if args.command == "serve":
-            package_file = _package_file_for_lab(args.lab)
-            prepared = prepare_lab_package(package_file, install_deps=not args.no_install_deps)
-            meta = {
-                "title": prepared.manifest.get("title") or prepared.package,
-                "description": prepared.manifest.get("description"),
-            }
-            if args.json_output:
-                print(
-                    json_dumps(
-                        {
-                            "command": "serve",
-                            "package": prepared.package,
-                            "version": prepared.version,
-                            "url": f"http://{args.host}:{args.port}/ui/",
-                            "modules": prepared.modules,
-                        }
-                    )
-                )
-            run_simui(
-                prepared.world,
-                {"meta": meta},
-                config_path=_lab_config_path(args.lab),
-                duration=prepared.duration,
-                port=args.port,
-                host=args.host,
-                open_browser=args.open_browser,
+            lab_path, _pull = _resolve_runtime_lab_path(
+                args.lab,
+                target=args.target,
+                force=args.force,
+                registry_url=args.registry_url,
             )
+            with (
+                _package_file_for_lab(lab_path) as package_file,
+                tempfile.TemporaryDirectory(prefix="biosim-pack-") as unpack_dir,
+            ):
+                prepared = prepare_lab_package(
+                    package_file,
+                    install_deps=not args.no_install_deps,
+                    unpack_root=unpack_dir,
+                )
+                meta = {
+                    "title": prepared.manifest.get("title") or prepared.package,
+                    "description": prepared.manifest.get("description"),
+                }
+                if args.json_output:
+                    print(
+                        json_dumps(
+                            {
+                                "command": "serve",
+                                "package": prepared.package,
+                                "version": prepared.version,
+                                "url": f"http://{args.host}:{args.port}/ui/",
+                                "modules": prepared.modules,
+                            }
+                        )
+                    )
+                run_simui(
+                    prepared.world,
+                    {"meta": meta},
+                    config_path=_lab_config_path(lab_path),
+                    duration=prepared.duration,
+                    port=args.port,
+                    host=args.host,
+                    open_browser=args.open_browser,
+                )
             return
     except PackageError as exc:
         _print_pack_error(exc, json_output=getattr(args, "json_output", False))
@@ -532,6 +890,191 @@ def _parse_package_reference(value: str) -> tuple[str, str]:
     return package_name.strip(), version.strip()
 
 
+def _package_lab_source(
+    lab: Path,
+    *,
+    output: Path | None,
+    package_name: str | None,
+    version: str | None,
+    visibility: str,
+) -> dict[str, Any]:
+    target = _resolve_lab_package_target(
+        lab,
+        output=output,
+        package_name=package_name,
+        version=version,
+        visibility=visibility,
+    )
+    validation = validate_package(target)
+    if not validation.valid or not validation.metadata:
+        raise PackageError("; ".join(validation.errors))
+    if validation.metadata.get("package_type") != "lab":
+        raise PackageError("labs package can only package lab source trees")
+    return {
+        "command": "labs.package",
+        "package_file": str(target),
+        "valid": True,
+        "package": validation.metadata.get("package"),
+        "version": validation.metadata.get("version"),
+        "package_type": validation.metadata.get("package_type"),
+        "warnings": validation.warnings,
+        "metadata": validation.metadata,
+    }
+
+
+def _resolve_lab_package_target(
+    lab: Path,
+    *,
+    output: Path | None,
+    package_name: str | None,
+    version: str | None,
+    visibility: str,
+) -> Path:
+    if output is None or output.suffix == ".bsilab":
+        return build_package(
+            lab,
+            output_path=output,
+            package_name=package_name,
+            version=version,
+            visibility=visibility,
+        )
+
+    output_dir = output.expanduser().resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="biosim-lab-package-") as temp_dir:
+        temp_target = Path(temp_dir) / "package.bsilab"
+        built = build_package(
+            lab,
+            output_path=temp_target,
+            package_name=package_name,
+            version=version,
+            visibility=visibility,
+        )
+        validation = validate_package(built)
+        if not validation.valid or not validation.metadata:
+            raise PackageError("; ".join(validation.errors))
+        if validation.metadata.get("package_type") != "lab":
+            raise PackageError("labs package can only package lab source trees")
+        target = output_dir / (
+            f"{_package_slug(str(validation.metadata['package']))}-"
+            f"{validation.metadata['version']}.bsilab"
+        )
+        shutil.copy2(built, target)
+        return target
+
+
+def _pull_public_lab(
+    reference: str,
+    *,
+    target: Path | None,
+    force: bool,
+    registry_url: str | None,
+) -> dict[str, Any]:
+    parsed = parse_package_reference(reference, allow_missing_version=True)
+    if parsed is None:
+        raise PackageError("labs pull requires a package reference: namespace/name[@version]")
+    client = PublicRegistryClient(registry_url)
+    artifact = client.resolve_package(parsed.package_name, parsed.version)
+    if artifact.get("package_type") != "lab":
+        raise PackageError(
+            f"Package {reference} is type `{artifact.get('package_type')}`, expected `lab`"
+        )
+    archive_bytes = client.download_package(str(artifact["id"]))
+    actual_sha = hashlib.sha256(archive_bytes).hexdigest()
+    expected_sha = str(artifact.get("sha256") or "")
+    if expected_sha and actual_sha != expected_sha:
+        raise PackageError("Downloaded lab package hash does not match registry metadata")
+
+    destination = lab_destination_for_reference(reference, target)
+    if destination.exists():
+        if not force:
+            raise PackageError(
+                f"Target already exists: {destination}; re-run with --force to replace it"
+            )
+        if destination.is_dir():
+            shutil.rmtree(destination)
+        else:
+            destination.unlink()
+
+    with tempfile.TemporaryDirectory(prefix="biosim-registry-pull-") as temp_dir:
+        temp_path = Path(temp_dir)
+        archive_path = temp_path / "download.bsilab"
+        archive_path.write_bytes(archive_bytes)
+        validation = validate_package(archive_path)
+        if not validation.valid:
+            raise PackageError("; ".join(validation.errors))
+        unpacked = unpack_package(archive_path, dest=temp_path / "unpacked")
+        payload_dir = unpacked / "payload"
+        if not payload_dir.is_dir():
+            raise PackageError("Downloaded lab package is missing payload/")
+        shutil.copytree(payload_dir, destination)
+
+    save_result = workspace_save_lab(destination)
+    return {
+        "command": "labs.pull",
+        "registry_url": client.base_url,
+        "reference": reference,
+        "path": str(destination),
+        "artifact": artifact,
+        "lab": save_result["lab"],
+    }
+
+
+def _lab_manifest_exists(path: Path) -> bool:
+    return path.joinpath("lab.yaml").is_file() or path.joinpath("lab.yml").is_file()
+
+
+def _resolve_runtime_lab_path(
+    lab: Path,
+    *,
+    target: Path | None,
+    force: bool,
+    registry_url: str | None,
+) -> tuple[Path, dict[str, Any] | None]:
+    local_candidate = lab.expanduser()
+    if local_candidate.exists():
+        return lab, None
+
+    reference = str(lab)
+    parsed = parse_package_reference(reference, allow_missing_version=True)
+    if parsed is None:
+        return lab, None
+
+    client = PublicRegistryClient(registry_url)
+    artifact = client.resolve_package(parsed.package_name, parsed.version)
+    if artifact.get("package_type") != "lab":
+        raise PackageError(
+            f"Package {reference} is type `{artifact.get('package_type')}`, expected `lab`"
+        )
+
+    destination = (
+        target.expanduser().resolve()
+        if target is not None
+        else cached_lab_destination_for_reference(reference, artifact)
+    )
+    if destination.exists() and _lab_manifest_exists(destination) and not force:
+        return destination, {
+            "command": "labs.pull",
+            "registry_url": client.base_url,
+            "reference": reference,
+            "path": str(destination),
+            "artifact": artifact,
+            "reused": True,
+        }
+    if destination.exists() and not force:
+        raise PackageError(
+            f"Target already exists and is not a lab source tree: {destination}; re-run with --force to replace it"
+        )
+
+    pull_result = _pull_public_lab(
+        reference,
+        target=destination,
+        force=force,
+        registry_url=registry_url,
+    )
+    return destination, pull_result
+
+
 def _init_lab_project(
     path: Path,
     *,
@@ -633,20 +1176,33 @@ class HelloModule(BioModule):
 
 
 def _validate_local_lab(path: Path) -> Any:
-    return validate_package(_package_file_for_lab(path))
-
-
-def _package_file_for_lab(path: Path) -> Path:
     target = path.expanduser().resolve()
     if target.is_file():
         if target.suffix != ".bsilab":
             raise PackageError(f"Expected a .bsilab package: {target}")
-        return target
+        return validate_package(target)
     if not target.is_dir():
         raise PackageError(f"Lab path not found: {target}")
     _lab_config_path(target)
-    temp_dir = Path(tempfile.mkdtemp(prefix="biosim-lab-"))
-    return build_package(target, output_path=temp_dir / f"{target.name or 'lab'}.bsilab")
+    return validate_lab_source(target)
+
+
+@contextmanager
+def _package_file_for_lab(path: Path) -> Iterator[Path]:
+    target = path.expanduser().resolve()
+    if target.is_file():
+        if target.suffix != ".bsilab":
+            raise PackageError(f"Expected a .bsilab package: {target}")
+        yield target
+        return
+    if not target.is_dir():
+        raise PackageError(f"Lab path not found: {target}")
+    _lab_config_path(target)
+    with tempfile.TemporaryDirectory(prefix="biosim-lab-") as temp_dir:
+        yield build_package(
+            target,
+            output_path=Path(temp_dir) / f"{target.name or 'lab'}.bsilab",
+        )
 
 
 def _lab_config_path(path: Path) -> Path:
@@ -676,6 +1232,102 @@ def json_dumps(value: Any) -> str:
     import json
 
     return json.dumps(value, sort_keys=True)
+
+
+def _parse_lab_rename_args(target_or_name: str, name: str | None) -> tuple[Path, str]:
+    if name is None:
+        return Path("."), target_or_name
+    return Path(target_or_name), name
+
+
+def _load_structured_file(path: Path) -> Any:
+    try:
+        import yaml
+    except ImportError as exc:
+        raise PackageError(
+            "Structured lab input requires PyYAML. Install with: pip install pyyaml"
+        ) from exc
+    return yaml.safe_load(path.read_text(encoding="utf-8"))
+
+
+def _print_workspace_result(payload: dict[str, Any], *, json_output: bool) -> None:
+    if json_output:
+        print(json_dumps(payload))
+        return
+
+    command = str(payload.get("command") or "labs")
+    print(f"Biosimulant {command} succeeded.")
+    labs = payload.get("labs")
+    if isinstance(labs, list):
+        if not labs:
+            print("No local labs found.")
+            return
+        for lab in labs:
+            if not isinstance(lab, dict):
+                continue
+            title = lab.get("title") or lab.get("package") or lab.get("id")
+            print(f"- {title} ({lab.get('id')})")
+            print(f"  Path: {lab.get('path')}")
+        return
+
+    lab = payload.get("lab")
+    if isinstance(lab, dict):
+        print(f"ID: {lab.get('id')}")
+        if lab.get("title"):
+            print(f"Title: {lab['title']}")
+        print(f"Path: {lab.get('path')}")
+        print(f"Package: {lab.get('package')}@{lab.get('version')}")
+    if payload.get("path"):
+        print(f"Path: {payload['path']}")
+    if payload.get("alias"):
+        print(f"Alias: {payload['alias']}")
+
+
+def _print_lab_package_result(payload: dict[str, Any], *, json_output: bool) -> None:
+    if json_output:
+        print(json_dumps(payload))
+        return
+    print("Biosimulant lab package built.")
+    print(f"Package: {payload.get('package')}@{payload.get('version')}")
+    print(f"File: {payload.get('package_file')}")
+    for warning in payload.get("warnings") or []:
+        print(f"Warning: {warning}")
+
+
+def _print_registry_result(payload: dict[str, Any], *, json_output: bool) -> None:
+    if json_output:
+        print(json_dumps(payload))
+        return
+    command = str(payload.get("command") or "labs")
+    print(f"Biosimulant {command} succeeded.")
+    result = payload.get("result")
+    if isinstance(result, dict):
+        items = result.get("items")
+        if isinstance(items, list):
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                title = item.get("title") or item.get("qualified_package_name") or item.get("id")
+                print(f"- {title}")
+                if item.get("qualified_package_name"):
+                    print(f"  Package: {item['qualified_package_name']}")
+                if item.get("id"):
+                    print(f"  ID: {item['id']}")
+            if not items:
+                print("No public labs found.")
+            return
+        artifact = result.get("artifact")
+        if isinstance(artifact, dict):
+            print(f"Package: {artifact.get('qualified_name') or artifact.get('package_name')}")
+            print(f"Version: {artifact.get('version')}")
+            print(f"Artifact: {artifact.get('id')}")
+        lab = result.get("lab")
+        if isinstance(lab, dict):
+            print(f"Lab: {lab.get('title') or lab.get('id')}")
+            if lab.get("qualified_package_name"):
+                print(f"Package: {lab['qualified_package_name']}")
+    if payload.get("path"):
+        print(f"Path: {payload['path']}")
 
 
 def _add_extension_subcommand(
@@ -714,8 +1366,8 @@ def _print_extension_unavailable(exc: ExtensionUnavailableError, *, json_output:
     print(f"Next step: {payload['install_hint']}", file=sys.stderr)
     print(
         "Open-source local commands remain available: "
-        "biosimulant labs init|validate|run|serve; "
-        "biosimulant packages validate|build|run.",
+        "biosimulant labs init|validate|run|serve|package; "
+        "biosimulant labs release validate|build.",
         file=sys.stderr,
     )
 
@@ -754,7 +1406,7 @@ def _print_lab_validation_success(package_file: Path, result: Any, *, json_outpu
 
 def _print_package_repo_validation_success(manifest: Any, *, json_output: bool) -> None:
     payload = {
-        "command": "packages.validate",
+        "command": "labs.release.validate",
         "manifest": str(manifest.path),
         "valid": True,
         "package_count": len(manifest.packages),
@@ -780,7 +1432,7 @@ def _print_package_repo_validation_success(manifest: Any, *, json_output: bool) 
 
 
 def _print_package_repo_build_success(built: list[dict[str, Any]], *, json_output: bool) -> None:
-    payload = {"command": "packages.build", "built": built}
+    payload = {"command": "labs.release.build", "built": built}
     if json_output:
         print(json_dumps(payload))
         return

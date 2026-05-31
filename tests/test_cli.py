@@ -256,54 +256,38 @@ runtime:
             with patch("biosim.world.BioWorld.module_names", new_callable=lambda: property(lambda self: (_ for _ in ()).throw(RuntimeError("test")))):
                 main()
 
-    def test_pack_validate_success_human_output(self, tmp_path, capsys):
-        from biosim.pack import build_package
+    def test_labs_package_human_output(self, tmp_path, capsys):
+        lab_dir = tmp_path / "lab"
+        with patch("sys.argv", ["biosim", "labs", "init", str(lab_dir), "--name", "CLI Lab"]):
+            main()
+        capsys.readouterr()
 
-        pkg_dir = tmp_path / "pkg"
-        pkg_dir.mkdir()
-        (pkg_dir / "model.yaml").write_text(
-            """
-schema_version: "2.0"
-title: "Counter"
-description: "Counter model"
-standard: other
-tags: [test]
-authors: ["Tests"]
-biosim:
-  entrypoint: "src.counter:Counter"
-  communication_step: 0.1
-""".strip()
-            + "\n",
-            encoding="utf-8",
-        )
-        src_dir = pkg_dir / "src"
-        src_dir.mkdir()
-        (src_dir / "counter.py").write_text(
-            """
-from biosim import BioModule
-
-
-class Counter(BioModule):
-    def advance_window(self, _start, t): return
-    def get_outputs(self): return {}
-""".strip()
-            + "\n",
-            encoding="utf-8",
-        )
-        package_path = build_package(pkg_dir, package_name="local/counter", version="1.0.0")
-
-        with patch("sys.argv", ["biosim", "pack", "validate", str(package_path)]):
+        with patch(
+            "sys.argv",
+            [
+                "biosim",
+                "labs",
+                "package",
+                str(lab_dir),
+                "--out",
+                str(tmp_path / "dist"),
+                "--package",
+                "local/cli-lab",
+                "--version",
+                "1.0.0",
+            ],
+        ):
             main()
 
         captured = capsys.readouterr()
-        assert "BioSim package validation passed." in captured.out
-        assert "local/counter@1.0.0" in captured.out
+        assert "Biosimulant lab package built." in captured.out
+        assert "local/cli-lab@1.0.0" in captured.out
 
-    def test_pack_validate_failure_human_output(self, tmp_path, capsys):
-        package_path = tmp_path / "bad.bsimpkg"
+    def test_labs_validate_archive_failure_human_output(self, tmp_path, capsys):
+        package_path = tmp_path / "bad.bsilab"
         package_path.write_bytes(b"not a zip")
 
-        with patch("sys.argv", ["biosim", "pack", "validate", str(package_path)]):
+        with patch("sys.argv", ["biosim", "labs", "validate", str(package_path)]):
             with pytest.raises(SystemExit) as exc_info:
                 main()
 
@@ -312,54 +296,42 @@ class Counter(BioModule):
         assert "BioSim package validation failed." in captured.err
         assert "not a zip" in captured.err.lower() or "file is not a zip file" in captured.err.lower()
 
-    def test_pack_build_human_output(self, tmp_path, capsys):
-        pkg_dir = tmp_path / "pkg"
-        pkg_dir.mkdir()
-        (pkg_dir / "model.yaml").write_text(
-            """
-schema_version: "2.0"
-title: "Counter"
-description: "Counter model"
-standard: other
-tags: [test]
-authors: ["Tests"]
-package: declared/counter
-version: 9.9.9
-biosim:
-  entrypoint: "src.counter:Counter"
-  communication_step: 0.1
-""".strip()
-            + "\n",
-            encoding="utf-8",
-        )
-        src_dir = pkg_dir / "src"
-        src_dir.mkdir()
-        (src_dir / "counter.py").write_text(
-            """
-from biosim import BioModule
+    def test_labs_release_build_human_output(self, tmp_path, capsys):
+        lab_dir = tmp_path / "pkg-lab"
+        with patch("sys.argv", ["biosim", "labs", "init", str(lab_dir), "--name", "Pkg Lab"]):
+            main()
+        capsys.readouterr()
 
-
-class Counter(BioModule):
-    def advance_window(self, _start, t): return
-    def get_outputs(self): return {}
+        manifest = tmp_path / "biosimulant-packages.yaml"
+        manifest.write_text(
+            """
+schema_version: 1
+packages:
+  - package: declared/lab
+    version: 9.9.9
+    type: lab
+    path: pkg-lab
 """.strip()
             + "\n",
             encoding="utf-8",
         )
 
-        with patch("sys.argv", ["biosim", "pack", "build", str(pkg_dir)]):
+        with patch(
+            "sys.argv",
+            ["biosim", "labs", "release", "build", str(manifest), "--out", str(tmp_path / "dist")],
+        ):
             main()
 
         captured = capsys.readouterr()
-        assert "BioSim package build succeeded." in captured.out
-        assert "declared/counter@9.9.9" in captured.out
+        assert "Biosimulant package manifest build succeeded." in captured.out
+        assert "declared/lab@9.9.9" in captured.out
 
-    def test_pack_command_error_output(self, capsys):
+    def test_removed_pack_command_error_output(self, capsys):
         with patch("sys.argv", ["biosim", "pack", "fetch", "badref"]):
             with pytest.raises(SystemExit) as exc_info:
                 main()
 
-        assert exc_info.value.code == 1
+        assert exc_info.value.code == 2
         captured = capsys.readouterr()
-        assert "BioSim package command failed." in captured.err
-        assert "package@version" in captured.err
+        assert "Command removed: python -m biosim pack" in captured.err
+        assert "biosimulant labs package" in captured.err

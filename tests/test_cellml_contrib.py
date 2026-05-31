@@ -20,7 +20,7 @@ from biosim.contrib.cellml import (
     cellml_cache_key,
     normalise_cellml_for_codegen,
 )
-from biosim.signals import ScalarSignal
+from biosim.signals import RecordSignal, ScalarSignal
 
 
 def _fake_generated_module(*, camel_case: bool = False) -> types.SimpleNamespace:
@@ -408,3 +408,303 @@ def test_missing_libcellml_dependency_error_is_actionable(tmp_path, monkeypatch)
 
     with pytest.raises(CellMLRuntimeError, match=r"pip install 'biosimulant\[cellml\]'"):
         wrapper.setup()
+
+
+def test_cellml_issue_helpers_cache_roots_and_generated_module_loading(tmp_path, monkeypatch) -> None:
+    class Issue:
+        def __init__(self, description: str, level: int = 0) -> None:
+            self._description = description
+            self._level = level
+
+        def level(self):
+            return self._level
+
+        def description(self):
+            return self._description
+
+    class IssueContainer:
+        def issueCount(self):
+            return 3
+
+        def issue(self, index):
+            if index == 0:
+                return Issue("fatal")
+            if index == 1:
+                return Issue("warning", level=1)
+            raise RuntimeError("missing issue")
+
+    assert cellml_module._call_issues(IssueContainer()) == ["fatal", "warning", "issue 2"]
+    assert cellml_module._call_issues(IssueContainer(), fatal_only=True) == ["fatal", "issue 2"]
+    with pytest.raises(CellMLRuntimeError, match="CellML parse failed: fatal"):
+        cellml_module._raise_on_issues("parse", IssueContainer())
+
+    monkeypatch.setenv("BIOSIM_CELLML_CACHE", str(tmp_path / "cache"))
+    assert cellml_module._cache_root() == tmp_path / "cache"
+    monkeypatch.delenv("BIOSIM_CELLML_CACHE")
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "xdg"))
+    assert cellml_module._cache_root() == tmp_path / "xdg" / "biosim" / "cellml"
+    monkeypatch.delenv("XDG_CACHE_HOME")
+    assert cellml_module._cache_root().name == "cellml"
+
+    generated = tmp_path / "generated.py"
+    generated.write_text("ANSWER = 42\n", encoding="utf-8")
+    module = cellml_module._load_generated_module(generated, "_test_generated_cellml")
+    assert module.ANSWER == 42
+
+    with pytest.raises(CellMLRuntimeError, match="failed to import"):
+        cellml_module._load_generated_module(tmp_path / "missing.py", "_test_missing_cellml")
+
+
+def test_cellml_nlasolver_existing_module_and_failure(monkeypatch) -> None:
+    existing = types.ModuleType("nlasolver")
+    monkeypatch.setitem(sys.modules, "nlasolver", existing)
+    cellml_module._ensure_nlasolver_module()
+    assert sys.modules["nlasolver"] is existing
+
+    monkeypatch.delitem(sys.modules, "nlasolver", raising=False)
+    scipy_module = types.ModuleType("scipy")
+    optimize_module = types.ModuleType("scipy.optimize")
+
+    class Failed:
+        success = False
+        message = "did not converge"
+        x = [0.0]
+
+    optimize_module.root = lambda residual, guess: Failed()
+    monkeypatch.setitem(sys.modules, "scipy", scipy_module)
+    monkeypatch.setitem(sys.modules, "scipy.optimize", optimize_module)
+
+    cellml_module._ensure_nlasolver_module()
+    from nlasolver import nla_solve
+
+    with pytest.raises(CellMLRuntimeError, match="did not converge"):
+        nla_solve(lambda u, f, data: None, [0.0], 1, None)
+
+
+def test_cellml_normalisation_noop_and_nonzero_voi_cases() -> None:
+    assert normalise_cellml_for_codegen("<not xml") == "<not xml"
+    assert normalise_cellml_for_codegen("<model name='plain'/>") == "<model name='plain'/>"
+
+    cellml = """<model xmlns="http://www.cellml.org/cellml/1.1#" name="m">
+      <component name="main">
+        <variable name="t" units="second" initial_value="5"/>
+        <variable name="x" units="dimensionless"/>
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply><eq/><apply><diff/><bvar><ci>t</ci></bvar><ci>x</ci></apply><cn>0</cn></apply>
+        </math>
+      </component>
+    </model>"""
+    assert 'initial_value="5"' in normalise_cellml_for_codegen(cellml)
+
+
+def test_generated_cellml_model_attribute_metadata_and_constants() -> None:
+    class Info:
+        def __init__(self, name: str, component: str, units: str) -> None:
+            self.name = name
+            self.component = component
+            self.units = units
+
+    module = types.SimpleNamespace()
+    module.STATE_INFO = [Info("x", "main", "u")]
+    module.VARIABLE_INFO = [Info("y", "aux", "v")]
+    module.STATE_COUNT = 1
+    module.VARIABLE_COUNT = 1
+
+    def initialise(states, rates, variables):
+        states[0] = 2.0
+        variables[0] = 4.0
+
+    def compute_constants(variables):
+        variables[0] = 5.0
+
+    def compute_rates(_t, states, rates, _variables):
+        rates[0] = states[0] + 1.0
+
+    def compute_variables(_t, states, rates, variables):
+        variables[0] = states[0] + rates[0]
+
+    module.initialise_variables = initialise
+    module.compute_computed_constants = compute_constants
+    module.compute_rates = compute_rates
+    module.compute_variables = compute_variables
+
+    adapter = GeneratedCellMLModel(module)
+
+    assert adapter.labels() == {"x": "main.x", "y": "aux.y"}
+    assert adapter.units() == {"x": "u", "y": "v"}
+    assert adapter.initialise_state() == ([2.0], [3.0], [5.0])
+    assert cellml_module._to_list(None) == []
+
+
+def test_libcellml_codegen_pipeline_and_cache(tmp_path, monkeypatch) -> None:
+    model_file = tmp_path / "model.cellml"
+    model_file.write_text("<model name='m'/>", encoding="utf-8")
+    calls: list[str] = []
+
+    class NoIssues:
+        def issueCount(self):
+            return 0
+
+    class Parser(NoIssues):
+        def setStrict(self, value):
+            calls.append(f"parser-strict:{value}")
+
+        def parseModel(self, text):
+            calls.append("parse")
+            return {"text": text}
+
+    class Importer(NoIssues):
+        def setStrict(self, value):
+            calls.append(f"importer-strict:{value}")
+
+        def resolveImports(self, model, directory):
+            calls.append(f"resolve:{Path(directory).name}")
+
+        def flattenModel(self, model):
+            calls.append("flatten")
+            return {"flat": model}
+
+    class Validator(NoIssues):
+        def validateModel(self, model):
+            calls.append("validate")
+
+    class Analyser(NoIssues):
+        def analyseModel(self, model):
+            calls.append("analyse")
+
+        def model(self):
+            return "analysed"
+
+    class Generator(NoIssues):
+        def setProfile(self, profile):
+            calls.append("profile")
+
+        def processModel(self, model):
+            calls.append(f"process:{model}")
+
+        def implementationCode(self):
+            return "VALUE = 6E7.0\n"
+
+    class GeneratorProfile:
+        class Profile:
+            PYTHON = "python"
+
+        def __init__(self, profile):
+            self.profile = profile
+
+    fake_libcellml = types.SimpleNamespace(
+        versionString=lambda: "0.6.3",
+        Parser=Parser,
+        Importer=Importer,
+        Validator=Validator,
+        Analyser=Analyser,
+        Generator=Generator,
+        GeneratorProfile=GeneratorProfile,
+    )
+    monkeypatch.setitem(sys.modules, "libcellml", fake_libcellml)
+
+    wrapper = LibCellMLBioModule(str(model_file), cache_dir=tmp_path / "cache")
+    implementation = wrapper._generate_python_code(fake_libcellml, model_file.read_text(encoding="utf-8"))
+    assert "6E7.0" not in implementation
+    assert calls == [
+        "parser-strict:False",
+        "parse",
+        "importer-strict:False",
+        f"resolve:{tmp_path.name}",
+        "flatten",
+        "validate",
+        "analyse",
+        "profile",
+        "process:analysed",
+    ]
+
+    module = wrapper._prepare_generated_module()
+    assert module.VALUE == 6e7
+    cache_files = list((tmp_path / "cache").glob("*.py"))
+    assert len(cache_files) == 1
+
+    cache_files[0].write_text("VALUE = 9\n", encoding="utf-8")
+    module = wrapper._prepare_generated_module()
+    assert module.VALUE == 9
+
+    class EmptyGenerator(Generator):
+        def implementationCode(self):
+            return ""
+
+    fake_empty = types.SimpleNamespace(
+        Parser=Parser,
+        Importer=None,
+        Validator=Validator,
+        Analyser=Analyser,
+        Generator=EmptyGenerator,
+        GeneratorProfile=GeneratorProfile,
+    )
+    with pytest.raises(CellMLRuntimeError, match="produced no Python implementation"):
+        wrapper._generate_python_code(fake_empty, "<model />")
+
+
+def test_libcellml_wrapper_overrides_reset_failure_and_no_state_paths(tmp_path) -> None:
+    model_file = tmp_path / "model.cellml"
+    model_file.write_text("<model />", encoding="utf-8")
+
+    module = types.SimpleNamespace()
+    module.STATE_INFO = []
+    module.VARIABLE_INFO = [{"name": "y", "component": "", "units": "dimensionless"}]
+    module.STATE_COUNT = 0
+    module.VARIABLE_COUNT = 1
+    module.create_variables_array = lambda: [2.0]
+    module.initialise_variables = lambda states, variables: variables.__setitem__(0, 2.0)
+    module.compute_rates = lambda t, states, rates, variables: None
+    module.compute_variables = lambda t, states, rates, variables: variables.__setitem__(0, 4.0 + float(t))
+
+    class FailedSolver:
+        success = False
+        message = "bad integration"
+        t = []
+        y = []
+
+    def failing_solver(rhs, span, y0, *, t_eval):
+        assert rhs(0.0, []) == []
+        return FailedSolver()
+
+    class Wrapper(LibCellMLBioModule):
+        _PARAMETER_INPUTS = {"y_param": ("y", 2.0, "u", "Set y.")}
+        _INITIAL_CONDITION_INPUTS = {"y_initial": ("y", 2.0, "u", "Set y initially.")}
+        _ENABLE_PARAMETER_OVERRIDES = True
+        _ENABLE_INITIAL_CONDITIONS = True
+        _EMIT_VARIABLE_LABELS = False
+        _HEADLINE_OUTPUTS = {"mean_y": ("y", "u", "Mean y.")}
+
+    wrapper = Wrapper(str(model_file), generated_module=module, solver=failing_solver)
+    specs = wrapper.inputs()
+    wrapper.set_inputs(
+        {
+            "y_param": ScalarSignal("test", "y_param", 8.0, 0.0, spec=specs["y_param"]),
+            "y_initial": ScalarSignal("test", "y_initial", 9.0, 0.0, spec=specs["y_initial"]),
+            "parameter_overrides": RecordSignal(
+                "test",
+                "parameter_overrides",
+                {"payload": {"y": 10.0}},
+                0.0,
+                spec=specs["parameter_overrides"],
+            ),
+            "initial_conditions": RecordSignal(
+                "test",
+                "initial_conditions",
+                {"payload": {"y": 11.0}},
+                0.0,
+                spec=specs["initial_conditions"],
+            ),
+        }
+    )
+    wrapper.setup()
+    assert wrapper._observables == ["y"]
+    assert "variable_labels" not in wrapper.outputs()
+    wrapper.publish_outputs(0.0)
+    assert wrapper.get_outputs()["mean_y"].value == 4.0
+
+    with pytest.raises(CellMLRuntimeError, match="bad integration"):
+        wrapper.advance_window(0.0, 1.0)
+
+    wrapper.reset()
+    assert wrapper.get_outputs()["state"].value == {"y": 4.0}

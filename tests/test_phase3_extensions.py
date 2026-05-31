@@ -35,19 +35,21 @@ def test_extension_command_metadata_marks_product_only_surface() -> None:
 
     for command in (
         "auth",
-        "hub",
         "runs",
         "runtime",
         "jobs",
         "self",
         "labs publish",
-        "packages publish",
+        "labs sync-status",
+        "labs release publish",
+        "labs release ci",
     ):
         assert specs[command].extension == DEFAULT_PRODUCT_EXTENSION
 
-    assert specs["hub"].category == "hub/cloud"
     assert specs["runs"].category == "desktop/cloud"
     assert specs["runtime"].category == "desktop"
+    assert "hub" not in specs
+    assert "packages publish" not in specs
 
 
 def test_biosimulant_namespace_exposes_extension_contracts() -> None:
@@ -57,17 +59,37 @@ def test_biosimulant_namespace_exposes_extension_contracts() -> None:
     assert extensions.extension_command_specs()
 
 
-def test_missing_hub_extension_has_clean_actionable_error(capsys) -> None:
+def test_removed_hub_surface_has_clean_removed_command_error(capsys) -> None:
     with pytest.raises(SystemExit) as exc_info:
         main(["hub", "labs", "list"], prog="biosimulant")
 
-    assert exc_info.value.code == 1
+    assert exc_info.value.code == 2
     captured = capsys.readouterr()
-    assert "Biosimulant product extension required." in captured.err
-    assert "Command: biosimulant hub labs list" in captured.err
-    assert "Category: hub/cloud" in captured.err
-    assert "Biosimulant Desktop/product CLI extension" in captured.err
+    assert "Command removed: biosimulant hub" in captured.err
+    assert "biosimulant labs search" in captured.err
     assert "Config file not found" not in captured.err
+
+
+def test_removed_packages_surface_can_return_json_error(capsys) -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        main(["packages", "validate", "biosimulant-packages.yaml", "--json"], prog="biosimulant")
+
+    assert exc_info.value.code == 2
+    payload = json.loads(capsys.readouterr().err)
+    assert payload["error"] == "command_removed"
+    assert payload["command"] == "packages"
+    assert "labs release" in payload["replacement"]
+
+
+def test_removed_labs_export_surface_can_return_json_error(capsys) -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        main(["labs", "export", "./lab", "--json"], prog="biosimulant")
+
+    assert exc_info.value.code == 2
+    payload = json.loads(capsys.readouterr().err)
+    assert payload["error"] == "command_removed"
+    assert payload["command"] == "labs export"
+    assert "labs package" in payload["replacement"]
 
 
 def test_missing_lab_publish_extension_is_not_an_argparse_unknown_command(capsys) -> None:
@@ -81,28 +103,41 @@ def test_missing_lab_publish_extension_is_not_an_argparse_unknown_command(capsys
     assert "invalid choice" not in captured.err
 
 
-def test_missing_package_publish_extension_can_return_json_error(capsys) -> None:
+def test_missing_lab_release_publish_extension_can_return_json_error(capsys) -> None:
     with pytest.raises(SystemExit) as exc_info:
         main(
-            ["packages", "publish", "biosimulant-packages.yaml", "--dry-run", "--json"],
+            [
+                "labs",
+                "release",
+                "publish",
+                "biosimulant-packages.yaml",
+                "--dry-run",
+                "--json",
+            ],
             prog="biosimulant",
         )
 
     assert exc_info.value.code == 1
     payload = json.loads(capsys.readouterr().err)
     assert payload["error"] == "extension_unavailable"
-    assert payload["command"] == "packages publish"
+    assert payload["command"] == "labs release publish"
     assert payload["category"] == "hub"
     assert payload["extension"] == DEFAULT_PRODUCT_EXTENSION
 
 
-def test_registered_extension_handles_hub_command() -> None:
+def test_registered_extension_handles_lab_release_command() -> None:
     extension = RecordingExtension()
     register_extension(DEFAULT_PRODUCT_EXTENSION, extension)
 
-    main(["hub", "labs", "list"], prog="biosimulant")
+    main(["labs", "release", "publish", "biosimulant-packages.yaml"], prog="biosimulant")
 
-    assert extension.calls == [("hub", ["labs", "list"], "biosimulant hub")]
+    assert extension.calls == [
+        (
+            "labs release publish",
+            ["release", "publish", "biosimulant-packages.yaml"],
+            "biosimulant labs",
+        )
+    ]
 
 
 def test_registered_extension_handles_desktop_runtime_command() -> None:

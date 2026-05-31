@@ -48,7 +48,7 @@ def test_labs_serve_uses_local_simui_without_desktop(tmp_path: Path) -> None:
     assert run_simui.call_args.kwargs["port"] == 9999
 
 
-def test_packages_validate_build_and_run_repo_manifest(tmp_path: Path, capsys) -> None:
+def test_labs_release_validate_build_and_run_repo_manifest(tmp_path: Path, capsys) -> None:
     lab_dir = tmp_path / "lab"
     main(["labs", "init", str(lab_dir), "--name", "Package Lab"], prog="biosimulant")
     capsys.readouterr()
@@ -71,14 +71,14 @@ packages:
         encoding="utf-8",
     )
 
-    main(["packages", "validate", str(manifest), "--json"], prog="biosimulant")
+    main(["labs", "release", "validate", str(manifest), "--json"], prog="biosimulant")
     validate_payload = json.loads(capsys.readouterr().out)
     assert validate_payload["valid"] is True
     assert validate_payload["package_count"] == 1
 
     out_dir = tmp_path / "dist" / "packages"
     main(
-        ["packages", "build", str(manifest), "--out", str(out_dir), "--json"],
+        ["labs", "release", "build", str(manifest), "--out", str(out_dir), "--json"],
         prog="biosimulant",
     )
     build_payload = json.loads(capsys.readouterr().out)
@@ -87,7 +87,7 @@ packages:
     assert validate_package(built_path).valid
 
     main(
-        ["packages", "run", str(built_path), "--no-install-deps", "--json"],
+        ["labs", "run", str(built_path), "--no-install-deps", "--json"],
         prog="biosimulant",
     )
     run_payload = json.loads(capsys.readouterr().out)
@@ -95,14 +95,17 @@ packages:
     assert run_payload["modules"][0]["alias"] == "hello"
 
 
-def test_package_archive_validate_alias_under_packages(tmp_path: Path, capsys) -> None:
+def test_package_archive_validate_under_labs(tmp_path: Path, capsys) -> None:
     lab_dir = tmp_path / "lab"
     main(["labs", "init", str(lab_dir), "--name", "Archive Lab"], prog="biosimulant")
     capsys.readouterr()
-    main(["packages", "build", _write_single_package_manifest(tmp_path, lab_dir), "--json"], prog="biosimulant")
+    main(
+        ["labs", "release", "build", _write_single_package_manifest(tmp_path, lab_dir), "--json"],
+        prog="biosimulant",
+    )
     built_path = Path(json.loads(capsys.readouterr().out)["built"][0]["path"])
 
-    main(["packages", "validate", str(built_path), "--json"], prog="biosimulant")
+    main(["labs", "validate", str(built_path), "--json"], prog="biosimulant")
     payload = json.loads(capsys.readouterr().out)
     assert payload["valid"] is True
     assert payload["package"] == "demo/archive-lab"

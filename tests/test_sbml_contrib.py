@@ -7,8 +7,15 @@ import sys
 import types
 from pathlib import Path
 
-from biosim.contrib.sbml import TelluriumSBMLBioModule, patch_uninitialised_parameters
-from biosim.signals import ScalarSignal
+import numpy as np
+import pytest
+
+from biosim.contrib.sbml import (
+    TelluriumSBMLBioModule,
+    patch_uninitialised_parameters,
+    read_sbml_text,
+)
+from biosim.signals import RecordSignal, ScalarSignal
 
 
 def test_importing_sbml_contrib_does_not_import_tellurium(monkeypatch) -> None:
@@ -181,3 +188,188 @@ def test_tellurium_module_named_initial_condition_inputs_apply_at_start(tmp_path
 
     assert wrapper._runner["raw_x"] == 7.0
     assert wrapper.get_outputs()["state"].value == {"readable_observable": 7.0}
+
+
+def test_read_sbml_text_falls_back_to_latin_1(tmp_path) -> None:
+    path = tmp_path / "legacy.xml"
+    path.write_bytes("<sbml><model name='caf\xe9'/></sbml>".encode("latin-1"))
+
+    assert "café" in read_sbml_text(path)
+
+
+@pytest.mark.parametrize(
+    "xml",
+    [
+        "<not xml",
+        "<sbml><model /></sbml>",
+        '<sbml xmlns="http://www.sbml.org/sbml/level3/version1/core"/>',
+        """<sbml xmlns="http://www.sbml.org/sbml/level3/version1/core"><model>
+        <listOfParameters><parameter id="fixed" value="1"/></listOfParameters>
+        </model></sbml>""",
+    ],
+)
+def test_patch_uninitialised_parameters_noop_cases(xml: str) -> None:
+    patched, patches = patch_uninitialised_parameters(xml)
+
+    assert patched == xml
+    assert patches == []
+
+
+def test_patch_uninitialised_time_parameter_without_existing_rules() -> None:
+    xml = """<sbml xmlns="http://www.sbml.org/sbml/level3/version1/core"><model>
+    <listOfParameters><parameter id="time_seconds" name="time"/></listOfParameters>
+    </model></sbml>"""
+
+    patched, patches = patch_uninitialised_parameters(xml)
+
+    assert patches == [("time_seconds", "assignmentRule->symbolic time")]
+    assert "listOfRules" in patched
+
+
+class _FakeTelluriumRunner(dict):
+    def __init__(self) -> None:
+        super().__init__(raw_x=1.0, raw_y=2.0, p=2.0, aux=3.0)
+        self.reset_called = False
+
+    def reset(self) -> None:
+        self.reset_called = True
+
+    def simulate(self, start, end, n_steps, *, selections):
+        rows = []
+        for index in range(n_steps):
+            t = float(start) + (float(end) - float(start)) * index / max(n_steps - 1, 1)
+            row = []
+            for name in selections:
+                if name == "time":
+                    row.append(t)
+                elif name == "raw_x":
+                    row.append(t + 10.0)
+                elif name == "raw_y":
+                    row.append(t + 20.0)
+                elif name == "aux":
+                    row.append(t + 30.0)
+                else:
+                    row.append(0.0)
+            rows.append(row)
+        return np.asarray(rows, dtype=float)
+
+
+def test_tellurium_sbml_wrapper_runs_with_fake_runner_and_overrides(tmp_path, monkeypatch) -> None:
+    model_file = tmp_path / "model.xml"
+    model_file.write_text(
+        """<sbml xmlns="http://www.sbml.org/sbml/level3/version1/core"><model>
+        <listOfSpecies>
+          <species id="raw_x" name="Raw X" substanceUnits="mole"/>
+          <species id="dummy"/>
+          <species id="boundary" sboTerm="SBO:0000291"/>
+        </listOfSpecies>
+        <listOfParameters><parameter id="p" value="2"/><parameter id="raw_y" name="Raw Y"/></listOfParameters>
+        <listOfRules><rateRule variable="raw_y"/></listOfRules>
+        </model></sbml>""",
+        encoding="utf-8",
+    )
+    fake_runner = _FakeTelluriumRunner()
+    tellurium = types.ModuleType("tellurium")
+    tellurium.loadSBMLModel = lambda _source: fake_runner
+    monkeypatch.setitem(sys.modules, "tellurium", tellurium)
+
+    class Wrapper(TelluriumSBMLBioModule):
+        _OBSERVABLES = ["raw_x", "raw_y"]
+        _STATE_OUTPUT_ALIASES = {"raw_x": "x", "raw_y": "y"}
+        _STATE_OUTPUT_AS_PAYLOAD = True
+        _SPECIES_LABELS = {"raw_x": "Readable X", "raw_y": "Readable Y"}
+        _SPECIES_LABELS_OUTPUT_AS_PAYLOAD = True
+        _PARAMETER_INPUTS = {"p_input": ("p", 2.0, "u", "Parameter p.")}
+        _INITIAL_CONDITION_INPUTS = {"x0": ("raw_x", 1.0, "u", "Initial x.")}
+        _MULTIPLIER_INPUTS = {"p_multiplier": (["p", "missing"], 1.0, "x", "Scale p.")}
+        _ENABLE_PARAMETER_OVERRIDES = True
+        _ENABLE_INITIAL_CONDITIONS = True
+        _HEADLINE_OUTPUTS = {"mean_x": ("raw_x", "mole", "Mean X.")}
+        _HEADLINE_EMIT_UNITS = True
+
+        def visualisation_extra_selections(self):
+            return ["aux", "raw_x"]
+
+        def visualisation_aux_schema(self):
+            return {"aux": "float"}
+
+        def visualisation_aux_payload(self, t, latest):
+            return {"aux": latest.get("aux", 0.0) + t}
+
+    wrapper = Wrapper(str(model_file), integration_step=0.5)
+    specs = wrapper.inputs()
+    wrapper.set_inputs(
+        {
+            "integration_step": ScalarSignal("test", "integration_step", 0.25, 0.0, spec=specs["integration_step"]),
+            "p_input": ScalarSignal("test", "p_input", 3.0, 0.0, spec=specs["p_input"]),
+            "x0": ScalarSignal("test", "x0", 7.0, 0.0, spec=specs["x0"]),
+            "p_multiplier": ScalarSignal("test", "p_multiplier", 10.0, 0.0, spec=specs["p_multiplier"]),
+            "parameter_overrides": RecordSignal(
+                "test",
+                "parameter_overrides",
+                {"payload": {"p": 5.0, "bad": "nan"}},
+                0.0,
+                spec=specs["parameter_overrides"],
+            ),
+            "initial_conditions": RecordSignal(
+                "test",
+                "initial_conditions",
+                {"payload": {"raw_x": 9.0}},
+                0.0,
+                spec=specs["initial_conditions"],
+            ),
+        }
+    )
+
+    wrapper.setup()
+    wrapper.advance_window(0.0, 1.0)
+    wrapper.advance_window(1.0, 0.5)
+    outputs = wrapper.get_outputs()
+
+    assert wrapper.integration_step == 0.25
+    assert fake_runner["p"] == 5.0
+    assert outputs["state"].value["payload"] == {"x": 11.0, "y": 21.0}
+    assert outputs["species_labels"].value == {"payload": {"x": "Readable X", "y": "Readable Y"}}
+    assert outputs["visualisation_aux"].value == {"aux": 32.0}
+    assert outputs["mean_x"].spec.emitted_unit == "mole"
+    assert outputs["trajectory"].value["payload"]["series"][0]["name"] == "x"
+
+    wrapper.reset()
+    assert fake_runner.reset_called is True
+    assert wrapper.get_outputs()["summary"].value["observable_count"] == 2
+
+
+def test_tellurium_sbml_rule_observable_discovery_and_error_fallbacks(tmp_path) -> None:
+    broken = tmp_path / "broken.xml"
+    broken.write_text("<not xml", encoding="utf-8")
+    assert TelluriumSBMLBioModule(str(broken))._discover_observables_from_xml() == ([], {}, {})
+
+    model_file = tmp_path / "rules.xml"
+    model_file.write_text(
+        """<sbml xmlns="http://www.sbml.org/sbml/level3/version1/core"><model>
+        <listOfParameters><parameter id="x" name="Readable X"/><parameter id="y" name="Readable Y"/></listOfParameters>
+        <listOfRules><rateRule variable="x"/><assignmentRule variable="y"/></listOfRules>
+        </model></sbml>""",
+        encoding="utf-8",
+    )
+
+    class RuleWrapper(TelluriumSBMLBioModule):
+        _OBSERVABLE_STRATEGY = "rules"
+
+    wrapper = RuleWrapper(str(model_file))
+    observables, units, display = wrapper._discover_observables_from_xml()
+
+    assert observables == ["x"]
+    assert units == {"x": None}
+    assert display == {"x": "Readable X"}
+
+    assignment_file = tmp_path / "assignment.xml"
+    assignment_file.write_text(
+        """<sbml xmlns="http://www.sbml.org/sbml/level3/version1/core"><model>
+        <listOfParameters><parameter id="y" name="Readable Y"/></listOfParameters>
+        <listOfRules><assignmentRule variable="y"/></listOfRules>
+        </model></sbml>""",
+        encoding="utf-8",
+    )
+    assignment = RuleWrapper(str(assignment_file))
+    assert assignment._discover_observables_from_xml()[0] == ["y"]

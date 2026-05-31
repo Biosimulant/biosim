@@ -9,7 +9,8 @@ pip install 'biosimulant[ui]'
 ## Local Lab CLI
 
 ```bash
-biosimulant labs init ./my-lab --name "My Lab"
+biosimulant labs create ./my-lab --name "My Lab"
+biosimulant labs list .
 biosimulant labs validate ./my-lab
 biosimulant labs run ./my-lab --no-install-deps
 biosimulant labs serve ./my-lab

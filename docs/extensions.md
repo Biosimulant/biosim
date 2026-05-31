@@ -10,18 +10,24 @@ These commands work without Desktop, Hub credentials, cloud access, or a product
 binary:
 
 ```bash
-biosimulant labs init ./my-lab --name "My Lab"
+biosimulant labs create ./my-lab --name "My Lab"
+biosimulant labs list .
+biosimulant labs get ./my-lab
+biosimulant labs save ./my-lab
+biosimulant labs package ./my-lab --out dist
+biosimulant labs add-model models/example --lab ./my-lab --alias example
+biosimulant labs vendor-model ../model-source --lab ./my-lab --alias vendored
+biosimulant labs inspect-owned ./my-lab
 biosimulant labs validate ./my-lab
 biosimulant labs run ./my-lab
 biosimulant labs serve ./my-lab
 
-biosimulant packages validate biosimulant-packages.yaml
-biosimulant packages build biosimulant-packages.yaml
-biosimulant packages run dist/biosimulant-packages/example.bsilab
+biosimulant labs release validate biosimulant-packages.yaml
+biosimulant labs release build biosimulant-packages.yaml
 
-biosimulant pack build ./my-lab
-biosimulant pack validate ./dist/my-lab.bsilab
-biosimulant pack run ./dist/my-lab.bsilab
+biosimulant labs search immune
+biosimulant labs info biosimulant/example-lab@1.0.0
+biosimulant labs pull biosimulant/example-lab@1.0.0 --target ./example-lab
 ```
 
 The OSS package also exposes runtime APIs such as `BioWorld`, `BioModule`,
@@ -32,16 +38,14 @@ signals, wiring, package validation, and local package execution.
 Commands in these areas require the `biosimulant-product` extension:
 
 - `auth`: Hub login, logout, token exchange, and secure credentials
-- `hub`: Hub labs, Hub runs, publishing, downloads, and cloud APIs
 - `runs`: Desktop run index, cloud runs, upload, logs, and reports
-- `models`: Desktop model registry and Hub-backed model workflows
 - `runtime`: Desktop-managed runtime bootstrap and inspection
 - `settings`: Desktop settings, logs, data directory, and dashboard integration
 - `jobs`: commercial hosted jobs and job inspection
 - `self`: product CLI self-update behavior
 - `agent`, `agents`, `chat`: authenticated product agent workflows
-- product-only `labs` commands such as `pull`, `open`, `add-model`, `export`, and `publish`
-- product-only `packages` commands such as `preview`, `import`, `export-model`, `export-lab`, `publish`, and `ci`
+- product-only `labs` commands such as `import`, `open`, `publish`, `sync-status`, and `release publish|ci`
+- product-only `runs remote ...` commands for Hub remote runs
 
 When the extension is not installed, the OSS CLI exits with a clear
 `extension_unavailable` error instead of trying to interpret the command as a
@@ -51,21 +55,21 @@ Human-readable example:
 
 ```text
 Biosimulant product extension required.
-Command: biosimulant hub labs list
-Category: hub/cloud
+Command: biosimulant labs publish ./my-lab
+Category: hub
 Extension: biosimulant-product
 ```
 
 JSON example:
 
 ```bash
-biosimulant packages publish biosimulant-packages.yaml --json
+biosimulant labs release publish biosimulant-packages.yaml --json
 ```
 
 ```json
 {
   "error": "extension_unavailable",
-  "command": "packages publish",
+  "command": "labs release publish",
   "extension": "biosimulant-product"
 }
 ```
@@ -87,10 +91,11 @@ def run_cli_command(command: str, argv: Sequence[str], *, prog: str) -> int | No
     ...
 ```
 
-The command path is a stable ownership key such as `hub`, `runtime`,
-`labs publish`, or `packages publish`. The `argv` sequence is the original
+The command path is a stable ownership key such as `runtime`,
+`labs publish`, or `labs release publish`. The `argv` sequence is the original
 remaining CLI argument list for that command surface.
 
 Local workflow implementations should remain in the OSS core. Product code may
 authenticate, persist, adapt, upload, download, or decorate shared behavior, but
-should not reimplement local lab/package validation, build, run, or serve logic.
+should not reimplement local lab source-tree management, package validation,
+build, run, or serve logic.

@@ -34,9 +34,9 @@ def test_public_docs_lead_with_biosimulant_package_and_cli() -> None:
     assert readme.startswith("# biosimulant")
     assert "`biosimulant` is the primary package, import namespace, and CLI name" in readme
     assert "pip install biosimulant" in readme
-    assert "biosimulant labs init" in readme
+    assert "biosimulant labs create" in readme
     assert "pip install 'biosimulant[ui]'" in quickstart
-    assert "biosimulant labs init" in quickstart
+    assert "biosimulant labs create" in quickstart
 
 
 def test_legacy_biosim_command_is_only_documented_as_compatibility() -> None:

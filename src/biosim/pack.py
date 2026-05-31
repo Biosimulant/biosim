@@ -403,7 +403,7 @@ def build_package(
     *,
     output_path: str | Path | None = None,
     package_name: str | None = None,
-    version: str = DEFAULT_PACKAGE_VERSION,
+    version: str | None = None,
     visibility: str = "private",
     source: Mapping[str, Any] | None = None,
 ) -> Path:
@@ -431,7 +431,11 @@ def build_package(
         or _manifest_declared_package(manifest)
         or _default_package_name(source_path)
     )
-    version = _validate_version(_manifest_declared_version(manifest) or version)
+    version = _validate_version(
+        version
+        if version is not None
+        else (_manifest_declared_version(manifest) or DEFAULT_PACKAGE_VERSION)
+    )
 
     logical_sha256 = _logical_hash(entries)
     package_yaml = _build_package_yaml(
@@ -461,7 +465,7 @@ def export_lab_package(
     *,
     output_path: str | Path | None = None,
     package_name: str | None = None,
-    version: str = DEFAULT_PACKAGE_VERSION,
+    version: str | None = None,
     visibility: str = "private",
     source: Mapping[str, Any] | None = None,
 ) -> Path:
@@ -472,7 +476,11 @@ def export_lab_package(
         or _manifest_declared_package(manifest)
         or _default_package_name(source_path)
     )
-    version = _validate_version(_manifest_declared_version(manifest) or version)
+    version = _validate_version(
+        version
+        if version is not None
+        else (_manifest_declared_version(manifest) or DEFAULT_PACKAGE_VERSION)
+    )
     logical_sha256 = _logical_hash(entries)
     package_yaml = _build_package_yaml(
         package_type="lab",
@@ -604,6 +612,46 @@ def validate_package(path: str | Path) -> PackageValidationResult:
             if not declared_hash:
                 result.warnings.append("package.yaml sha256 is missing")
             return result
+    except Exception as exc:
+        result.errors.append(str(exc))
+        return result
+
+
+def validate_lab_source(path: str | Path) -> PackageValidationResult:
+    source_path = Path(path).expanduser().resolve()
+    result = PackageValidationResult(valid=False)
+    if not source_path.is_dir():
+        result.errors.append(f"Lab source path not found: {source_path}")
+        return result
+
+    try:
+        manifest_path = _find_manifest_in_dir(source_path, ("lab.yaml", "lab.yml"))
+        manifest = _safe_yaml_load(manifest_path.read_bytes())
+        _validate_lab_manifest(manifest)
+        _validate_lab_source_dir(
+            source_root=source_path,
+            current_lab_dir=source_path,
+            parsed_manifest=manifest,
+            visited=set(),
+        )
+        package_name = _manifest_declared_package(manifest) or _default_package_name(
+            source_path
+        )
+        version = _validate_version(
+            _manifest_declared_version(manifest) or DEFAULT_PACKAGE_VERSION
+        )
+        result.valid = True
+        result.metadata = {
+            "schema_version": PACKAGE_SCHEMA_VERSION,
+            "package_type": "lab",
+            "package": package_name,
+            "version": version,
+            "title": manifest.get("title") or package_name,
+            "description": manifest.get("description"),
+            "entry_manifest": manifest_path.name,
+            "source_format": "source-tree",
+        }
+        return result
     except Exception as exc:
         result.errors.append(str(exc))
         return result
@@ -798,6 +846,54 @@ def _load_model_manifest_from_dir(directory: Path) -> dict[str, Any]:
             f"Invalid embedded model manifest at {manifest_path}: {exc}"
         ) from exc
     return manifest
+
+
+def _validate_lab_source_dir(
+    *,
+    source_root: Path,
+    current_lab_dir: Path,
+    parsed_manifest: Mapping[str, Any],
+    visited: set[Path],
+) -> None:
+    current = current_lab_dir.resolve()
+    if current in visited:
+        raise PackageError(
+            f"Circular embedded child lab reference detected at {current}"
+        )
+    visited = visited | {current}
+
+    models = parsed_manifest.get("models")
+    if isinstance(models, list):
+        for entry in models:
+            if not isinstance(entry, Mapping):
+                continue
+            embedded_path = entry.get("path")
+            if not isinstance(embedded_path, str):
+                continue
+            model_dir = _resolve_embedded_dir(
+                source_root,
+                current_lab_dir,
+                embedded_path,
+            )
+            _load_model_manifest_from_dir(model_dir)
+
+    children = parsed_manifest.get("children")
+    if not isinstance(children, list):
+        return
+    for entry in children:
+        if not isinstance(entry, Mapping):
+            continue
+        embedded_path = entry.get("path")
+        if not isinstance(embedded_path, str):
+            continue
+        child_dir = _resolve_embedded_dir(source_root, current_lab_dir, embedded_path)
+        parsed_child = _load_lab_manifest_from_dir(child_dir)
+        _validate_lab_source_dir(
+            source_root=source_root,
+            current_lab_dir=child_dir,
+            parsed_manifest=parsed_child,
+            visited=visited,
+        )
 
 
 def _resolve_embedded_dir(
@@ -1330,8 +1426,23 @@ def _install_declared_dependencies(manifest: Mapping[str, Any]) -> None:
     )
 
 
-def run_package(path: str | Path, *, install_deps: bool = True) -> dict[str, Any]:
-    loaded = _loaded_package_from_path(Path(path).expanduser().resolve())
+def run_package(
+    path: str | Path,
+    *,
+    install_deps: bool = True,
+    unpack_root: str | Path | None = None,
+) -> dict[str, Any]:
+    if unpack_root is None:
+        with tempfile.TemporaryDirectory(prefix="biosim-pack-") as temp_dir:
+            return run_package(
+                path,
+                install_deps=install_deps,
+                unpack_root=temp_dir,
+            )
+    loaded = _loaded_package_from_path(
+        Path(path).expanduser().resolve(),
+        unpack_root=Path(unpack_root).expanduser().resolve(),
+    )
     if loaded.package_type == "model":
         return _run_model_loaded_package(loaded, install_deps=install_deps)
     if loaded.package_type == "lab":
@@ -1340,9 +1451,19 @@ def run_package(path: str | Path, *, install_deps: bool = True) -> dict[str, Any
 
 
 def prepare_lab_package(
-    path: str | Path, *, install_deps: bool = True
+    path: str | Path,
+    *,
+    install_deps: bool = True,
+    unpack_root: str | Path | None = None,
 ) -> LabPackageRuntime:
-    loaded = _loaded_package_from_path(Path(path).expanduser().resolve())
+    loaded = _loaded_package_from_path(
+        Path(path).expanduser().resolve(),
+        unpack_root=(
+            Path(unpack_root).expanduser().resolve()
+            if unpack_root is not None
+            else None
+        ),
+    )
     if loaded.package_type != "lab":
         raise PackageError(f"Expected a lab package, got: {loaded.package_type}")
     return _prepare_lab_loaded_package(loaded, install_deps=install_deps)
@@ -1454,5 +1575,6 @@ __all__ = [
     "publish_package",
     "run_package",
     "unpack_package",
+    "validate_lab_source",
     "validate_package",
 ]
