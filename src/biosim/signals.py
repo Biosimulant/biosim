@@ -1,5 +1,5 @@
 """
-Typed signal primitives and port specifications for the BioSim communication-step kernel.
+Typed signal primitives and port specifications for the Biosimulant communication-step kernel.
 """
 
 from __future__ import annotations

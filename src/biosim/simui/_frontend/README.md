@@ -27,7 +27,7 @@ This is a minimal, clean Vite + React + TypeScript frontend that builds to a sin
 The Python wrapper expects `dist/app.js`. From repo root:
 
 ```
-python -m biosim.simui.build
+python -m biosimulant.simui.build
 ```
 
 That script installs deps and runs the Vite build, copying `dist/app.js` into `src/biosim/simui/static/app.js`.

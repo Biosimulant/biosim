@@ -1,4 +1,4 @@
-"""Typed runtime input coercion for Biosim modules.
+"""Typed runtime input coercion for Biosimulant modules.
 
 This module is provisional. It converts raw ``runtime.initial_inputs`` payloads
 into typed BioSignal instances by matching declared input SignalSpec profiles.

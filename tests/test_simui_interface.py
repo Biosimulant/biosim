@@ -111,7 +111,7 @@ class TestInterfaceInit:
     def test_default_controls(self):
         world = _make_world()
         ui = Interface(world)
-        assert ui._title == "BioSim UI"
+        assert ui._title == "Biosimulant UI"
         assert ui._description is None
 
     def test_custom_controls(self):
@@ -142,7 +142,7 @@ class TestSpecEndpoint:
         assert data["version"] == "2"
         assert data["bsim_version"] == __version__
         assert "m" in data["modules"]
-        assert data["title"] == "BioSim UI"
+        assert data["title"] == "Biosimulant UI"
 
     def test_spec_with_custom_controls(self):
         app, ui = _make_app(

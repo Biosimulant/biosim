@@ -1,4 +1,4 @@
-"""Runtime configuration helpers shared by Biosim execution surfaces."""
+"""Runtime configuration helpers shared by Biosimulant execution surfaces."""
 
 from __future__ import annotations
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 Thin CLI wrapper for maintainers to build the SimUI frontend bundle.
 
 Usage:
-    python -m biosim.simui.build
+    python -m biosimulant.simui.build
 
 Requires npm and the repo UI package at packages/simui-ui.
 Writes app.js/app.css to src/biosim/simui/static/.

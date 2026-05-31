@@ -395,12 +395,12 @@ class TestListFiles:
             assert r.status_code == 400
 
 
-class TestResolveConfigPathBiosim:
-    def test_path_under_biosim_package(self, tmp_path, monkeypatch):
-        """Path under the biosim package directory should be allowed via biosim check."""
+class TestResolveConfigPathRuntimePackage:
+    def test_path_under_runtime_package(self, tmp_path, monkeypatch):
+        """Path under the installed runtime package directory should be allowed."""
         import biosim
         bsim_parent = Path(biosim.__file__).parent.parent
-        # Change cwd to tmp_path so bsim_parent is NOT under cwd
+        # Change cwd to tmp_path so the package parent is not under cwd.
         monkeypatch.chdir(tmp_path)
         # Also clear BSIM_CONFIG_PATH
         monkeypatch.delenv("BSIM_CONFIG_PATH", raising=False)

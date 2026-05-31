@@ -1,14 +1,14 @@
 # SPDX-FileCopyrightText: 2025-present Demi <bjaiye1@gmail.com>
 #
 # SPDX-License-Identifier: MIT
-"""Generic CLI runner for biosim simulations.
+"""Generic CLI runner for Biosimulant simulations.
 
 Run any YAML/TOML config directly without needing a separate demo script.
 
 Usage:
-    python -m biosim config.yaml                    # Run headless
-    python -m biosim config.yaml --simui            # Launch SimUI dashboard
-    python -m biosim config.yaml --duration 10.0
+    biosimulant config.yaml                    # Run headless
+    biosimulant config.yaml --simui            # Launch SimUI dashboard
+    biosimulant config.yaml --duration 10.0
 
 YAML config format (simplified):
     meta:
@@ -161,7 +161,7 @@ def run_simui(
         sys.exit(1)
 
     meta = config.get("meta", {})
-    title = meta.get("title", "BioSim Simulation")
+    title = meta.get("title", "Biosimulant Simulation")
     description = meta.get("description")
 
     controls = [
@@ -189,7 +189,7 @@ def run_simui(
     ui.launch(host=host, port=port, open_browser=open_browser)
 
 
-def main(argv: list[str] | None = None, *, prog: str = "python -m biosim") -> None:
+def main(argv: list[str] | None = None, *, prog: str = "biosimulant") -> None:
     args_list = list(sys.argv[1:] if argv is None else argv)
     if args_list and args_list[0] in {"pack", "packages", "hub", "models"}:
         _removed_command_or_exit(args_list[0], prog=prog, json_output="--json" in args_list)
@@ -202,7 +202,7 @@ def main(argv: list[str] | None = None, *, prog: str = "python -m biosim") -> No
 
     parser = argparse.ArgumentParser(
         prog=prog,
-        description="Run biosim simulations from YAML/TOML config files.",
+        description="Run Biosimulant simulations from YAML/TOML config files.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=f"""
 Examples:
@@ -328,7 +328,7 @@ def _removed_labs_command_or_exit(command: str, *, prog: str, json_output: bool)
     raise SystemExit(2)
 
 
-def _main_labs(argv: list[str], *, prog: str = "python -m biosim labs") -> None:
+def _main_labs(argv: list[str], *, prog: str = "biosimulant labs") -> None:
     if argv and argv[0] == "export":
         _removed_labs_command_or_exit("export", prog=prog, json_output="--json" in argv)
 
@@ -745,7 +745,7 @@ def _main_labs(argv: list[str], *, prog: str = "python -m biosim labs") -> None:
         raise SystemExit(1) from exc
 
 
-def _main_packages(argv: list[str], *, prog: str = "python -m biosim packages") -> None:
+def _main_packages(argv: list[str], *, prog: str = "biosimulant packages") -> None:
     parser = argparse.ArgumentParser(
         prog=prog,
         description="Validate/build package repositories and run local package archives.",
@@ -799,10 +799,10 @@ def _main_packages(argv: list[str], *, prog: str = "python -m biosim packages") 
         raise SystemExit(1) from exc
 
 
-def _main_pack(argv: list[str], *, prog: str = "python -m biosim pack") -> None:
+def _main_pack(argv: list[str], *, prog: str = "biosimulant pack") -> None:
     parser = argparse.ArgumentParser(
         prog=prog,
-        description="Build, validate, fetch, and run BioSim package files.",
+        description="Build, validate, fetch, and run Biosimulant package files.",
     )
     parser.add_argument(
         "--json",
@@ -1450,7 +1450,7 @@ def _print_pack_result(json_output: bool, payload: dict[str, Any]) -> None:
         print(json_dumps(payload))
         return
     command = payload.get("command", "pack")
-    print(f"BioSim package {command} succeeded.")
+    print(f"Biosimulant package {command} succeeded.")
     if payload.get("package"):
         print(f"Package: {payload['package']}@{payload.get('version')}")
     if payload.get("package_type"):
@@ -1476,7 +1476,7 @@ def _print_validation_success(package_file: Path, result: Any, *, json_output: b
     if json_output:
         print(json_dumps(payload))
         return
-    print("BioSim package validation passed.")
+    print("Biosimulant package validation passed.")
     print(f"File: {package_file}")
     if result.metadata:
         print(f"Package: {result.metadata.get('package')}@{result.metadata.get('version')}")
@@ -1497,7 +1497,7 @@ def _print_validation_failure(package_file: Path, result: Any, *, json_output: b
     if json_output:
         print(json_dumps(payload), file=sys.stderr)
         return
-    print("BioSim package validation failed.", file=sys.stderr)
+    print("Biosimulant package validation failed.", file=sys.stderr)
     print(f"File: {package_file}", file=sys.stderr)
     for error in result.errors:
         print(f"Error: {error}", file=sys.stderr)
@@ -1509,7 +1509,7 @@ def _print_run_result(package_file: Path, result: dict[str, Any], *, json_output
     if json_output:
         print(json_dumps(result))
         return
-    print("BioSim package run completed.")
+    print("Biosimulant package run completed.")
     print(f"File: {package_file}")
     if result.get("package"):
         print(f"Package: {result['package']}@{result.get('version')}")
@@ -1531,7 +1531,7 @@ def _print_pack_error(exc: Exception, *, json_output: bool) -> None:
     if json_output:
         print(json_dumps(payload), file=sys.stderr)
         return
-    print("BioSim package command failed.", file=sys.stderr)
+    print("Biosimulant package command failed.", file=sys.stderr)
     print(f"Error: {exc}", file=sys.stderr)
 
 

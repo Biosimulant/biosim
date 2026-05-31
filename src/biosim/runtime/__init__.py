@@ -1,4 +1,4 @@
-"""Provisional runtime helpers shared by Biosim execution surfaces.
+"""Provisional runtime helpers shared by Biosimulant execution surfaces.
 
 The ``biosim.runtime`` package centralizes kernel-level package interpretation:
 entrypoint loading, typed initial-input coercion, communication-step resolution,

@@ -293,7 +293,7 @@ runtime:
 
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
-        assert "BioSim package validation failed." in captured.err
+        assert "Biosimulant package validation failed." in captured.err
         assert "not a zip" in captured.err.lower() or "file is not a zip file" in captured.err.lower()
 
     def test_labs_release_build_human_output(self, tmp_path, capsys):
@@ -333,5 +333,5 @@ packages:
 
         assert exc_info.value.code == 2
         captured = capsys.readouterr()
-        assert "Command removed: python -m biosim pack" in captured.err
+        assert "Command removed: biosimulant pack" in captured.err
         assert "biosimulant labs package" in captured.err

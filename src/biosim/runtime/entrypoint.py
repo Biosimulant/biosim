@@ -1,4 +1,4 @@
-"""Canonical entrypoint loading for packaged Biosim models.
+"""Canonical entrypoint loading for packaged Biosimulant models.
 
 This module is provisional. It exists to keep CLI, desktop, and sandbox
 entrypoint semantics aligned while namespace-package layouts are common.

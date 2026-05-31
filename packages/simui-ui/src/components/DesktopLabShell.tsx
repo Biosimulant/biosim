@@ -348,7 +348,7 @@ function LabContentsSidebar({
       <div className="sidebar-heading">
         <div className="sidebar-title-row">
           <div>
-            <h2>{state.spec?.title || "BioSim Lab"}</h2>
+            <h2>{state.spec?.title || "Biosimulant Lab"}</h2>
             <p>{moduleNames.length} module{moduleNames.length === 1 ? "" : "s"}</p>
           </div>
         </div>
@@ -1206,7 +1206,7 @@ export default function DesktopLabShell({
               <Icon name="panel-left" />
             </button>
             <div className="command-title">
-              <h1>{state.spec?.title || meta.title || "BioSim Lab"}</h1>
+              <h1>{state.spec?.title || meta.title || "Biosimulant Lab"}</h1>
               <p>{connected ? "Stream connected" : "Connecting stream"}</p>
             </div>
           </div>

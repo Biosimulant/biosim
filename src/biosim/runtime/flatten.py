@@ -1,4 +1,4 @@
-"""Canonical lab-tree flattening for Biosim runtimes."""
+"""Canonical lab-tree flattening for Biosimulant runtimes."""
 
 from __future__ import annotations
 

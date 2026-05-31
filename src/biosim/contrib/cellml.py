@@ -222,7 +222,7 @@ def _ensure_nlasolver_module() -> None:
 
     libCellML emits ``from nlasolver import nla_solve`` for generated models
     with algebraic systems. The reference helper is not packaged with the
-    generated module, so BioSimulant supplies a tiny SciPy-backed equivalent.
+    generated module, so Biosimulant supplies a tiny SciPy-backed equivalent.
     """
 
     if "nlasolver" in sys.modules:

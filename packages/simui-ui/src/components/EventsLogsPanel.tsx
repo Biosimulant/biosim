@@ -191,7 +191,7 @@ export default function EventsLogsPanel() {
               </>
             )}
             {bsimVersion && (
-              <span className="footer-version-chip" title={`BioSim library version ${bsimVersion}`}>
+              <span className="footer-version-chip" title={`Biosimulant library version ${bsimVersion}`}>
                 bsim v{bsimVersion}
               </span>
             )}

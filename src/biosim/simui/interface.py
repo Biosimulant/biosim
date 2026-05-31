@@ -67,7 +67,7 @@ class Interface:
         self,
         world: BioWorld,
         *,
-        title: str = "BioSim UI",
+        title: str = "Biosimulant UI",
         description: str | None = None,
         controls: Sequence[Any] | None = None,
         outputs: Sequence[Any] | None = None,

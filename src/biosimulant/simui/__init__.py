@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026-present Biosimulant Team
 #
 # SPDX-License-Identifier: MIT
-"""Compatibility alias for :mod:`biosim.simui`."""
+"""Biosimulant SimUI namespace."""
 from __future__ import annotations
 
 import importlib

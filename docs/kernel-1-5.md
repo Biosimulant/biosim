@@ -1,6 +1,6 @@
 # Communication-Step Kernel
 
-The communication-step kernel moves BioSim from a per-module due-time scheduler to a communication-step co-simulation model.
+The communication-step kernel moves Biosimulant from a per-module due-time scheduler to a communication-step co-simulation model.
 
 ## What changed
 
