@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import posixpath
+import re
 import shutil
 import subprocess
 import sys
@@ -44,6 +45,13 @@ FIXED_ZIP_TIME = (2020, 1, 1, 0, 0, 0)
 _FORBIDDEN_LEGACY_SOURCE_KEYS = frozenset(
     {"repo", "manifest_path", "upstream_repo", "upstream_manifest_path"}
 )
+_SEMVER_RE = re.compile(
+    r"^(0|[1-9]\d*)\."
+    r"(0|[1-9]\d*)\."
+    r"(0|[1-9]\d*)"
+    r"(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$"
+)
+_PACKAGE_SEGMENT_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$")
 
 
 class PackageError(ValueError):
@@ -135,9 +143,46 @@ def _default_package_name(path: Path) -> str:
 
 def _validate_version(version: str) -> str:
     clean = version.strip()
-    if not clean:
-        raise PackageError("Package version must not be empty")
+    if not _SEMVER_RE.fullmatch(clean):
+        raise PackageError(
+            "Package version must be SemVer MAJOR.MINOR.PATCH with optional prerelease and no build metadata"
+        )
     return clean
+
+
+def _validate_package_ref(package_name: str) -> str:
+    clean = package_name.strip()
+    parts = clean.split("/")
+    if len(parts) not in {1, 2} or any(not part for part in parts):
+        raise PackageError("Package names must be `name` or `namespace/name`")
+    for part in parts:
+        if not _PACKAGE_SEGMENT_RE.fullmatch(part):
+            raise PackageError(
+                "Package names must contain only lowercase letters, digits, and dashes, "
+                "and must start and end with a lowercase letter or digit"
+            )
+    return clean
+
+
+def _validate_lab_release_identity(
+    manifest: Mapping[str, Any],
+    *,
+    package_name_override: str | None,
+    version_override: str | None,
+) -> tuple[str, str]:
+    package_name = _manifest_declared_package(manifest)
+    if package_name is None:
+        raise PackageError("lab.yaml must declare a non-empty package")
+    package_name = _validate_package_ref(package_name)
+    if package_name_override is not None and package_name_override.strip() != package_name:
+        raise PackageError("--package must match lab.yaml package")
+    version = _manifest_declared_version(manifest)
+    if version is None:
+        raise PackageError("lab.yaml must declare a non-empty version")
+    version = _validate_version(version)
+    if version_override is not None and version_override.strip() != version:
+        raise PackageError("--version must match lab.yaml version")
+    return package_name, version
 
 
 def _is_exact_pin(dep: str) -> bool:
@@ -471,15 +516,10 @@ def export_lab_package(
 ) -> Path:
     source_path = Path(source_dir).expanduser().resolve()
     manifest, entries = _collect_lab_entries(source_path)
-    package_name = (
-        package_name
-        or _manifest_declared_package(manifest)
-        or _default_package_name(source_path)
-    )
-    version = _validate_version(
-        version
-        if version is not None
-        else (_manifest_declared_version(manifest) or DEFAULT_PACKAGE_VERSION)
+    package_name, version = _validate_lab_release_identity(
+        manifest,
+        package_name_override=package_name,
+        version_override=version,
     )
     logical_sha256 = _logical_hash(entries)
     package_yaml = _build_package_yaml(
@@ -634,11 +674,10 @@ def validate_lab_source(path: str | Path) -> PackageValidationResult:
             parsed_manifest=manifest,
             visited=set(),
         )
-        package_name = _manifest_declared_package(manifest) or _default_package_name(
-            source_path
-        )
-        version = _validate_version(
-            _manifest_declared_version(manifest) or DEFAULT_PACKAGE_VERSION
+        package_name, version = _validate_lab_release_identity(
+            manifest,
+            package_name_override=None,
+            version_override=None,
         )
         result.valid = True
         result.metadata = {

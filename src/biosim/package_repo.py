@@ -15,7 +15,7 @@ _SEMVER_RE = re.compile(
     r"(0|[1-9]\d*)\."
     r"(0|[1-9]\d*)"
     r"(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?"
-    r"(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$"
+    r"$"
 )
 _VALID_PACKAGE_SEGMENT_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$")
 _VALID_VISIBILITIES = {"private", "public"}

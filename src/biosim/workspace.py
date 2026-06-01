@@ -105,7 +105,7 @@ wiring: []"""
     lab_yaml = f"""schema_version: "2.0"
 title: {_json_string(name)}
 description: {_json_string(description) if description is not None else "null"}
-package: local/{slug}
+package: {slug}
 version: 0.1.0
 {models_block}
 runtime:
