@@ -39,6 +39,23 @@ install the Desktop/product CLI can have another `biosimulant` binary on `PATH`.
 Use `python -m biosimulant ...` to explicitly run the Python package CLI during
 release verification and debugging.
 
+## Final biosim archive release
+
+Before archiving the legacy `biosim` PyPI project, publish one final `biosim`
+release whose package description warns users that `biosim` is archived and
+points them to `biosimulant`.
+
+Current transition flow:
+
+1. Configure a PyPI Trusted Publisher for the existing `biosim` project using
+   owner `Biosimulant`, repository `biosim`, workflow `publish-pypi.yml`, and
+   environment `pypi`.
+2. Run the `Publish to PyPI` GitHub workflow on `main`.
+3. Confirm `biosim==0.0.12` is visible on PyPI with the archive notice.
+4. Archive the `biosim` project on PyPI.
+5. Remove the temporary archive notice from this repository README so the
+   project documentation focuses on `biosimulant`.
+
 ## Manual commands
 
 ```bash

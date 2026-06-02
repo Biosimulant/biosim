@@ -47,7 +47,7 @@ def _prepare_legacy_metadata(worktree: Path) -> None:
     pyproject = _replace_once(
         pyproject,
         'description = "Open-source local simulation runtime and CLI for Biosimulant"',
-        'description = "Open-source local simulation runtime and CLI for Biosimulant (legacy biosim distribution)"',
+        'description = "Archived legacy biosim distribution for Biosimulant; use biosimulant instead"',
     )
     pyproject = _replace_once(
         pyproject,
@@ -65,9 +65,16 @@ def _prepare_legacy_metadata(worktree: Path) -> None:
     readme = readme_path.read_text(encoding="utf-8")
     readme_path.write_text(
         "# biosim\n\n"
-        "This is the legacy PyPI distribution name for Biosimulant. New projects "
-        "should prefer `pip install biosimulant`; this package is published in "
-        "lockstep and ships both the `biosim` and `biosimulant` import namespaces.\n\n"
+        "## Archived legacy package\n\n"
+        "The `biosim` PyPI project is archived and will not receive further "
+        "updates after this final notice release. Use "
+        "[`biosimulant`](https://pypi.org/project/biosimulant/) instead:\n\n"
+        "```console\n"
+        "pip install biosimulant\n"
+        "```\n\n"
+        "Existing Python code that imports `biosim` should install "
+        "`biosimulant`; the `biosimulant` package continues to ship the "
+        "compatibility `biosim` import path.\n\n"
         + readme,
         encoding="utf-8",
     )
