@@ -49,12 +49,18 @@ Current transition flow:
 
 1. Configure a PyPI Trusted Publisher for the existing `biosim` project using
    owner `Biosimulant`, repository `biosim`, workflow `publish-pypi.yml`, and
-   environment `pypi`.
-2. Run the `Publish to PyPI` GitHub workflow on `main`.
+   environment `(Any)`.
+2. Run the `Publish to PyPI` GitHub workflow on `main` with `package=biosim`.
 3. Confirm `biosim==0.0.12` is visible on PyPI with the archive notice.
 4. Archive the `biosim` project on PyPI.
 5. Remove the temporary archive notice from this repository README so the
    project documentation focuses on `biosimulant`.
+
+CLI rerun:
+
+```bash
+gh workflow run publish-pypi.yml --ref main -f package=biosim
+```
 
 ## Manual commands
 

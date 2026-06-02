@@ -5,15 +5,22 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      package:
+        description: "Package to publish"
+        required: false
+        default: "all"
+        type: choice
+        options:
+          - all
+          - biosimulant
+          - biosim
 
 jobs:
-  publish:
+  build:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write
       contents: read
-    environment:
-      name: pypi
     steps:
       - uses: actions/checkout@v4
 
@@ -42,11 +49,59 @@ jobs:
       - name: Check package distributions
         run: twine check dist/biosimulant/* dist/biosim/*
 
+      - name: Upload biosimulant distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: biosimulant-dist
+          path: dist/biosimulant/*
+
+      - name: Upload legacy biosim distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: biosim-dist
+          path: dist/biosim/*
+
+  publish-biosimulant:
+    needs: build
+    if: >-
+      github.event_name != 'workflow_dispatch' ||
+      github.event.inputs.package == 'all' ||
+      github.event.inputs.package == 'biosimulant'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    environment:
+      name: pypi
+    steps:
+      - name: Download biosimulant distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: biosimulant-dist
+          path: dist/biosimulant
+
       - name: Publish biosimulant to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist/biosimulant
           skip-existing: true
+
+  publish-biosim:
+    needs: build
+    if: >-
+      github.event_name != 'workflow_dispatch' ||
+      github.event.inputs.package == 'all' ||
+      github.event.inputs.package == 'biosim'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Download legacy biosim distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: biosim-dist
+          path: dist/biosim
 
       - name: Publish legacy biosim to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
