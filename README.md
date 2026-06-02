@@ -44,6 +44,10 @@ Alternative (package index):
 pip install biosimulant
 ```
 
+The default install includes the local SimUI runtime used by
+`biosimulant labs serve`. The `biosimulant[ui]` extra remains accepted for
+backwards compatibility but is no longer required.
+
 For the shared ONNX biomodule helpers:
 
 ```console
@@ -310,7 +314,7 @@ the shared library.
 SimUI lets you build and launch a small web UI entirely from Python (similar to Gradio's ergonomics), backed by FastAPI and a prebuilt React SPA that renders visuals from JSON. The frontend uses Server-Sent Events (SSE) for real-time updates.
 
 - User usage (no Node/npm required):
-  - Install UI extras: `pip install 'biosimulant[ui]'`
+  - Install Biosimulant: `pip install biosimulant`
   - Try the demo: `python examples/ui_demo.py` then open `http://127.0.0.1:7860/ui/`.
   - From your own code:
 

@@ -30,13 +30,17 @@ def _public_text_files() -> list[Path]:
 def test_public_docs_lead_with_biosimulant_package_and_cli() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     quickstart = (ROOT / "docs" / "quickstart.md").read_text(encoding="utf-8")
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
 
     assert readme.startswith("# biosimulant")
     assert "`biosimulant` is the primary package, import namespace, and CLI name" in readme
     assert "pip install biosimulant" in readme
     assert "biosimulant labs create" in readme
-    assert "pip install 'biosimulant[ui]'" in quickstart
+    assert "pip install biosimulant" in quickstart
+    assert "biosimulant[ui]` extra remains valid" in quickstart
     assert "biosimulant labs create" in quickstart
+    assert "## [Unreleased]" in changelog
+    assert "Keep a Changelog" in changelog
 
 
 def test_legacy_biosim_command_is_only_documented_as_compatibility() -> None:

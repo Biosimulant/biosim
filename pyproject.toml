@@ -24,8 +24,10 @@ classifiers = [
 ]
 dependencies = [
   "argcomplete>=3.5",
+  "fastapi>=0.110,<1",
   "numpy>=1.26",
   "pyyaml>=6",
+  "uvicorn>=0.23",
 ]
 
 [project.urls]
@@ -125,6 +127,7 @@ include = [
   "docs/**",
   "examples/**",
   "scripts/**",
+  "CHANGELOG.md",
   "README.md",
   "LICENSE.txt",
   "pyproject.toml",

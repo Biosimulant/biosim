@@ -3,8 +3,12 @@
 ## Install
 
 ```bash
-pip install 'biosimulant[ui]'
+pip install biosimulant
 ```
+
+The default install includes SimUI for `biosimulant labs serve`. The
+`biosimulant[ui]` extra remains valid for older instructions but is no longer
+required.
 
 For bash or zsh Tab completion, register the installed CLI once:
 

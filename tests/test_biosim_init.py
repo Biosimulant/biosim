@@ -3,12 +3,12 @@ import importlib
 
 
 def test_getattr_simui_lazy_import(biosim):
-    """__getattr__ should lazily import simui (or raise ImportError if deps missing)."""
+    """__getattr__ should lazily import simui (or raise ImportError in stale installs)."""
     try:
         mod = biosim.__getattr__("simui")
         assert mod is not None
     except ImportError:
-        # SimUI deps (fastapi) not installed - that's fine, we covered the code path
+        # Stale/minimal environments can still lack SimUI deps.
         pass
 
 

@@ -7,7 +7,7 @@ def fastapi_client():
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
     except Exception:
-        pytest.skip("fastapi not installed (install with biosim[ui])")
+        pytest.skip("fastapi not installed")
     return FastAPI, TestClient
 
 

@@ -230,8 +230,16 @@ def run_simui(
     try:
         from biosim.simui import Interface, Number, Button, EventLog, VisualsPanel
     except ImportError as e:
-        print(f"Error: SimUI requires additional dependencies: {e}", file=sys.stderr)
-        print("Install with: pip install 'biosimulant[ui]' or pip install fastapi uvicorn", file=sys.stderr)
+        print(
+            f"Error: SimUI dependencies are missing from this environment: {e}",
+            file=sys.stderr,
+        )
+        print(
+            "Current biosimulant releases include SimUI by default. "
+            "Reinstall with: pipx install biosimulant --force. "
+            "For older pipx installs, run: pipx inject biosimulant fastapi uvicorn.",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     meta = config.get("meta", {})
