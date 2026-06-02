@@ -9,11 +9,11 @@ new installs should use `pip install biosimulant`.
 ## Release workflow
 
 1. Confirm the PyPI Trusted Publisher is configured for the `biosimulant` project.
-2. Update `src/biosim/__about__.py` with a new version (example: `0.0.14`).
+2. Update `src/biosim/__about__.py` with a new version (example: `0.0.15`).
 3. Move the matching notes in `CHANGELOG.md` from `Unreleased` into a dated
    release section.
 4. Commit and push the version/changelog bump to `main`.
-5. Create and push a matching tag (`v0.0.14`).
+5. Create and push a matching tag (`v0.0.15`).
 6. Verify GitHub Actions `Publish to PyPI` finishes successfully.
 7. Verify a fresh install from PyPI:
 
@@ -36,10 +36,10 @@ release verification and debugging.
 ```bash
 git add src/biosim/__about__.py
 git add CHANGELOG.md
-git commit -m "Bump version to 0.0.14"
+git commit -m "Bump version to 0.0.15"
 git push origin main
-git tag v0.0.14
-git push origin v0.0.14
+git tag v0.0.15
+git push origin v0.0.15
 ```
 
 ## Automation script
@@ -58,5 +58,5 @@ Behavior:
 
 Options:
 
-- Explicit version: `bash scripts/release_pypi.sh 0.0.14`
+- Explicit version: `bash scripts/release_pypi.sh 0.0.15`
 - Local tag only (no push): `bash scripts/release_pypi.sh --no-push`

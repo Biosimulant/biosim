@@ -148,43 +148,6 @@ class TestRunHeadless:
         assert "bar" in captured.out
 
 
-class TestRunSimui:
-    def test_simui_import_error(self, biosim, capsys):
-        from biosim.__main__ import run_simui
-
-        with patch.dict(sys.modules, {"biosim.simui": None}):
-            with pytest.raises(SystemExit):
-                run_simui(
-                    biosim.BioWorld(communication_step=0.1),
-                    {},
-                    config_path=Path("/tmp/test.yaml"),
-                    duration=1.0,
-                    port=8765,
-                    host="127.0.0.1",
-                    open_browser=False,
-                )
-
-    def test_simui_success(self, biosim, capsys):
-        """run_simui should create Interface and call launch."""
-        from biosim.__main__ import run_simui
-        from biosim.simui.interface import Interface
-        mock_interface = MagicMock()
-        with patch.object(Interface, "launch") as mock_launch:
-            with patch.object(Interface, "mount"):
-                run_simui(
-                    biosim.BioWorld(communication_step=0.1),
-                    {"meta": {"title": "Test Sim", "description": "Desc"}},
-                    config_path=Path("/tmp/test.yaml"),
-                    duration=5.0,
-                    port=9999,
-                    host="0.0.0.0",
-                    open_browser=True,
-                )
-        mock_launch.assert_called_once_with(host="0.0.0.0", port=9999, open_browser=True)
-        captured = capsys.readouterr()
-        assert "Starting SimUI" in captured.out
-
-
 class TestMain:
     def test_missing_config(self, tmp_path):
         with patch("sys.argv", ["biosim", str(tmp_path / "nonexistent.yaml")]):
@@ -224,8 +187,8 @@ runtime:
         with patch("sys.argv", ["biosim", str(cfg), "--duration", "0.1"]):
             main()
 
-    def test_simui_mode(self, tmp_path):
-        """--simui flag should call run_simui."""
+    def test_simui_flag_removed(self, tmp_path):
+        """The old top-level --simui flag should no longer be accepted."""
         from examples.wiring_builder_demo import Eye
 
         cfg = tmp_path / "wiring.yaml"
@@ -237,9 +200,9 @@ runtime:
   communication_step: 0.1
 """)
         with patch("sys.argv", ["biosim", str(cfg), "--simui"]):
-            with patch("biosim.__main__.run_simui") as mock_simui:
+            with pytest.raises(SystemExit) as exc_info:
                 main()
-                mock_simui.assert_called_once()
+        assert exc_info.value.code == 2
 
     def test_module_count_exception(self, tmp_path):
         """If module_names raises, module_count should default to 0."""

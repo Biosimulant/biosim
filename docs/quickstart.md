@@ -6,9 +6,7 @@
 pip install biosimulant
 ```
 
-The default install includes SimUI for `biosimulant labs serve`. The
-`biosimulant[ui]` extra remains valid for older instructions but is no longer
-required.
+The default install includes the local lab UI for `biosimulant labs serve`.
 
 For bash or zsh Tab completion, register the installed CLI once:
 
@@ -28,6 +26,9 @@ biosimulant labs validate ./my-lab
 biosimulant labs run ./my-lab --no-install-deps
 biosimulant labs serve ./my-lab
 ```
+
+`labs serve` opens `http://127.0.0.1:8765/` by default. Use `--no-open` to
+start the server without opening a browser.
 
 ## Minimal 1.5 example
 
@@ -100,7 +101,6 @@ world.run(duration=0.3)
 - `python examples/world_simulation.py`
 - `python examples/wiring_builder_demo.py`
 - `python examples/visuals_demo.py`
-- `python examples/ui_demo.py`
 
 ## Next reading
 

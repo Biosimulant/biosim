@@ -7,6 +7,30 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [0.0.15] - 2026-06-02
+
+### Added
+
+- Add the embedded open-source Labs Serve UI as the implementation behind
+  `biosimulant labs serve`.
+- Add Labs Serve API endpoints for lab metadata, local run lifecycle, logs,
+  results, cancellation, manifest edits, and layout persistence.
+- Add `--no-open` to suppress the default browser launch.
+
+### Changed
+
+- Serve the Labs Serve UI at the root URL (`/`) and report the root URL in JSON
+  output.
+- Redirect `/ui` and `/ui/` to `/` for one release.
+- Build the private React/Vite Labs Serve UI into the Python wheel so users do
+  not install a separate UI package.
+
+### Removed
+
+- Remove the old Python-declared SimUI implementation and public
+  `biosim.simui` / `biosimulant.simui` modules.
+- Remove the top-level `--simui` runner flag and the `biosimulant[ui]` extra.
+
 ## [0.0.14] - 2026-06-02
 
 ### Changed
@@ -73,7 +97,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Preserve the legacy `biosim` import path and `python -m biosim` compatibility
   command for existing model packages.
 
-[Unreleased]: https://github.com/Biosimulant/biosim/compare/v0.0.14...HEAD
+[Unreleased]: https://github.com/Biosimulant/biosim/compare/v0.0.15...HEAD
+[0.0.15]: https://github.com/Biosimulant/biosim/compare/v0.0.14...v0.0.15
 [0.0.14]: https://github.com/Biosimulant/biosim/compare/v0.0.13...v0.0.14
 [0.0.13]: https://github.com/Biosimulant/biosim/compare/v0.0.12...v0.0.13
 [0.0.12]: https://github.com/Biosimulant/biosim/compare/v0.0.11...v0.0.12

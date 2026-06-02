@@ -215,12 +215,14 @@ def test_labs_serve_auto_pulls_public_lab_ref(monkeypatch, tmp_path: Path, capsy
             assert package_id == "pkg-1"
             return package_bytes
 
-    def fake_run_simui(world, config, **kwargs):
-        calls.append({"world": world, "config": config, "kwargs": kwargs})
+    def fake_serve_lab(path, **kwargs):
+        calls.append({"path": path, "kwargs": kwargs})
+        if kwargs.get("emit_json"):
+            print(json.dumps({"command": "serve", "url": f"http://127.0.0.1:{kwargs['port']}/"}))
 
     target = tmp_path / "served-lab"
     monkeypatch.setattr(cli_main, "PublicRegistryClient", FakeRegistryClient)
-    monkeypatch.setattr(cli_main, "run_simui", fake_run_simui)
+    monkeypatch.setattr(cli_main, "serve_lab", fake_serve_lab)
 
     main(
         [
@@ -238,8 +240,8 @@ def test_labs_serve_auto_pulls_public_lab_ref(monkeypatch, tmp_path: Path, capsy
     )
     payload = json.loads(capsys.readouterr().out)
 
-    assert payload["package"] == "demo/immune"
+    assert payload["url"] == "http://127.0.0.1:9999/"
     assert (target / "lab.yaml").is_file()
     assert calls
     assert calls[0]["kwargs"]["port"] == 9999
-    assert calls[0]["kwargs"]["config_path"] == target / "lab.yaml"
+    assert calls[0]["path"] == target.resolve()

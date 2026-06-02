@@ -91,10 +91,6 @@ dev = [
   "httpx>=0.26",
   "tomli>=2; python_version < '3.11'",
 ]
-ui = [
-  "fastapi>=0.110,<1",
-  "uvicorn>=0.23",
-]
 ml = [
   "onnxruntime>=1.18",
 ]
@@ -104,16 +100,16 @@ cellml = [
 ]
 # Everything
 all = [
-  "biosimulant[dev,ui,ml,cellml]",
+  "biosimulant[dev,ml,cellml]",
 ]
 
 [tool.hatch.build]
 include = [
-  "src/biosim/simui/static/**",
+  "src/biosim/labs_serve/static/**",
   "src/biosimulant/**",
 ]
 exclude = [
-  "src/biosim/simui/_frontend/**",
+  "packages/labs-serve-ui/node_modules/**",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -127,6 +123,7 @@ include = [
   "docs/**",
   "examples/**",
   "scripts/**",
+  "packages/labs-serve-ui/**",
   "CHANGELOG.md",
   "README.md",
   "LICENSE.txt",

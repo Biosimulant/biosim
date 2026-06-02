@@ -1,15 +1,13 @@
 """Tests for biosim.__init__ – lazy imports and __dir__."""
 import importlib
 
+import pytest
 
-def test_getattr_simui_lazy_import(biosim):
-    """__getattr__ should lazily import simui (or raise ImportError in stale installs)."""
-    try:
-        mod = biosim.__getattr__("simui")
-        assert mod is not None
-    except ImportError:
-        # Stale/minimal environments can still lack SimUI deps.
-        pass
+
+def test_getattr_simui_removed(biosim):
+    """The old public SimUI API is removed; labs serve owns the local UI."""
+    with pytest.raises(AttributeError):
+        biosim.__getattr__("simui")
 
 
 def test_getattr_onnx_module_lazy_import(biosim):
@@ -29,12 +27,12 @@ def test_getattr_unknown_raises():
         assert "no_such_attr_xyz" in str(e)
 
 
-def test_dir_includes_simui():
+def test_dir_excludes_simui():
     """__dir__ should include lazy namespaces and exported helpers."""
     import biosim
 
     names = biosim.__dir__()
-    assert "simui" in names
+    assert "simui" not in names
     assert "onnx" in names
     assert "OnnxClassifierModule" in names
     assert "__version__" in names

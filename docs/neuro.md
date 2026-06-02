@@ -37,7 +37,6 @@ Clone the models repository alongside biosimulant:
 git clone https://github.com/Biosimulant/models.git
 cd models
 pip install -e ../biosim            # Install biosimulant core from the local repo
-pip install -e ../biosim'[ui]'      # Optional: for SimUI
 ```
 
 ### Running Labs
@@ -59,10 +58,10 @@ biosimulant labs/neuro-microcircuit/wiring.yaml
 biosimulant labs/neuro-hodgkin-huxley-neuron/wiring.yaml
 ```
 
-**Local SimUI (optional):**
+**Local lab UI (optional):**
 ```bash
-python labs/neuro-microcircuit/simui_local.py
-# Then open http://localhost:7860/ui/
+biosimulant labs serve labs/neuro-microcircuit
+# Opens http://127.0.0.1:8765/
 ```
 
 **Config-driven runs (no code changes):**
@@ -351,7 +350,7 @@ RecordSignal(
 
 ## Visual Outputs
 
-The neuro packs use the SimUI VisualSpec contract. VisualSpecs may include an optional `description` field for hover text/captions.
+The neuro packs use the Biosimulant VisualSpec contract. VisualSpecs may include an optional `description` field for hover text/captions.
 
 ### Raster Plot (Image)
 
@@ -477,7 +476,7 @@ world.run(duration=0.3)
 
 ## See Also
 
-- [Biosimulant README](../README.md) - VisualSpec types, SimUI API reference
+- [Biosimulant README](../README.md) - VisualSpec types and local lab UI notes
 - [Wiring docs](wiring.md) - WiringBuilder and loader API
 - [Config docs](config.md) - YAML/TOML config file format
 - [models STANDARDS.md](https://github.com/Biosimulant/models/blob/main/STANDARDS.md) - Model contribution guidelines

@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import importlib
 from types import ModuleType
-from typing import TYPE_CHECKING
 
 from .__about__ import __version__
 from .world import BioWorld, WorldEvent
@@ -43,9 +42,6 @@ from .pack import (
     unpack_package,
     validate_package,
 )
-
-if TYPE_CHECKING:  # pragma: no cover
-    from . import simui as simui
 
 __all__ = [
     "__version__",
@@ -89,8 +85,6 @@ __all__ = [
 
 def __getattr__(name: str) -> ModuleType:
     # Lazily import optional namespaces so `import biosim` does not require extras.
-    if name == "simui":
-        return importlib.import_module(".simui", __name__)
     if name == "onnx":
         return importlib.import_module(".onnx", __name__)
     if name == "OnnxClassifierModule":
@@ -99,4 +93,4 @@ def __getattr__(name: str) -> ModuleType:
 
 
 def __dir__() -> list[str]:
-    return sorted([*__all__, "onnx", "simui"])
+    return sorted([*__all__, "onnx"])

@@ -5,7 +5,7 @@
 - **BioWorld**: the runtime container that orchestrates multi-rate biomodules, routes signals, and publishes lifecycle events. Supports cooperative pause/resume/stop.
 - **BioModule**: a unit of behavior with local state that implements the runnable contract (`setup/reset/advance_window/get_outputs/snapshot/restore/...`).
 - **BioSignal**: typed data exchanged between modules over named ports. Each signal carries `source`, `name`, `value`, `emitted_at`, and a bound `SignalSpec`.
-- **SimUI**: a lightweight web UI layer for running, visualizing, and editing simulations from the browser, backed by FastAPI + a React SPA.
+- **Local Lab UI**: a bundled browser UI for running, visualizing, and editing labs through `biosimulant labs serve`.
 
 `BioModule` is the minimal full-control interface. Authors who want less adapter
 boilerplate can opt into `SignalEmitterBioModule` for output wrapping or
@@ -26,11 +26,11 @@ helpers, not required architecture.
 - Optional port metadata on modules (`inputs()`, `outputs()`) enables connection validation.
 - `build_from_spec(world, spec)` builds a module graph from a dict spec (used by YAML/TOML loaders).
 
-## SimUI (web UI)
-- Python-declared interface: `Interface(world, controls=[...], outputs=[...]).launch()`.
-- REST + SSE API under `/ui/api/...` for run control, real-time events, visuals, and status.
-- Config editor sub-API (`/ui/api/editor/...`) for visual wiring editing, YAML import/export, and live reloading.
-- Background simulation runner (`SimulationManager`) with pause/resume support.
+## Local Lab UI
+- Start with `biosimulant labs serve ./my-lab`.
+- The UI is served at `/` and opens by default.
+- Lab edits persist to `lab.yaml`; canvas layout persists to `wiring-layout.json`.
+- The local API is under `/api/...` and uses in-memory run history for the active server process.
 
 ## Standard-agnostic by design
 - Biomodules are self-contained Python packages and may wrap external simulators internally.

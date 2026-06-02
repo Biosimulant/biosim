@@ -35,20 +35,20 @@ def test_labs_init_validate_and_run_without_desktop(tmp_path: Path, capsys) -> N
     assert run_payload["modules"][0]["alias"] == "hello"
 
 
-def test_labs_serve_uses_local_simui_without_desktop(tmp_path: Path) -> None:
+def test_labs_serve_uses_local_lab_ui_without_desktop(tmp_path: Path) -> None:
     lab_dir = tmp_path / "served-lab"
     main(["labs", "init", str(lab_dir), "--name", "Served Lab"], prog="biosimulant")
 
-    with patch("biosim.__main__.run_simui") as run_simui:
+    with patch("biosim.__main__.serve_lab") as serve_lab:
         main(
-            ["labs", "serve", str(lab_dir), "--port", "9999", "--no-install-deps"],
+            ["labs", "serve", str(lab_dir), "--port", "9999", "--no-open", "--no-install-deps"],
             prog="biosimulant",
         )
 
-    run_simui.assert_called_once()
-    _, config = run_simui.call_args.args[:2]
-    assert config["meta"]["title"] == "Served Lab"
-    assert run_simui.call_args.kwargs["port"] == 9999
+    serve_lab.assert_called_once()
+    assert serve_lab.call_args.args == (lab_dir.resolve(),)
+    assert serve_lab.call_args.kwargs["port"] == 9999
+    assert serve_lab.call_args.kwargs["open_browser"] is False
 
 
 def test_identity_free_labs_validate_run_serve_and_package_with_flags(
@@ -72,14 +72,14 @@ def test_identity_free_labs_validate_run_serve_and_package_with_flags(
     assert run_payload["version"] == "0.1.0"
     assert run_payload["modules"][0]["alias"] == "counter"
 
-    with patch("biosim.__main__.run_simui") as run_simui:
+    with patch("biosim.__main__.serve_lab") as serve_lab:
         main(
             ["labs", "serve", str(lab_dir), "--no-install-deps"],
             prog="biosimulant",
         )
-    run_simui.assert_called_once()
-    _, config = run_simui.call_args.args[:2]
-    assert config["meta"]["title"] == "Test: Lab"
+    serve_lab.assert_called_once()
+    assert serve_lab.call_args.args == (lab_dir.resolve(),)
+    assert serve_lab.call_args.kwargs["open_browser"] is True
 
     with pytest.raises(SystemExit) as exc_info:
         main(["labs", "package", str(lab_dir)], prog="biosimulant")

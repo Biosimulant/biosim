@@ -8,7 +8,6 @@ Run any YAML/TOML config directly without needing a separate demo script.
 
 Usage:
     biosimulant config.yaml                    # Run headless
-    biosimulant config.yaml --simui            # Launch SimUI dashboard
     biosimulant config.yaml --duration 10.0
 
 YAML config format (simplified):
@@ -49,6 +48,7 @@ from .extensions import (
     is_extension_command_path,
     run_extension_command,
 )
+from .labs_serve import serve_lab
 from .package_repo import build_package_repo, validate_package_repo
 from .pack import (
     DEFAULT_PACKAGE_NAMESPACE,
@@ -58,7 +58,6 @@ from .pack import (
     fetch_package,
     _local_lab_release_identity,
     _package_slug,
-    prepare_lab_package,
     run_package,
     unpack_package,
     validate_lab_source,
@@ -216,61 +215,6 @@ def run_headless(world: "BioWorld", duration: float) -> None:
         print("No visuals collected.")
 
 
-def run_simui(
-    world: "BioWorld",
-    config: Dict[str, Any],
-    *,
-    config_path: Path,
-    duration: float,
-    port: int,
-    host: str,
-    open_browser: bool,
-) -> None:
-    """Launch SimUI with the configured world."""
-    try:
-        from biosim.simui import Interface, Number, Button, EventLog, VisualsPanel
-    except ImportError as e:
-        print(
-            f"Error: SimUI dependencies are missing from this environment: {e}",
-            file=sys.stderr,
-        )
-        print(
-            "Current biosimulant releases include SimUI by default. "
-            "Reinstall with: pipx install biosimulant --force. "
-            "For older pipx installs, run: pipx inject biosimulant fastapi uvicorn.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
-    meta = config.get("meta", {})
-    title = meta.get("title", "Biosimulant Simulation")
-    description = meta.get("description")
-
-    controls = [
-        Number("duration", duration, label="Duration", minimum=0.01, maximum=100000.0, step=0.1),
-        Button("Run"),
-    ]
-
-    outputs = [
-        EventLog(limit=100),
-        VisualsPanel(refresh="auto", interval_ms=500),
-    ]
-
-    ui = Interface(
-        world,
-        title=title,
-        description=description,
-        controls=controls,
-        outputs=outputs,
-        config_path=config_path,
-    )
-
-    print(f"Starting SimUI: http://{host}:{port}/ui/")
-    print("Press Ctrl+C to stop.")
-
-    ui.launch(host=host, port=port, open_browser=open_browser)
-
-
 def _build_main_parser(*, prog: str = "biosimulant") -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog=prog,
@@ -281,9 +225,7 @@ Examples:
   {prog} labs init ./my-lab --name "My Lab"
   {prog} labs validate ./my-lab
   {prog} labs package ./my-lab --out dist/
-  {prog} wiring.yaml --simui
   {prog} config.yaml --duration 10.0
-  {prog} config.yaml --simui --port 8080 --open
         """,
     )
 
@@ -293,11 +235,6 @@ Examples:
         help="Path to YAML or TOML config file",
     )
     config_action.completer = _top_level_config_completer
-    parser.add_argument(
-        "--simui",
-        action="store_true",
-        help="Launch SimUI web dashboard instead of headless run",
-    )
     parser.add_argument(
         "--duration",
         type=float,
@@ -309,24 +246,6 @@ Examples:
         type=float,
         default=None,
         help="Override runtime.communication_step from config",
-    )
-    parser.add_argument(
-        "--port",
-        type=int,
-        default=8765,
-        help="SimUI server port (default: 8765)",
-    )
-    parser.add_argument(
-        "--host",
-        type=str,
-        default="127.0.0.1",
-        help="SimUI server host (default: 127.0.0.1)",
-    )
-    parser.add_argument(
-        "--open",
-        action="store_true",
-        dest="open_browser",
-        help="Open browser automatically when starting SimUI",
     )
     _enable_path_completers(parser)
     return parser
@@ -382,18 +301,7 @@ def main(argv: list[str] | None = None, *, prog: str = "biosimulant") -> None:
     print(f"Loaded config: {args.config}")
     print(f"Modules: {module_count}")
 
-    if args.simui:
-        run_simui(
-            world,
-            config,
-            config_path=args.config.resolve(),
-            duration=args.duration,
-            port=args.port,
-            host=args.host,
-            open_browser=args.open_browser,
-        )
-    else:
-        run_headless(world, duration=args.duration)
+    run_headless(world, duration=args.duration)
 
 
 def _removed_command_or_exit(command: str, *, prog: str, json_output: bool) -> None:
@@ -465,14 +373,16 @@ def _populate_labs_parser(parser: argparse.ArgumentParser) -> argparse.ArgumentP
     run_parser.add_argument("--results-file", type=Path, default=None)
     run_parser.add_argument("--json", action="store_true", dest="json_output")
 
-    serve_parser = subparsers.add_parser("serve", help="Serve a local lab or registry ref through SimUI")
+    serve_parser = subparsers.add_parser("serve", help="Serve a local lab or registry ref through the local lab UI")
     serve_parser.add_argument("lab", type=Path, nargs="?", default=Path("."))
     serve_parser.add_argument("--target", type=Path, default=None, help="Destination for auto-pulled registry refs")
     serve_parser.add_argument("--force", action="store_true", help="Replace an existing auto-pull target")
     serve_parser.add_argument("--registry-url", default=None)
     serve_parser.add_argument("--host", default="127.0.0.1")
     serve_parser.add_argument("--port", type=int, default=8765)
-    serve_parser.add_argument("--open", action="store_true", dest="open_browser")
+    serve_parser.set_defaults(open_browser=True)
+    serve_parser.add_argument("--open", action="store_true", dest="open_browser", help="Open browser automatically (default)")
+    serve_parser.add_argument("--no-open", action="store_false", dest="open_browser", help="Do not open a browser automatically")
     serve_parser.add_argument("--no-install-deps", action="store_true")
     serve_parser.add_argument("--json", action="store_true", dest="json_output")
 
@@ -821,39 +731,26 @@ def _main_labs(argv: list[str], *, prog: str = "biosimulant labs") -> None:
                 force=args.force,
                 registry_url=args.registry_url,
             )
-            with (
-                _package_file_for_lab(lab_path) as package_file,
-                tempfile.TemporaryDirectory(prefix="biosim-pack-") as unpack_dir,
-            ):
-                prepared = prepare_lab_package(
-                    package_file,
-                    install_deps=not args.no_install_deps,
-                    unpack_root=unpack_dir,
-                )
-                meta = {
-                    "title": prepared.manifest.get("title") or prepared.package,
-                    "description": prepared.manifest.get("description"),
-                }
-                if args.json_output:
-                    print(
-                        json_dumps(
-                            {
-                                "command": "serve",
-                                "package": prepared.package,
-                                "version": prepared.version,
-                                "url": f"http://{args.host}:{args.port}/ui/",
-                                "modules": prepared.modules,
-                            }
-                        )
+            resolved_lab_path = lab_path.expanduser().resolve()
+            if resolved_lab_path.is_file():
+                with tempfile.TemporaryDirectory(prefix="biosim-serve-package-") as temp_dir:
+                    unpacked = unpack_package(resolved_lab_path, dest=Path(temp_dir) / "unpacked")
+                    serve_lab(
+                        unpacked / "payload",
+                        host=args.host,
+                        port=args.port,
+                        open_browser=args.open_browser,
+                        install_deps=not args.no_install_deps,
+                        emit_json=args.json_output,
                     )
-                run_simui(
-                    prepared.world,
-                    {"meta": meta},
-                    config_path=_lab_config_path(lab_path),
-                    duration=prepared.duration,
-                    port=args.port,
+            else:
+                serve_lab(
+                    resolved_lab_path,
                     host=args.host,
+                    port=args.port,
                     open_browser=args.open_browser,
+                    install_deps=not args.no_install_deps,
+                    emit_json=args.json_output,
                 )
             return
     except PackageError as exc:

@@ -30,8 +30,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install build twine
 
-      - name: Build SimUI frontend
-        run: bash scripts/build_simui_frontend.sh
+      - name: Build labs serve UI
+        run: bash scripts/build_labs_serve_ui.sh
 
       - name: Build package distributions
         run: python -m build --outdir dist/biosimulant

@@ -24,7 +24,7 @@ def __getattr__(name: str) -> Any:
 
 
 def __dir__() -> list[str]:
-    return sorted([*__all__, "onnx", "simui"])
+    return sorted([*__all__, "onnx"])
 
 
 _ALIASED_SUBMODULES = (

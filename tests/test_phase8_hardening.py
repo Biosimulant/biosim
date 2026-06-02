@@ -54,7 +54,7 @@ def test_labs_run_and_serve_clean_temporary_directories(
     assert run_payload["package"] == "local/runtime-lab"
     _assert_no_lab_temp_residue(temp_root)
 
-    with patch("biosim.__main__.run_simui") as run_simui:
+    with patch("biosim.__main__.serve_lab") as serve_lab:
         main(
             [
                 "labs",
@@ -64,13 +64,16 @@ def test_labs_run_and_serve_clean_temporary_directories(
                 "9999",
                 "--no-install-deps",
                 "--json",
+                "--no-open",
             ],
             prog="biosimulant",
         )
 
-    serve_payload = json.loads(capsys.readouterr().out)
-    assert serve_payload["package"] == "local/runtime-lab"
-    run_simui.assert_called_once()
+    capsys.readouterr()
+    serve_lab.assert_called_once()
+    assert serve_lab.call_args.args == (lab_dir.resolve(),)
+    assert serve_lab.call_args.kwargs["emit_json"] is True
+    assert serve_lab.call_args.kwargs["open_browser"] is False
     _assert_no_lab_temp_residue(temp_root)
 
 

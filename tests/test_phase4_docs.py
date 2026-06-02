@@ -37,7 +37,8 @@ def test_public_docs_lead_with_biosimulant_package_and_cli() -> None:
     assert "pip install biosimulant" in readme
     assert "biosimulant labs create" in readme
     assert "pip install biosimulant" in quickstart
-    assert "biosimulant[ui]` extra remains valid" in quickstart
+    assert "local lab UI" in quickstart
+    assert "--no-open" in quickstart
     assert "biosimulant labs create" in quickstart
     assert "## [Unreleased]" in changelog
     assert "Keep a Changelog" in changelog

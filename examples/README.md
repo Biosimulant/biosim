@@ -10,10 +10,6 @@ Core usage
 - `wiring_builder_demo.py`: Demonstrates `WiringBuilder` (including port validation).
 - `visuals_demo.py`: Minimal example of module-provided visuals + `world.collect_visuals()`.
 
-SimUI
-- `ui_demo.py`: Minimal SimUI demo (requires UI extras).
-- `multi_module_ui_demo.py`: Multi-module visuals demo in SimUI (large defaults).
-
 Advanced models, labs, and domain demos
 -----------------------------------------
 
@@ -36,8 +32,8 @@ Option B: Without installing
   - `PYTHONPATH=src python examples/world_simulation.py`
   - `PYTHONPATH=src python -m biosimulant <path-to-wiring.yaml>`
 
-SimUI notes
------------
+Local UI notes
+--------------
 
-- SimUI requires UI deps: `pip install -e '.[ui]'`
-- SimUI mounts at `http://localhost:<port>/ui/` by default.
+- Use `biosimulant labs serve <lab>` to run the bundled local lab UI.
+- The UI mounts at `http://localhost:<port>/` and opens by default.

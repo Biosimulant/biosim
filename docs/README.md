@@ -8,7 +8,7 @@ existing model packages.
 
 ## Contents
 
-- [Overview](overview.md): high-level architecture, core concepts (BioWorld, BioModule, BioSignal, SimUI)
+- [Overview](overview.md): high-level architecture, core concepts (BioWorld, BioModule, BioSignal, Local Lab UI)
 - [Quickstart](quickstart.md): install, run, and explore
 - API:
   - [BioWorld](bioworld.md): orchestrator, events, run control (pause/resume/stop), signal routing
@@ -26,13 +26,11 @@ existing model packages.
 
 See the files in this folder for a textbook-style walkthrough with code and concrete data examples.
 
-## SimUI
+## Local Lab UI
 
-The Biosimulant core includes a lightweight web UI (SimUI) for running and visualizing simulations. See the [README](../README.md#simui-python-declared-ui) for:
-- Python-declared interface API
-- Full REST + SSE endpoint reference
-- Config editor sub-API for visual wiring editing
-- VisualSpec render types (timeseries, bar, table, image, scatter, heatmap, graph, custom)
+The Biosimulant core includes a bundled web UI for local labs. Run
+`biosimulant labs serve ./my-lab` and open the root URL to inspect, edit, run,
+and compare lab runs.
 
 ## Building a single PDF
 - Requirements: `pandoc` and a LaTeX engine (e.g., TeX Live)

@@ -50,8 +50,8 @@ Tip: Import the library as `import biosim`.
 - Events: `WorldEvent` published by `BioWorld`; subscribe via `world.on(...)`.
 - Modules: implement the runnable `BioModule` contract and add with `world.add_biomodule(...)`.
 
-### SimUI (Dev Notes)
-- Python-first UI under `biosim.simui`: declare controls/outputs, inject into a `BioWorld`, and `launch()` or `mount()`.
-- Frontend is React/Vite (prebuilt) and ships as static assets; no npm required for users.
-- SSE transport: the SPA connects to `/api/stream` for real-time updates. Polling endpoints (`/api/status`, `/api/events`, `/api/visuals`) available for fallback.
-- VisualSpec JSON contract drives rendering (timeseries, bar, table, image; graph placeholder; JSON fallback).
+### Labs Serve UI (Dev Notes)
+- Local lab UI lives behind `biosimulant labs serve` and is served by `biosim.labs_serve`.
+- Frontend source is private React/Vite under `packages/labs-serve-ui`; built assets ship inside the Python wheel.
+- The SPA uses `/api/lab`, `/api/runs`, `/api/runs/{id}`, `/api/runs/{id}/results`, and mutation endpoints for local manifest/layout edits.
+- VisualSpec JSON contract drives rendering (timeseries, bar, table, image, graph, structure3d, JSON fallback).

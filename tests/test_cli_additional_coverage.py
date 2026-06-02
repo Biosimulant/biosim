@@ -371,21 +371,13 @@ def test_labs_dispatcher_covers_validate_run_serve_and_extension_paths(monkeypat
     monkeypatch.setattr(cli, "_resolve_runtime_lab_path", lambda *args, **kwargs: (tmp_path / "lab", {"reused": True}))
     monkeypatch.setattr(cli, "_package_file_for_lab", fake_package_file)
     monkeypatch.setattr(cli, "run_package", lambda _path, *, install_deps: {"package": "demo/lab", "outputs": ["state"]})
-    monkeypatch.setattr(cli, "_lab_config_path", lambda _path: tmp_path / "lab.yaml")
-    monkeypatch.setattr(
-        cli,
-        "prepare_lab_package",
-        lambda *_args, **_kwargs: SimpleNamespace(
-            manifest={"title": "Prepared", "description": "Demo"},
-            package="demo/lab",
-            version="1.0.0",
-            modules=[{"alias": "hello", "path": "models/hello"}],
-            world=object(),
-            duration=1.0,
-        ),
-    )
     launched = {}
-    monkeypatch.setattr(cli, "run_simui", lambda *args, **kwargs: launched.update(kwargs))
+    def fake_serve_lab(_path, **kwargs):
+        launched.update(kwargs)
+        if kwargs.get("emit_json"):
+            print('{"command": "serve", "url": "http://0.0.0.0:9999/"}')
+
+    monkeypatch.setattr(cli, "serve_lab", fake_serve_lab)
 
     cli._main_labs(["run", "demo/lab", "--results-file", str(results_path)])
     assert "Outputs: state" in capsys.readouterr().out

@@ -6,7 +6,7 @@ Source reviewed: `product-docs/PRD.md`
 
 - Wiring uses `name.port` references; port validation is enforced when declared.
 - BioWorld orchestration contract replaces legacy runtime layers.
-- SimUI run parameters align with `duration`.
+- Labs Serve run parameters align with `duration`.
 
 ## Placeholders / unfinished
 
@@ -22,5 +22,5 @@ Source reviewed: `product-docs/PRD.md`
   - Define required metadata fields and compatibility rules between modules.
 - Wiring/config security:
   - Clarify schema/versioning, import resolution rules, and safe-mode behavior.
-- SimUI API scope:
+- Labs Serve API scope:
   - Define which endpoints and controls are mandatory vs optional.

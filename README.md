@@ -15,7 +15,7 @@ supported for existing model packages during the migration.
 
 ### Vision
 
-Provide a small, stable composition layer for simulations: wire reusable components ("biomodules") into a `BioWorld`, run them with a single orchestration contract, and visualize/debug runs via a lightweight web UI (SimUI). Biomodules are self-contained Python packages that can wrap external simulators internally (SBML/NeuroML/CellML/etc.) without a separate adapter layer.
+Provide a small, stable composition layer for simulations: wire reusable components ("biomodules") into a `BioWorld`, run them with a single orchestration contract, and visualize/debug labs via the local `labs serve` web UI. Biomodules are self-contained Python packages that can wrap external simulators internally (SBML/NeuroML/CellML/etc.) without a separate adapter layer.
 
 ### Core Mission
 
@@ -44,9 +44,8 @@ Alternative (package index):
 pip install biosimulant
 ```
 
-The default install includes the local SimUI runtime used by
-`biosimulant labs serve`. The `biosimulant[ui]` extra remains accepted for
-backwards compatibility but is no longer required.
+The default install includes the local web runtime used by
+`biosimulant labs serve`.
 
 For the shared ONNX biomodule helpers:
 
@@ -309,63 +308,32 @@ Model packs can subclass `OnnxClassifierModule` to set model-relative
 `model_path`, port names, and label sets while keeping the inference logic in
 the shared library.
 
-## SimUI (Python-Declared UI)
+## Local Lab UI
 
-SimUI lets you build and launch a small web UI entirely from Python (similar to Gradio's ergonomics), backed by FastAPI and a prebuilt React SPA that renders visuals from JSON. The frontend uses Server-Sent Events (SSE) for real-time updates.
+`biosimulant labs serve` starts the bundled local lab UI from any runnable lab
+source tree, `.bsilab` package, or registry reference.
 
-- User usage (no Node/npm required):
-  - Install Biosimulant: `pip install biosimulant`
-  - Try the demo: `python examples/ui_demo.py` then open `http://127.0.0.1:7860/ui/`.
-  - From your own code:
+```console
+biosimulant labs serve ./my-lab
+```
 
-    ```python
-    import biosimulant as biosim
-    from biosimulant.simui import Interface, Number, Button, EventLog, VisualsPanel
+The command opens the browser by default and serves the UI at the root URL, for
+example `http://127.0.0.1:8765/`. Use `--no-open` to suppress the browser
+launch and `--port` to choose a different port.
 
-    world = biosim.BioWorld(communication_step=0.1)
-    ui = Interface(
-        world,
-        controls=[Number("duration", 10), Button("Run")],
-        outputs=[EventLog(), VisualsPanel()],
-    )
-    ui.launch()
-    ```
+The UI stores lab edits in local files:
 
-  - The UI provides endpoints under `/ui/api/...`:
-    - `GET /api/spec` – UI layout (controls, outputs, modules)
-    - `POST /api/run` – Start a simulation run
-    - `GET /api/status` – Runner status (running/paused/error + optional progress fields)
-    - `GET /api/state` – Full state (status + last step + modules)
-    - `GET /api/events` – Buffered world events (`?since_id=&limit=`)
-    - `GET /api/visuals` – Collected module visuals
-    - `GET /api/snapshot` – Full snapshot (status + visuals + events)
-    - `GET /api/stream` – SSE endpoint for real-time event streaming
-    - `POST /api/pause` – Pause running simulation
-    - `POST /api/resume` – Resume paused simulation
-    - `POST /api/reset` – Stop, reset, and clear buffers
-    - **Editor sub-API** (`/api/editor/...`): visual config editor for loading, saving, validating, and applying YAML wiring configs as node graphs. Endpoints include `modules`, `current`, `config`, `apply`, `validate`, `layout`, `to-yaml`, `from-yaml`, and `files`.
+- `lab.yaml` for model, world, runtime, and wiring changes.
+- `wiring-layout.json` for canvas positions.
+- Run history is in memory for the active server process.
 
-Per-run resets for clean visuals
-- On each `Run`, the backend clears its event buffer and calls `reset()` on modules if they implement it.
-- The frontend clears visuals/events before posting `/api/run`.
-- To avoid overlapping charts across runs, add `reset()` to modules that accumulate history (e.g., time series points).
+Maintainer flow for the bundled frontend:
 
-- Maintainer flow (building the frontend SPA):
-  - Edit the React/Vite app under `src/biosim/simui/_frontend/`.
-  - Build via Python: `python -m biosimulant.simui.build` (requires Node/npm). This writes `src/biosim/simui/static/app.js`.
-  - Alternatively: `bash scripts/build_simui_frontend.sh`.
-  - Packaging includes `src/biosim/simui/static/**`, so end users never need npm.
+- Edit the private React/Vite app under `packages/labs-serve-ui`.
+- Build with `bash scripts/build_labs_serve_ui.sh`.
+- Packaging includes `src/biosim/labs_serve/static/**`, so end users never need npm.
 
-- CI packaging (recommended): run the frontend build before `python -m build` so wheels/sdists ship the bundled assets.
-
-Troubleshooting:
-- If you see `SimUI static bundle missing at .../static/app.js`, build the frontend with `python -m biosimulant.simui.build` (requires Node/npm) before launching. End users installing a release wheel won't see this.
-
-### SimUI Design Notes
-- Transport: SSE (Server-Sent Events). The SPA connects to `/api/stream` for real-time updates. Polling endpoints (`/api/status`, `/api/visuals`, `/api/events`) remain available for fallback/debugging.
-- Objective progress fields are based on simulation-time progress (`(sim_time - sim_start) / duration`), not wall-clock time.
-- `/api/status` may include: `sim_time`, `sim_start`, `sim_end`, `sim_remaining`, `progress`, `progress_pct` (all optional/additive).
-- Events API: `/api/events?since_id=<int>&limit=<int>` returns `{ events, next_since_id }` where `events` are appended world events and `next_since_id` is the cursor for subsequent calls.
+### Visual Notes
 - VisualSpec types supported now:
   - `timeseries`: `data = { "series": [{ "name": str, "points": [[x, y], ...] }, ...] }`
   - `bar`: `data = { "items": [{ "label": str, "value": number }, ...] }`
@@ -376,7 +344,6 @@ Troubleshooting:
   - `graph`: simple node-edge graph renderer
   - `structure3d`: `data = { "title"?: str, "source": { "kind": "url", "url": str } | { "kind": "artifact", "artifact_id": str }, "format": "mmcif" | "pdb", "annotations"?: [{ "label": str, "value": str|number|bool }], "initial_view"?: {...} }`
 - VisualSpec may also include an optional `description` (string) for hover text or captions.
-- SimUI serves artifact-backed `structure3d` files through `/api/artifacts/{artifact_id}` so browser clients do not receive raw local filesystem paths.
 
 ## Terminology
 
