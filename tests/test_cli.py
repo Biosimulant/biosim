@@ -6,6 +6,7 @@ from unittest.mock import patch, MagicMock
 import pytest
 
 from biosim.__main__ import load_config, create_world, run_headless, main
+from tests.test_pack import _write_lab_release_identity
 
 
 class TestLoadConfig:
@@ -261,6 +262,7 @@ runtime:
         with patch("sys.argv", ["biosim", "labs", "init", str(lab_dir), "--name", "CLI Lab"]):
             main()
         capsys.readouterr()
+        _write_lab_release_identity(lab_dir, "local/cli-lab", "1.0.0")
 
         with patch(
             "sys.argv",
@@ -301,6 +303,7 @@ runtime:
         with patch("sys.argv", ["biosim", "labs", "init", str(lab_dir), "--name", "Pkg Lab"]):
             main()
         capsys.readouterr()
+        _write_lab_release_identity(lab_dir, "declared/lab", "9.9.9")
 
         manifest = tmp_path / "biosimulant-packages.yaml"
         manifest.write_text(

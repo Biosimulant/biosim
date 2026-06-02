@@ -48,6 +48,7 @@ from .extensions import (
 )
 from .package_repo import build_package_repo, validate_package_repo
 from .pack import (
+    DEFAULT_PACKAGE_NAMESPACE,
     PACKAGE_EXTENSIONS,
     PackageError,
     build_package,
@@ -1106,7 +1107,7 @@ wiring: []"""
     lab_yaml = f"""schema_version: "2.0"
 title: {_yaml_string(name)}
 description: {_yaml_string(description) if description is not None else "null"}
-package: {slug}
+package: {DEFAULT_PACKAGE_NAMESPACE}/{slug}
 version: 0.1.0
 {models_block}
 runtime:

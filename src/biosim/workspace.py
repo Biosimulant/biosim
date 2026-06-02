@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from .pack import (
+    DEFAULT_PACKAGE_NAMESPACE,
     DEFAULT_PACKAGE_VERSION,
     PackageError,
     _default_package_name,
@@ -105,7 +106,7 @@ wiring: []"""
     lab_yaml = f"""schema_version: "2.0"
 title: {_json_string(name)}
 description: {_json_string(description) if description is not None else "null"}
-package: {slug}
+package: {DEFAULT_PACKAGE_NAMESPACE}/{slug}
 version: 0.1.0
 {models_block}
 runtime:

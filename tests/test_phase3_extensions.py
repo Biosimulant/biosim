@@ -1,16 +1,21 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Sequence
 
 import pytest
 
 from biosim.__main__ import main
+import biosim.extensions as extension_module
 from biosim.extensions import (
     DEFAULT_PRODUCT_EXTENSION,
+    DESKTOP_CLI_ENV,
+    DISABLE_DESKTOP_DELEGATION_ENV,
     clear_extensions,
     extension_command_specs,
     register_extension,
+    run_extension_command,
 )
 
 
@@ -24,8 +29,9 @@ class RecordingExtension:
 
 
 @pytest.fixture(autouse=True)
-def _clear_extensions() -> None:
+def _clear_extensions(monkeypatch: pytest.MonkeyPatch) -> None:
     clear_extensions()
+    monkeypatch.setenv(DISABLE_DESKTOP_DELEGATION_ENV, "1")
     yield
     clear_extensions()
 
@@ -147,3 +153,50 @@ def test_registered_extension_handles_desktop_runtime_command() -> None:
     main(["runtime", "status"], prog="biosimulant")
 
     assert extension.calls == [("runtime", ["status"], "biosimulant runtime")]
+
+
+def test_missing_extension_delegates_to_desktop_cli_when_available(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[list[str], dict[str, str] | None]] = []
+    candidate = extension_module.DesktopCliCandidate(Path("/tmp/desktop-biosimulant"))
+
+    monkeypatch.delenv(DISABLE_DESKTOP_DELEGATION_ENV, raising=False)
+    monkeypatch.setattr(extension_module, "_find_desktop_cli", lambda: candidate)
+    monkeypatch.setattr(
+        extension_module.subprocess,
+        "call",
+        lambda args, env=None: calls.append((list(args), env)) or 17,
+    )
+
+    exit_code = run_extension_command(
+        "labs open",
+        ["open", "."],
+        prog="biosimulant labs",
+    )
+
+    assert exit_code == 17
+    assert calls[0][0] == ["/tmp/desktop-biosimulant", "labs", "open", "."]
+    assert calls[0][1] is not None
+    assert calls[0][1][DISABLE_DESKTOP_DELEGATION_ENV] == "1"
+
+
+def test_desktop_cli_discovery_uses_explicit_env_path(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    desktop_cli = tmp_path / "biosimulant"
+    desktop_cli.write_text("#!/bin/sh\n", encoding="utf-8")
+    desktop_cli.chmod(0o755)
+
+    monkeypatch.delenv(DISABLE_DESKTOP_DELEGATION_ENV, raising=False)
+    monkeypatch.setenv(DESKTOP_CLI_ENV, str(desktop_cli))
+    monkeypatch.setattr(
+        extension_module,
+        "_is_desktop_cli",
+        lambda candidate: candidate.executable == desktop_cli.resolve(),
+    )
+
+    found = extension_module._find_desktop_cli()
+
+    assert found == extension_module.DesktopCliCandidate(desktop_cli.resolve())

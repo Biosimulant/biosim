@@ -4,14 +4,25 @@
 """Extension contracts for product-only Biosimulant CLI behavior."""
 from __future__ import annotations
 
+import json
+import os
+import shutil
+import subprocess
+import sys
+from collections.abc import Iterator
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Protocol, Sequence
 
 
 DEFAULT_PRODUCT_EXTENSION = "biosimulant-product"
 DEFAULT_INSTALL_HINT = (
-    "Install or configure the Biosimulant Desktop/product CLI extension, then retry this command."
+    "Install the Biosimulant Desktop app and its CLI tools, or set "
+    "BIOSIMULANT_DESKTOP_CLI to the Desktop CLI binary, then retry this command."
 )
+DESKTOP_CLI_ENV = "BIOSIMULANT_DESKTOP_CLI"
+DISABLE_DESKTOP_DELEGATION_ENV = "BIOSIMULANT_DISABLE_DESKTOP_DELEGATION"
+_DESKTOP_CLI_SENTINEL_ARG = "__biosimulant_cli__"
 
 
 class CliExtension(Protocol):
@@ -65,6 +76,14 @@ class ExtensionCommandSpec:
     summary: str
     extension: str = DEFAULT_PRODUCT_EXTENSION
     install_hint: str = DEFAULT_INSTALL_HINT
+
+
+@dataclass(frozen=True)
+class DesktopCliCandidate:
+    """Executable plus any prefix args needed to invoke Desktop CLI mode."""
+
+    executable: Path
+    prefix_args: tuple[str, ...] = ()
 
 
 class ExtensionUnavailableError(RuntimeError):
@@ -173,10 +192,194 @@ def run_extension_command(command: str, argv: Sequence[str], *, prog: str) -> in
 
     extension = get_extension(spec.extension)
     if extension is None:
+        delegated = _run_desktop_cli_extension_command(command, argv)
+        if delegated is not None:
+            return delegated
         raise ExtensionUnavailableError(spec, argv, prog=prog)
 
     result = extension.run_cli_command(command, list(argv), prog=prog)
     return int(result or 0)
+
+
+def _run_desktop_cli_extension_command(command: str, argv: Sequence[str]) -> int | None:
+    candidate = _find_desktop_cli()
+    if candidate is None:
+        return None
+
+    child_env = _desktop_delegation_child_env()
+    args = [
+        str(candidate.executable),
+        *candidate.prefix_args,
+        *_desktop_cli_args_for_extension_command(command, argv),
+    ]
+    try:
+        return subprocess.call(args, env=child_env)
+    except OSError:
+        return None
+
+
+def _desktop_cli_args_for_extension_command(command: str, argv: Sequence[str]) -> list[str]:
+    command_root = command.split()[0]
+    return [command_root, *[str(item) for item in argv]]
+
+
+def _find_desktop_cli() -> DesktopCliCandidate | None:
+    if _env_truthy(DISABLE_DESKTOP_DELEGATION_ENV):
+        return None
+
+    seen: set[Path] = set()
+    for candidate in _desktop_cli_candidates():
+        resolved = _resolve_candidate(candidate)
+        if resolved is None or resolved in seen or _is_current_cli_path(resolved):
+            continue
+        seen.add(resolved)
+        desktop_candidate = DesktopCliCandidate(
+            resolved,
+            _desktop_cli_prefix_args(resolved),
+        )
+        if _is_desktop_cli(desktop_candidate):
+            return desktop_candidate
+    return None
+
+
+def _desktop_cli_candidates() -> Iterator[Path]:
+    explicit = os.environ.get(DESKTOP_CLI_ENV)
+    if explicit:
+        if found := _resolve_path_or_which(explicit):
+            yield found
+
+    home = Path.home()
+    if os.name == "nt":
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        if local_app_data:
+            root = Path(local_app_data) / "Programs" / "Biosimulant" / "bin"
+            yield root / "biosimulant.exe"
+            yield root / "biosimulant.cmd"
+    else:
+        yield home / ".local" / "share" / "biosimulant" / "bin" / "biosimulant"
+        yield home / ".local" / "bin" / "biosimulant"
+        yield Path("/Applications/Biosimulant.app/Contents/MacOS/biosimulant")
+        yield home / "Applications" / "Biosimulant.app" / "Contents" / "MacOS" / "biosimulant"
+
+    for directory in os.environ.get("PATH", "").split(os.pathsep):
+        if not directory:
+            continue
+        root = Path(directory)
+        for name in _desktop_cli_binary_names():
+            yield root / name
+
+
+def _desktop_cli_binary_names() -> tuple[str, ...]:
+    if os.name == "nt":
+        return ("biosimulant.exe", "biosimulant.cmd", "biosimulant.bat", "biosimulant")
+    return ("biosimulant",)
+
+
+def _resolve_candidate(candidate: Path) -> Path | None:
+    if not candidate.exists() or candidate.is_dir():
+        return None
+    if os.name != "nt" and not os.access(candidate, os.X_OK):
+        return None
+    try:
+        return candidate.resolve()
+    except OSError:
+        return candidate
+
+
+def _resolve_path_or_which(value: str) -> Path | None:
+    raw = value.strip()
+    if not raw:
+        return None
+    path = Path(raw)
+    if path.parent != Path(".") or path.is_absolute():
+        return path
+    found = shutil.which(raw)
+    return Path(found) if found else path
+
+
+def _desktop_cli_prefix_args(path: Path) -> tuple[str, ...]:
+    stem = path.stem.lower()
+    if "biosimulant-desktop" in stem:
+        return (_DESKTOP_CLI_SENTINEL_ARG,)
+    return ()
+
+
+def _is_desktop_cli(candidate: DesktopCliCandidate) -> bool:
+    env = _desktop_delegation_child_env()
+    try:
+        completed = subprocess.run(
+            [
+                str(candidate.executable),
+                *candidate.prefix_args,
+                "--json",
+                "doctor",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+            env=env,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+    if completed.returncode != 0:
+        return False
+
+    try:
+        payload = json.loads(completed.stdout)
+    except json.JSONDecodeError:
+        return False
+
+    data = payload.get("data") if isinstance(payload, dict) else None
+    if not isinstance(data, dict):
+        data = payload if isinstance(payload, dict) else None
+    if not isinstance(data, dict):
+        return False
+
+    return "bundled_version" in data and (
+        "shim_path" in data or "installed_binary_path" in data
+    )
+
+
+def _desktop_delegation_child_env() -> dict[str, str]:
+    env = os.environ.copy()
+    env[DISABLE_DESKTOP_DELEGATION_ENV] = "1"
+    return env
+
+
+def _env_truthy(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _is_current_cli_path(candidate: Path) -> bool:
+    for current in _current_cli_paths():
+        try:
+            if candidate.samefile(current):
+                return True
+        except OSError:
+            if candidate == current:
+                return True
+    return False
+
+
+def _current_cli_paths() -> Iterator[Path]:
+    argv0 = sys.argv[0] if sys.argv else ""
+    if not argv0:
+        return
+
+    raw = Path(argv0)
+    candidates: list[Path] = []
+    if raw.exists():
+        candidates.append(raw)
+    if found := shutil.which(argv0):
+        candidates.append(Path(found))
+
+    for candidate in candidates:
+        try:
+            yield candidate.resolve()
+        except OSError:
+            yield candidate
 
 
 def extension_error_payload(error: ExtensionUnavailableError) -> dict[str, Any]:

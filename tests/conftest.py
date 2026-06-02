@@ -20,3 +20,8 @@ if _examples not in sys.path:
 def biosim():
     import biosim as _bsim  # type: ignore
     return _bsim
+
+
+@pytest.fixture(autouse=True)
+def _disable_desktop_cli_delegation_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("BIOSIMULANT_DISABLE_DESKTOP_DELEGATION", "1")

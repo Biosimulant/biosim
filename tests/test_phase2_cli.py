@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from biosim.__main__ import main
 from biosim.pack import validate_package
+from tests.test_pack import _write_lab_release_identity
 
 
 def test_labs_init_validate_and_run_without_desktop(tmp_path: Path, capsys) -> None:
@@ -52,6 +53,7 @@ def test_labs_release_validate_build_and_run_repo_manifest(tmp_path: Path, capsy
     lab_dir = tmp_path / "lab"
     main(["labs", "init", str(lab_dir), "--name", "Package Lab"], prog="biosimulant")
     capsys.readouterr()
+    _write_lab_release_identity(lab_dir, "demo/package-lab", "1.0.0")
 
     manifest = tmp_path / "biosimulant-packages.yaml"
     manifest.write_text(
@@ -99,6 +101,7 @@ def test_package_archive_validate_under_labs(tmp_path: Path, capsys) -> None:
     lab_dir = tmp_path / "lab"
     main(["labs", "init", str(lab_dir), "--name", "Archive Lab"], prog="biosimulant")
     capsys.readouterr()
+    _write_lab_release_identity(lab_dir, "demo/archive-lab", "1.0.0")
     main(
         ["labs", "release", "build", _write_single_package_manifest(tmp_path, lab_dir), "--json"],
         prog="biosimulant",

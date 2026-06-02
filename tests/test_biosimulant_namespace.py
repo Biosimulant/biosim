@@ -74,4 +74,11 @@ def test_pyproject_declares_biosimulant_distribution_and_console_script() -> Non
 def test_release_version_targets_first_biosimulant_package() -> None:
     import biosimulant
 
-    assert biosimulant.__version__ == "0.0.11"
+    ns: dict[str, str] = {}
+    exec(
+        (Path(__file__).resolve().parents[1] / "src" / "biosim" / "__about__.py").read_text(
+            encoding="utf-8"
+        ),
+        ns,
+    )
+    assert biosimulant.__version__ == ns["__version__"]

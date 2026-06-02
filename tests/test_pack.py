@@ -159,6 +159,17 @@ wiring:
     return path
 
 
+def _write_lab_release_identity(
+    path: Path, package_name: str, version: str
+) -> Path:
+    manifest_path = path / "lab.yaml"
+    manifest = pack_module._safe_yaml_load(manifest_path.read_bytes())
+    manifest["package"] = package_name
+    manifest["version"] = version
+    manifest_path.write_bytes(pack_module._safe_yaml_dump(manifest))
+    return path
+
+
 def _write_path_manifest_lab(path: Path) -> Path:
     path.mkdir(parents=True, exist_ok=True)
     _write_counter_model(path / "models" / "counter")
@@ -347,8 +358,13 @@ class InputModel(BioModule):
 
 
 def test_lab_build_embeds_models_and_runs_without_registry(tmp_path: Path):
+    lab_dir = _write_lab_release_identity(
+        _write_lab(tmp_path / "lab"),
+        "local/source-lab",
+        "1.0.0",
+    )
     lab_pkg = build_package(
-        _write_lab(tmp_path / "lab"), package_name="local/source-lab", version="1.0.0"
+        lab_dir, package_name="local/source-lab", version="1.0.0"
     )
     validation = validate_package(lab_pkg)
     assert validation.valid
@@ -377,8 +393,13 @@ def test_lab_build_embeds_models_and_runs_without_registry(tmp_path: Path):
 
 
 def test_export_lab_alias_embeds_models(tmp_path: Path):
+    lab_dir = _write_lab_release_identity(
+        _write_lab(tmp_path / "lab"),
+        "local/source-lab",
+        "1.0.0",
+    )
     exported = export_lab_package(
-        _write_lab(tmp_path / "lab"), package_name="local/source-lab", version="1.0.0"
+        lab_dir, package_name="local/source-lab", version="1.0.0"
     )
     validation = validate_package(exported)
     assert validation.valid
@@ -387,7 +408,11 @@ def test_export_lab_alias_embeds_models(tmp_path: Path):
 
 
 def test_export_lab_package_ignores_project_metadata_in_logical_hash(tmp_path: Path):
-    lab_dir = _write_lab(tmp_path / "lab")
+    lab_dir = _write_lab_release_identity(
+        _write_lab(tmp_path / "lab"),
+        "local/source-lab",
+        "1.0.0",
+    )
     metadata_path = lab_dir / ".biosimulant-project.json"
     metadata_path.write_text('{"hub_id":"old"}\n', encoding="utf-8")
     first = export_lab_package(
@@ -421,6 +446,8 @@ def test_lab_package_run_settles_final_visuals(tmp_path: Path):
 schema_version: "2.0"
 title: "Test: Settled Lab"
 description: "Final propagation lab"
+package: local/settled-lab
+version: 1.0.0
 models:
   - path: models/counter
     alias: counter
@@ -449,7 +476,11 @@ wiring:
 
 
 def test_lab_build_ignores_generated_files(tmp_path: Path):
-    lab_dir = _write_lab(tmp_path / "lab")
+    lab_dir = _write_lab_release_identity(
+        _write_lab(tmp_path / "lab"),
+        "local/source-lab",
+        "1.0.0",
+    )
     (lab_dir / ".DS_Store").write_text("junk", encoding="utf-8")
     (lab_dir / "dist").mkdir(exist_ok=True)
     (lab_dir / "dist" / "old.bsilab").write_text("junk", encoding="utf-8")
@@ -472,7 +503,11 @@ def test_lab_build_ignores_generated_files(tmp_path: Path):
 
 
 def test_build_lab_from_source_path_refs(tmp_path: Path):
-    lab_dir = _write_path_manifest_lab(tmp_path / "source-lab")
+    lab_dir = _write_lab_release_identity(
+        _write_path_manifest_lab(tmp_path / "source-lab"),
+        "local/source-lab",
+        "1.0.0",
+    )
 
     package_path = build_package(
         lab_dir, package_name="local/source-lab", version="1.0.0"
@@ -496,7 +531,11 @@ def test_build_lab_from_source_path_refs(tmp_path: Path):
 def test_build_lab_from_source_path_refs_does_not_require_nested_package_identity(
     tmp_path: Path,
 ):
-    lab_dir = _write_path_manifest_lab(tmp_path / "source-lab")
+    lab_dir = _write_lab_release_identity(
+        _write_path_manifest_lab(tmp_path / "source-lab"),
+        "local/source-lab",
+        "1.0.0",
+    )
     package_path = build_package(
         lab_dir, package_name="local/source-lab", version="1.0.0"
     )
@@ -506,8 +545,13 @@ def test_build_lab_from_source_path_refs_does_not_require_nested_package_identit
 
 def test_lab_build_preserves_source_provenance(tmp_path: Path):
     source = {"path": "labs/demo/lab.yaml", "commit": "abc123"}
-    lab_pkg = build_package(
+    lab_dir = _write_lab_release_identity(
         _write_lab(tmp_path / "lab"),
+        "local/provenance-lab",
+        "1.0.0",
+    )
+    lab_pkg = build_package(
+        lab_dir,
         package_name="local/provenance-lab",
         version="1.0.0",
         source=source,
@@ -537,8 +581,13 @@ def test_build_rejects_legacy_source_provenance(tmp_path: Path):
 
 
 def test_lab_build_embeds_child_spaces_and_runs_without_registry(tmp_path: Path):
-    parent_pkg = build_package(
+    parent_lab = _write_lab_release_identity(
         _write_parent_lab_with_child(tmp_path / "parent-lab"),
+        "local/parent-lab",
+        "1.0.0",
+    )
+    parent_pkg = build_package(
+        parent_lab,
         package_name="local/parent-lab",
         version="1.0.0",
     )
@@ -573,6 +622,8 @@ def test_lab_package_run_coerces_alias_initial_inputs(tmp_path: Path):
 schema_version: "2.0"
 title: "Input Lab"
 description: "Lab initial inputs"
+package: local/input-lab
+version: 1.0.0
 models:
   - path: models/accumulator
     alias: accumulator

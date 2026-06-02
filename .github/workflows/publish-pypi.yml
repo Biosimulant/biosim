@@ -28,13 +28,28 @@ jobs:
       - name: Install build dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install build
+          pip install build twine
 
       - name: Build SimUI frontend
         run: bash scripts/build_simui_frontend.sh
 
-      - name: Build package distributions
-        run: python -m build
+      - name: Build biosimulant package distributions
+        run: python -m build --outdir dist/biosimulant
 
-      - name: Publish to PyPI
+      - name: Build legacy biosim package distributions
+        run: python scripts/build_legacy_biosim_dist.py --outdir dist/biosim
+
+      - name: Check package distributions
+        run: twine check dist/biosimulant/* dist/biosim/*
+
+      - name: Publish biosimulant to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/biosimulant
+          skip-existing: true
+
+      - name: Publish legacy biosim to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/biosim
+          skip-existing: true

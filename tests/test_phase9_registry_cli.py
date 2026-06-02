@@ -7,7 +7,7 @@ from pathlib import Path
 from biosim import __main__ as cli_main
 from biosim.__main__ import main
 from biosim.pack import build_package
-from tests.test_pack import _write_lab
+from tests.test_pack import _write_lab, _write_lab_release_identity
 
 
 def test_labs_registry_read_commands_use_public_client(monkeypatch, capsys) -> None:
@@ -57,7 +57,11 @@ def test_labs_registry_read_commands_use_public_client(monkeypatch, capsys) -> N
 
 def test_labs_pull_downloads_public_lab_package(monkeypatch, tmp_path: Path, capsys) -> None:
     package_file = build_package(
-        _write_lab(tmp_path / "source-lab"),
+        _write_lab_release_identity(
+            _write_lab(tmp_path / "source-lab"),
+            "demo/immune",
+            "1.0.0",
+        ),
         package_name="demo/immune",
         version="1.0.0",
     )
@@ -109,7 +113,11 @@ def test_labs_pull_downloads_public_lab_package(monkeypatch, tmp_path: Path, cap
 
 def test_labs_run_auto_pulls_public_lab_ref(monkeypatch, tmp_path: Path, capsys) -> None:
     package_file = build_package(
-        _write_lab(tmp_path / "source-lab"),
+        _write_lab_release_identity(
+            _write_lab(tmp_path / "source-lab"),
+            "demo/immune",
+            "1.0.0",
+        ),
         package_name="demo/immune",
         version="1.0.0",
     )
@@ -154,7 +162,7 @@ def test_labs_run_auto_pulls_public_lab_ref(monkeypatch, tmp_path: Path, capsys)
     )
     payload = json.loads(capsys.readouterr().out)
 
-    assert payload["package"].startswith("local/")
+    assert payload["package"] == "demo/immune"
     assert payload["modules"][0]["alias"] == "counter"
     assert calls["downloads"] == 1
     assert list(cache_dir.rglob("lab.yaml"))
@@ -175,7 +183,11 @@ def test_labs_run_auto_pulls_public_lab_ref(monkeypatch, tmp_path: Path, capsys)
 
 def test_labs_serve_auto_pulls_public_lab_ref(monkeypatch, tmp_path: Path, capsys) -> None:
     package_file = build_package(
-        _write_lab(tmp_path / "source-lab"),
+        _write_lab_release_identity(
+            _write_lab(tmp_path / "source-lab"),
+            "demo/immune",
+            "1.0.0",
+        ),
         package_name="demo/immune",
         version="1.0.0",
     )
@@ -226,7 +238,7 @@ def test_labs_serve_auto_pulls_public_lab_ref(monkeypatch, tmp_path: Path, capsy
     )
     payload = json.loads(capsys.readouterr().out)
 
-    assert payload["package"] == "local/served-lab"
+    assert payload["package"] == "demo/immune"
     assert (target / "lab.yaml").is_file()
     assert calls
     assert calls[0]["kwargs"]["port"] == 9999
