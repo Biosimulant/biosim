@@ -9,20 +9,6 @@ Composable simulation runtime + UI layer for orchestrating runnable biomodules.
 existing `biosim` Python import path and `python -m biosim` command remain
 supported for existing model packages during the migration.
 
-## Legacy `biosim` PyPI project archive notice
-
-The legacy `biosim` PyPI distribution is being retired and archived. It will not
-receive further updates after its final archive notice release. New installs and
-all new documentation should use [`biosimulant`](https://pypi.org/project/biosimulant/)
-instead:
-
-```console
-pip install biosimulant
-```
-
-Existing Python code that imports `biosim` can continue to work through the
-`biosimulant` package, which still ships the compatibility import path.
-
 ---
 
 ## Executive Summary & System Goals

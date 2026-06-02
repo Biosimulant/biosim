@@ -11,9 +11,6 @@ COMPATIBILITY_DOCS = {
     ROOT / "docs" / "README.md",
     ROOT / "docs" / "releasing.md",
 }
-LEGACY_INSTALL_DOCS = {
-    ROOT / "docs" / "releasing.md",
-}
 
 
 def _public_text_files() -> list[Path]:
@@ -66,8 +63,6 @@ def test_public_examples_do_not_use_legacy_install_or_cli_names() -> None:
         text = path.read_text(encoding="utf-8")
         for pattern in forbidden:
             if pattern.search(text):
-                if pattern.pattern.startswith("pip install") and path in LEGACY_INSTALL_DOCS:
-                    continue
                 offenders.append(f"{path.relative_to(ROOT)}: {pattern.pattern}")
 
     assert offenders == []
