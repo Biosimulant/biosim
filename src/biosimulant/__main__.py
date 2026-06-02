@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: 2026-present Biosimulant Team
 #
 # SPDX-License-Identifier: MIT
+# PYTHON_ARGCOMPLETE_OK
 """Primary `biosimulant` CLI entrypoint.
 
 This delegates to the compatibility `biosim` CLI implementation so Phase 1 adds

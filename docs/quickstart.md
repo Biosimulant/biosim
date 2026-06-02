@@ -6,6 +6,15 @@
 pip install 'biosimulant[ui]'
 ```
 
+For bash or zsh Tab completion, register the installed CLI once:
+
+```bash
+# ~/.zshrc or ~/.bashrc
+eval "$(register-python-argcomplete biosimulant)"
+```
+
+Restart the shell, or run `source ~/.zshrc` / `source ~/.bashrc`.
+
 ## Local Lab CLI
 
 ```bash

@@ -78,6 +78,18 @@ binary runs. Use `python -m biosimulant ...` to force the Python package CLI.
 The Python package owns local open-source workflows; Desktop/product extensions
 own Hub, auth, cloud, app state, and managed-service workflows.
 
+### Shell completion
+
+`biosimulant` supports bash and zsh completion for commands, options, and file
+paths. Add the completion hook once to your shell startup file:
+
+```bash
+# ~/.zshrc or ~/.bashrc
+eval "$(register-python-argcomplete biosimulant)"
+```
+
+Then restart the shell, or run `source ~/.zshrc` / `source ~/.bashrc`.
+
 ## Publishing to PyPI
 
 See the release guide: [`docs/releasing.md`](docs/releasing.md).
@@ -128,7 +140,8 @@ biosimulant labs run dist/local__source-lab-1.0.0.bsilab --no-install-deps
 ```
 
 Notes:
-- `labs package` uses `package:` and `version:` from `lab.yaml` unless explicitly overridden with `--package` or `--version`.
+- local `labs validate`, `labs run`, and `labs serve` can use source labs without `package:` or `version:`; the CLI assigns a transient `local/<lab-directory-slug>` identity for local execution.
+- standalone `labs package` builds require `package:` and `version:` in `lab.yaml`, or explicit `--package` and `--version` values. Release manifests can supply identity through `biosimulant-packages.yaml`.
 - model dependencies in manifests must use exact `==` pins.
 - lab builds are always self-contained and preserve the full runnable source tree inside the `.bsilab`.
 - nested lab dependencies must use relative `path` refs and must already exist inside the packaged lab directory.

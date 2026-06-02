@@ -58,6 +58,7 @@ Biosimulant product extension required.
 Command: biosimulant labs publish ./my-lab
 Category: hub
 Extension: biosimulant-product
+Next step: Download the Biosimulant Desktop app from https://biosimulant.com, install its CLI tools, or set BIOSIMULANT_DESKTOP_CLI to the Desktop CLI binary, then retry this command.
 ```
 
 JSON example:

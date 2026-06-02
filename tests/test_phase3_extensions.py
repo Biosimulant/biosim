@@ -106,6 +106,7 @@ def test_missing_lab_publish_extension_is_not_an_argparse_unknown_command(capsys
     captured = capsys.readouterr()
     assert "Command: biosimulant labs publish ./my-lab --visibility private" in captured.err
     assert "Reason: Hub lab publishing" in captured.err
+    assert "https://biosimulant.com" in captured.err
     assert "invalid choice" not in captured.err
 
 

@@ -137,8 +137,17 @@ def _package_slug(package_name: str) -> str:
     return "__".join(_package_to_parts(package_name))
 
 
+def _package_segment_slug(value: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+    return slug or "lab"
+
+
 def _default_package_name(path: Path) -> str:
     return f"{DEFAULT_PACKAGE_NAMESPACE}/{path.name}"
+
+
+def _default_lab_package_name(path: Path) -> str:
+    return f"{DEFAULT_PACKAGE_NAMESPACE}/{_package_segment_slug(path.name)}"
 
 
 def _validate_version(version: str) -> str:
@@ -169,20 +178,51 @@ def _validate_lab_release_identity(
     *,
     package_name_override: str | None,
     version_override: str | None,
+    source_path: Path | None = None,
+    allow_default_identity: bool = False,
 ) -> tuple[str, str]:
-    package_name = _manifest_declared_package(manifest)
-    if package_name is None:
-        raise PackageError("lab.yaml must declare a non-empty package")
-    package_name = _validate_package_ref(package_name)
-    if package_name_override is not None and package_name_override.strip() != package_name:
-        raise PackageError("--package must match lab.yaml package")
-    version = _manifest_declared_version(manifest)
-    if version is None:
-        raise PackageError("lab.yaml must declare a non-empty version")
-    version = _validate_version(version)
-    if version_override is not None and version_override.strip() != version:
-        raise PackageError("--version must match lab.yaml version")
+    declared_package = _manifest_declared_package(manifest)
+    declared_version = _manifest_declared_version(manifest)
+
+    if package_name_override is not None:
+        package_name = _validate_package_ref(package_name_override)
+        if declared_package is not None:
+            declared_package = _validate_package_ref(declared_package)
+            if declared_package != package_name:
+                raise PackageError("--package must match lab.yaml package")
+    elif declared_package is not None:
+        package_name = _validate_package_ref(declared_package)
+    elif allow_default_identity and source_path is not None:
+        package_name = _validate_package_ref(_default_lab_package_name(source_path))
+    else:
+        raise PackageError("lab.yaml must declare a non-empty package or pass --package")
+
+    if version_override is not None:
+        version = _validate_version(version_override)
+        if declared_version is not None:
+            declared_version = _validate_version(declared_version)
+            if declared_version != version:
+                raise PackageError("--version must match lab.yaml version")
+    elif declared_version is not None:
+        version = _validate_version(declared_version)
+    elif allow_default_identity:
+        version = DEFAULT_PACKAGE_VERSION
+    else:
+        raise PackageError("lab.yaml must declare a non-empty version or pass --version")
     return package_name, version
+
+
+def _local_lab_release_identity(source_dir: str | Path) -> tuple[str, str]:
+    source_path = Path(source_dir).expanduser().resolve()
+    manifest_path = _find_manifest_in_dir(source_path, ("lab.yaml", "lab.yml"))
+    manifest = _safe_yaml_load(manifest_path.read_bytes())
+    return _validate_lab_release_identity(
+        manifest,
+        package_name_override=None,
+        version_override=None,
+        source_path=source_path,
+        allow_default_identity=True,
+    )
 
 
 def _is_exact_pin(dep: str) -> bool:
@@ -678,6 +718,8 @@ def validate_lab_source(path: str | Path) -> PackageValidationResult:
             manifest,
             package_name_override=None,
             version_override=None,
+            source_path=source_path,
+            allow_default_identity=True,
         )
         result.valid = True
         result.metadata = {

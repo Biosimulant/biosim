@@ -392,6 +392,61 @@ def test_lab_build_embeds_models_and_runs_without_registry(tmp_path: Path):
     ]
 
 
+def test_identity_free_lab_source_uses_transient_identity_for_validation(
+    tmp_path: Path,
+):
+    lab_dir = _write_lab(tmp_path / "Identity Free Lab")
+
+    validation = pack_module.validate_lab_source(lab_dir)
+
+    assert validation.valid
+    assert validation.metadata["package"] == "local/identity-free-lab"
+    assert validation.metadata["version"] == "0.1.0"
+
+
+def test_identity_free_lab_requires_release_identity_for_standalone_package(
+    tmp_path: Path,
+):
+    lab_dir = _write_lab(tmp_path / "identity-free-lab")
+
+    with pytest.raises(PackageError, match="pass --package"):
+        build_package(lab_dir)
+
+    package_path = build_package(
+        lab_dir,
+        package_name="demo/identity-free-lab",
+        version="1.0.0",
+    )
+    validation = validate_package(package_path)
+
+    assert validation.valid
+    assert validation.metadata["package"] == "demo/identity-free-lab"
+    assert validation.metadata["version"] == "1.0.0"
+
+
+def test_lab_release_identity_overrides_must_match_declared_identity(
+    tmp_path: Path,
+):
+    lab_dir = _write_lab_release_identity(
+        _write_lab(tmp_path / "lab"),
+        "demo/source-lab",
+        "1.0.0",
+    )
+
+    with pytest.raises(PackageError, match="--package must match"):
+        build_package(
+            lab_dir,
+            package_name="demo/other-lab",
+            version="1.0.0",
+        )
+    with pytest.raises(PackageError, match="--version must match"):
+        build_package(
+            lab_dir,
+            package_name="demo/source-lab",
+            version="2.0.0",
+        )
+
+
 def test_export_lab_alias_embeds_models(tmp_path: Path):
     lab_dir = _write_lab_release_identity(
         _write_lab(tmp_path / "lab"),

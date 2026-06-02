@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: 2025-present Demi <bjaiye1@gmail.com>
 #
 # SPDX-License-Identifier: MIT
+# PYTHON_ARGCOMPLETE_OK
 """Generic CLI runner for Biosimulant simulations.
 
 Run any YAML/TOML config directly without needing a separate demo script.
@@ -31,7 +32,9 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import os
 import shutil
+import shlex
 import sys
 import tempfile
 from collections.abc import Iterator
@@ -53,6 +56,7 @@ from .pack import (
     PackageError,
     build_package,
     fetch_package,
+    _local_lab_release_identity,
     _package_slug,
     prepare_lab_package,
     run_package,
@@ -78,6 +82,75 @@ from .workspace import (
     save_lab as workspace_save_lab,
     vendor_model as workspace_vendor_model,
 )
+
+
+_ARGCOMPLETE_ENV = "_ARGCOMPLETE"
+_TOP_LEVEL_COMPLETION_COMMANDS = ("labs",)
+
+
+def _is_completion_request() -> bool:
+    return bool(os.environ.get(_ARGCOMPLETE_ENV))
+
+
+def _completion_args_from_env() -> list[str]:
+    comp_line = os.environ.get("COMP_LINE", "")
+    try:
+        comp_point = int(os.environ.get("COMP_POINT", len(comp_line)))
+    except ValueError:
+        comp_point = len(comp_line)
+    comp_fragment = comp_line[: max(0, min(comp_point, len(comp_line)))]
+    try:
+        words = shlex.split(comp_fragment)
+    except ValueError:
+        words = comp_fragment.split()
+    if len(words) >= 3 and words[1] == "-m" and words[2] in {"biosim", "biosimulant"}:
+        return words[3:]
+    if not words:
+        return []
+    return words[1:]
+
+
+def _path_completer(prefix: str, **kwargs: Any) -> list[str]:
+    from argcomplete.completers import FilesCompleter
+
+    return list(FilesCompleter()(prefix, **kwargs) or [])
+
+
+def _top_level_config_completer(prefix: str, **kwargs: Any) -> list[str]:
+    command_matches = [
+        f"{command} "
+        for command in _TOP_LEVEL_COMPLETION_COMMANDS
+        if command.startswith(prefix)
+    ]
+    return [*command_matches, *_path_completer(prefix, **kwargs)]
+
+
+def _enable_path_completers(parser: argparse.ArgumentParser) -> None:
+    for action in parser._actions:
+        if getattr(action, "type", None) is Path and not hasattr(action, "completer"):
+            action.completer = _path_completer
+        if isinstance(action, argparse._SubParsersAction):
+            for subparser in action.choices.values():
+                if isinstance(subparser, argparse.ArgumentParser):
+                    _enable_path_completers(subparser)
+
+
+def _autocomplete(parser: argparse.ArgumentParser) -> None:
+    if not _is_completion_request():
+        return
+    try:
+        import argcomplete
+    except ImportError:
+        return
+    argcomplete.autocomplete(parser)
+
+
+def _autocomplete_for_completion_request(prog: str) -> None:
+    args = _completion_args_from_env()
+    if args and args[0] == "labs":
+        _autocomplete(_build_completion_parser(prog=prog))
+        return
+    _autocomplete(_build_main_parser(prog=prog))
 
 
 def load_config(path: Path) -> Dict[str, Any]:
@@ -190,17 +263,7 @@ def run_simui(
     ui.launch(host=host, port=port, open_browser=open_browser)
 
 
-def main(argv: list[str] | None = None, *, prog: str = "biosimulant") -> None:
-    args_list = list(sys.argv[1:] if argv is None else argv)
-    if args_list and args_list[0] in {"pack", "packages", "hub", "models"}:
-        _removed_command_or_exit(args_list[0], prog=prog, json_output="--json" in args_list)
-    if args_list and args_list[0] == "labs":
-        _main_labs(args_list[1:], prog=f"{prog} labs")
-        return
-    if args_list and is_extension_command_path(args_list[0]):
-        _run_extension_or_exit(args_list[0], args_list[1:], prog=f"{prog} {args_list[0]}")
-        return
-
+def _build_main_parser(*, prog: str = "biosimulant") -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog=prog,
         description="Run Biosimulant simulations from YAML/TOML config files.",
@@ -216,11 +279,12 @@ Examples:
         """,
     )
 
-    parser.add_argument(
+    config_action = parser.add_argument(
         "config",
         type=Path,
         help="Path to YAML or TOML config file",
     )
+    config_action.completer = _top_level_config_completer
     parser.add_argument(
         "--simui",
         action="store_true",
@@ -256,7 +320,39 @@ Examples:
         dest="open_browser",
         help="Open browser automatically when starting SimUI",
     )
+    _enable_path_completers(parser)
+    return parser
 
+
+def _build_completion_parser(*, prog: str = "biosimulant") -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog=prog,
+        description="Run Biosimulant simulations and manage local labs.",
+    )
+    subparsers = parser.add_subparsers(dest="command")
+    labs_parser = subparsers.add_parser(
+        "labs",
+        help="Initialize, validate, run, and serve local Biosimulant labs",
+    )
+    _populate_labs_parser(labs_parser)
+    return parser
+
+
+def main(argv: list[str] | None = None, *, prog: str = "biosimulant") -> None:
+    if _is_completion_request():
+        _autocomplete_for_completion_request(prog)
+
+    args_list = list(sys.argv[1:] if argv is None else argv)
+    if args_list and args_list[0] in {"pack", "packages", "hub", "models"}:
+        _removed_command_or_exit(args_list[0], prog=prog, json_output="--json" in args_list)
+    if args_list and args_list[0] == "labs":
+        _main_labs(args_list[1:], prog=f"{prog} labs")
+        return
+    if args_list and is_extension_command_path(args_list[0]):
+        _run_extension_or_exit(args_list[0], args_list[1:], prog=f"{prog} {args_list[0]}")
+        return
+
+    parser = _build_main_parser(prog=prog)
     args = parser.parse_args(args_list)
 
     if not args.config.exists():
@@ -329,14 +425,15 @@ def _removed_labs_command_or_exit(command: str, *, prog: str, json_output: bool)
     raise SystemExit(2)
 
 
-def _main_labs(argv: list[str], *, prog: str = "biosimulant labs") -> None:
-    if argv and argv[0] == "export":
-        _removed_labs_command_or_exit("export", prog=prog, json_output="--json" in argv)
-
+def _build_labs_parser(*, prog: str = "biosimulant labs") -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog=prog,
         description="Initialize, validate, run, and serve local Biosimulant labs.",
     )
+    return _populate_labs_parser(parser)
+
+
+def _populate_labs_parser(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     init_parser = subparsers.add_parser("init", help="Create a local runnable lab")
@@ -492,6 +589,16 @@ def _main_labs(argv: list[str], *, prog: str = "biosimulant labs") -> None:
     for name in ("import", "open", "publish", "sync-status"):
         _add_extension_subcommand(subparsers, name, f"labs {name}")
 
+    _enable_path_completers(parser)
+    return parser
+
+
+def _main_labs(argv: list[str], *, prog: str = "biosimulant labs") -> None:
+    if argv and argv[0] == "export":
+        _removed_labs_command_or_exit("export", prog=prog, json_output="--json" in argv)
+
+    parser = _build_labs_parser(prog=prog)
+    _autocomplete(parser)
     args = parser.parse_args(argv)
     if extension_command := getattr(args, "extension_command_path", None):
         _run_extension_or_exit(extension_command, argv, prog=prog)
@@ -1199,10 +1306,13 @@ def _package_file_for_lab(path: Path) -> Iterator[Path]:
     if not target.is_dir():
         raise PackageError(f"Lab path not found: {target}")
     _lab_config_path(target)
+    package_name, version = _local_lab_release_identity(target)
     with tempfile.TemporaryDirectory(prefix="biosim-lab-") as temp_dir:
         yield build_package(
             target,
             output_path=Path(temp_dir) / f"{target.name or 'lab'}.bsilab",
+            package_name=package_name,
+            version=version,
         )
 
 

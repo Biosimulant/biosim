@@ -71,6 +71,15 @@ biosimulant labs run path/to/lab.bsilab --no-install-deps
 
 Use `--json` with `biosimulant labs` commands when you need machine-readable output.
 
+For bash or zsh completion of commands, options, and paths, add this once to
+`~/.zshrc` or `~/.bashrc`:
+
+```bash
+eval "$(register-python-argcomplete biosimulant)"
+```
+
+Restart the shell, or run `source ~/.zshrc` / `source ~/.bashrc`.
+
 `biosimulant pack`, `biosimulant packages`, `biosimulant hub`, and standalone
 `biosimulant models` are no longer public CLI surfaces. The library-level
 package helpers remain available as Python APIs for internal tooling and
@@ -179,11 +188,15 @@ version: 1.2.0
 
 then `biosimulant labs package` uses those values by default.
 
-If they are not declared, `biosimulant` falls back to:
-- package: `local/<directory-name>`
+Local source-lab commands do not require release identity. For
+`biosimulant labs validate`, `biosimulant labs run`, and
+`biosimulant labs serve`, identity-free labs use a transient local identity:
+- package: `local/<directory-slug>`
 - version: `0.1.0`
 
-You can also override both at the CLI:
+Standalone `.bsilab` builds still need release identity. Add `package:` and
+`version:` to `lab.yaml`, provide both at the CLI, or build through
+`biosimulant-packages.yaml`:
 
 ```bash
 biosimulant labs package path/to/lab --package biosimulant/example-lab --version 1.2.0

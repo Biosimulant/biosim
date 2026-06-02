@@ -4,9 +4,11 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from biosim.__main__ import main
 from biosim.pack import validate_package
-from tests.test_pack import _write_lab_release_identity
+from tests.test_pack import _write_lab, _write_lab_release_identity
 
 
 def test_labs_init_validate_and_run_without_desktop(tmp_path: Path, capsys) -> None:
@@ -47,6 +49,62 @@ def test_labs_serve_uses_local_simui_without_desktop(tmp_path: Path) -> None:
     _, config = run_simui.call_args.args[:2]
     assert config["meta"]["title"] == "Served Lab"
     assert run_simui.call_args.kwargs["port"] == 9999
+
+
+def test_identity_free_labs_validate_run_serve_and_package_with_flags(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    lab_dir = _write_lab(tmp_path / "identity-free-lab")
+
+    main(["labs", "validate", str(lab_dir), "--json"], prog="biosimulant")
+    validate_payload = json.loads(capsys.readouterr().out)
+    assert validate_payload["valid"] is True
+    assert validate_payload["package"] == "local/identity-free-lab"
+    assert validate_payload["version"] == "0.1.0"
+
+    main(
+        ["labs", "run", str(lab_dir), "--no-install-deps", "--json"],
+        prog="biosimulant",
+    )
+    run_payload = json.loads(capsys.readouterr().out)
+    assert run_payload["package"] == "local/identity-free-lab"
+    assert run_payload["version"] == "0.1.0"
+    assert run_payload["modules"][0]["alias"] == "counter"
+
+    with patch("biosim.__main__.run_simui") as run_simui:
+        main(
+            ["labs", "serve", str(lab_dir), "--no-install-deps"],
+            prog="biosimulant",
+        )
+    run_simui.assert_called_once()
+    _, config = run_simui.call_args.args[:2]
+    assert config["meta"]["title"] == "Test: Lab"
+
+    with pytest.raises(SystemExit) as exc_info:
+        main(["labs", "package", str(lab_dir)], prog="biosimulant")
+    assert exc_info.value.code == 1
+    assert "pass --package" in capsys.readouterr().err
+
+    main(
+        [
+            "labs",
+            "package",
+            str(lab_dir),
+            "--package",
+            "demo/identity-free-lab",
+            "--version",
+            "1.0.0",
+            "--out",
+            str(tmp_path / "dist"),
+            "--json",
+        ],
+        prog="biosimulant",
+    )
+    package_payload = json.loads(capsys.readouterr().out)
+    assert package_payload["package"] == "demo/identity-free-lab"
+    assert package_payload["version"] == "1.0.0"
+    assert Path(package_payload["package_file"]).is_file()
 
 
 def test_labs_release_validate_build_and_run_repo_manifest(tmp_path: Path, capsys) -> None:
@@ -95,6 +153,44 @@ packages:
     run_payload = json.loads(capsys.readouterr().out)
     assert run_payload["package"] == "demo/package-lab"
     assert run_payload["modules"][0]["alias"] == "hello"
+
+
+def test_labs_release_manifest_supplies_identity_for_identity_free_lab(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    _write_lab(tmp_path / "lab")
+    manifest = tmp_path / "biosimulant-packages.yaml"
+    manifest.write_text(
+        """
+schema_version: "1"
+namespace: demo
+default_visibility: public
+packages:
+  - id: identity-free-lab
+    package: demo/identity-free-lab
+    version: 1.0.0
+    type: lab
+    path: lab
+    visibility: public
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    main(["labs", "release", "validate", str(manifest), "--json"], prog="biosimulant")
+    validate_payload = json.loads(capsys.readouterr().out)
+    assert validate_payload["valid"] is True
+    assert validate_payload["packages"][0]["package"] == "demo/identity-free-lab"
+
+    main(
+        ["labs", "release", "build", str(manifest), "--out", str(tmp_path / "dist"), "--json"],
+        prog="biosimulant",
+    )
+    build_payload = json.loads(capsys.readouterr().out)
+    built_path = Path(build_payload["built"][0]["path"])
+    assert built_path.name == "demo__identity-free-lab-1.0.0.bsilab"
+    assert validate_package(built_path).valid
 
 
 def test_package_archive_validate_under_labs(tmp_path: Path, capsys) -> None:

@@ -17,8 +17,9 @@ from typing import Any, Protocol, Sequence
 
 DEFAULT_PRODUCT_EXTENSION = "biosimulant-product"
 DEFAULT_INSTALL_HINT = (
-    "Install the Biosimulant Desktop app and its CLI tools, or set "
-    "BIOSIMULANT_DESKTOP_CLI to the Desktop CLI binary, then retry this command."
+    "Download the Biosimulant Desktop app from https://biosimulant.com, install "
+    "its CLI tools, or set BIOSIMULANT_DESKTOP_CLI to the Desktop CLI binary, "
+    "then retry this command."
 )
 DESKTOP_CLI_ENV = "BIOSIMULANT_DESKTOP_CLI"
 DISABLE_DESKTOP_DELEGATION_ENV = "BIOSIMULANT_DISABLE_DESKTOP_DELEGATION"
