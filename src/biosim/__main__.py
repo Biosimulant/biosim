@@ -41,6 +41,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Dict
 
+from .__about__ import __version__
 from .extensions import (
     ExtensionUnavailableError,
     extension_error_payload,
@@ -247,6 +248,11 @@ Examples:
         default=None,
         help="Override runtime.communication_step from config",
     )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"{prog} {__version__}",
+    )
     _enable_path_completers(parser)
     return parser
 
@@ -370,6 +376,7 @@ def _populate_labs_parser(parser: argparse.ArgumentParser) -> argparse.ArgumentP
     run_parser.add_argument("--force", action="store_true", help="Replace an existing auto-pull target")
     run_parser.add_argument("--registry-url", default=None)
     run_parser.add_argument("--no-install-deps", action="store_true")
+    run_parser.add_argument("--no-open", action="store_true", help=argparse.SUPPRESS)
     run_parser.add_argument("--results-file", type=Path, default=None)
     run_parser.add_argument("--json", action="store_true", dest="json_output")
 

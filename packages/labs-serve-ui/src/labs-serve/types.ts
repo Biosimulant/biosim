@@ -115,6 +115,15 @@ export type LocalRun = {
   results_path: string | null;
   error_message: string | null;
   duration_seconds: number | null;
+  progress: {
+    t?: number | null;
+    start?: number | null;
+    end?: number | null;
+    duration?: number | null;
+    remaining?: number | null;
+    progress?: number | null;
+    progress_pct?: number | null;
+  } | null;
   started_at: string | null;
   completed_at: string | null;
   created_at: string;

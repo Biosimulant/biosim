@@ -25,6 +25,9 @@ function compactJson(value: unknown) {
 function extractProgress(logs: RunLogEntry[], run: LocalRun | null): number {
   if (!run) return 0;
   if (run.status === "completed") return 100;
+  if (run.progress?.progress_pct != null) {
+    return Math.min(100, Math.max(0, Number(run.progress.progress_pct)));
+  }
   const progressLog = [...logs].reverse().find((entry) => /\((\d+(?:\.\d+)?)%\)/.test(entry.message));
   const match = progressLog?.message.match(/\((\d+(?:\.\d+)?)%\)/);
   if (match) return Math.min(100, Math.max(0, Number(match[1])));

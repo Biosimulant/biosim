@@ -4,7 +4,7 @@ export type AddToLabModalProps = {
   onCancel: () => void;
 };
 
-const DESKTOP_DOWNLOAD_URL = "https://biosimulant.dev/download";
+const DESKTOP_DOWNLOAD_URL = "https://www.biosimulant.com/download/desktop";
 
 export function AddToLabModal({ onCancel }: AddToLabModalProps) {
   return (

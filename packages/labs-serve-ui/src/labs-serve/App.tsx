@@ -208,7 +208,7 @@ function UpgradeBanner() {
     <div className="upgrade-banner">
       <span className="upgrade-banner-text">
         To run remotely, use the Agent, and access more features -{" "}
-        <a href="https://biosimulant.com/desktop" target="_blank" rel="noreferrer">
+        <a href="https://www.biosimulant.com/download/desktop" target="_blank" rel="noreferrer">
           get the desktop app
         </a>
         .

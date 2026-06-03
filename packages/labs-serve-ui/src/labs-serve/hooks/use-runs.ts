@@ -45,14 +45,18 @@ export function useRuns(): RunsState {
       const target = preferredRunId ?? selectedRunIdRef.current ?? sorted[0]?.id ?? null;
       setSelectedRunId(target);
       if (target) {
-        const [{ run }, { results: nextResults }, { logs: nextLogs }] = await Promise.all([
+        const [{ run }, { logs: nextLogs }] = await Promise.all([
           serveApi.run(target),
-          serveApi.results(target),
           serveApi.logs(target),
         ]);
         setSelectedRun(run);
-        setResults(nextResults);
         setLogs(nextLogs);
+        if (isActive(run)) {
+          setResults(null);
+        } else {
+          const { results: nextResults } = await serveApi.results(target);
+          setResults(nextResults);
+        }
       } else {
         setSelectedRun(null);
         setResults(null);

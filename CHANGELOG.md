@@ -7,6 +7,21 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [0.0.16] - 2026-06-03
+
+### Added
+
+- Add root `biosimulant --version` output.
+- Add Labs Serve run progress metadata for active local runs.
+
+### Changed
+
+- Update Labs Serve desktop download links to
+  `https://www.biosimulant.com/download/desktop`.
+- Avoid polling run results from the Labs Serve UI until a run reaches a
+  terminal state.
+- Accept `biosimulant labs run --no-open` as a compatibility no-op flag.
+
 ## [0.0.15] - 2026-06-02
 
 ### Added
@@ -97,7 +112,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Preserve the legacy `biosim` import path and `python -m biosim` compatibility
   command for existing model packages.
 
-[Unreleased]: https://github.com/Biosimulant/biosim/compare/v0.0.15...HEAD
+[Unreleased]: https://github.com/Biosimulant/biosim/compare/v0.0.16...HEAD
+[0.0.16]: https://github.com/Biosimulant/biosim/compare/v0.0.15...v0.0.16
 [0.0.15]: https://github.com/Biosimulant/biosim/compare/v0.0.14...v0.0.15
 [0.0.14]: https://github.com/Biosimulant/biosim/compare/v0.0.13...v0.0.14
 [0.0.13]: https://github.com/Biosimulant/biosim/compare/v0.0.12...v0.0.13

@@ -368,6 +368,7 @@ class RunRecord:
     results_path: str | None = None
     error_message: str | None = None
     duration_seconds: float | None = None
+    progress: dict[str, Any] | None = None
     started_at: str | None = None
     completed_at: str | None = None
     created_at: str = field(default_factory=_now)
@@ -377,6 +378,8 @@ class RunRecord:
     world: Any = None
     cancel_requested: bool = False
     thread: threading.Thread | None = None
+    last_progress_log_at: float = 0.0
+    last_progress_log_pct: float = -10.0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -392,6 +395,7 @@ class RunRecord:
             "results_path": self.results_path,
             "error_message": self.error_message,
             "duration_seconds": self.duration_seconds,
+            "progress": self.progress,
             "started_at": self.started_at,
             "completed_at": self.completed_at,
             "created_at": self.created_at,
@@ -674,8 +678,41 @@ class LabServeSession:
 
                 def listener(event: WorldEvent, payload: dict[str, Any]) -> None:
                     if event == WorldEvent.STEP:
+                        now = time.time()
+                        pct = float(payload.get("progress_pct") or 0.0)
+                        progress = {
+                            "t": payload.get("t"),
+                            "start": payload.get("start"),
+                            "end": payload.get("end"),
+                            "duration": payload.get("duration"),
+                            "remaining": payload.get("remaining"),
+                            "progress": payload.get("progress"),
+                            "progress_pct": pct,
+                        }
+                        with self._lock:
+                            run.progress = progress
+                            should_log = (
+                                now - run.last_progress_log_at >= 2.0
+                                or pct - run.last_progress_log_pct >= 10.0
+                                or pct >= 100.0
+                            )
+                            if should_log:
+                                run.last_progress_log_at = now
+                                run.last_progress_log_pct = pct
+                                run.add_log("info", f"progress ({pct:.1f}%)", source="world")
                         return
-                    run.add_log("info", event.value, source="world")
+                    with self._lock:
+                        if event == WorldEvent.STARTED:
+                            run.progress = {
+                                "t": payload.get("t"),
+                                "start": payload.get("start"),
+                                "end": payload.get("end"),
+                                "duration": payload.get("duration"),
+                                "remaining": payload.get("remaining"),
+                                "progress": payload.get("progress"),
+                                "progress_pct": payload.get("progress_pct"),
+                            }
+                        run.add_log("info", event.value, source="world")
 
                 world.on(listener)
                 with self._lock:

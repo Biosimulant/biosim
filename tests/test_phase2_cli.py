@@ -34,6 +34,21 @@ def test_labs_init_validate_and_run_without_desktop(tmp_path: Path, capsys) -> N
     assert run_payload["duration"] == 1.0
     assert run_payload["modules"][0]["alias"] == "hello"
 
+    main(
+        ["labs", "run", str(lab_dir), "--no-install-deps", "--json", "--no-open"],
+        prog="biosimulant",
+    )
+    run_no_open_payload = json.loads(capsys.readouterr().out)
+    assert run_no_open_payload["package"] == "local/starter-lab"
+
+
+def test_root_version_flag(capsys) -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        main(["--version"], prog="biosimulant")
+
+    assert exc_info.value.code == 0
+    assert capsys.readouterr().out.strip() == "biosimulant 0.0.16"
+
 
 def test_labs_serve_uses_local_lab_ui_without_desktop(tmp_path: Path) -> None:
     lab_dir = tmp_path / "served-lab"

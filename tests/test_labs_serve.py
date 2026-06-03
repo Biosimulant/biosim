@@ -7,7 +7,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from biosim.labs_serve import server
-from biosim.labs_serve.server import LabServeSession, create_app
+from biosim.labs_serve.server import LabServeSession, RunRecord, create_app
 from biosim.pack import _safe_yaml_dump, _safe_yaml_load
 from tests.test_pack import _write_lab
 
@@ -87,11 +87,13 @@ def test_run_lifecycle_maps_world_inputs_and_returns_visuals(tmp_path: Path) -> 
     run.thread.join(timeout=5)
 
     for _ in range(20):
-        status = client.get(f"/api/runs/{run_id}").json()["data"]["run"]["status"]
+        run_payload = client.get(f"/api/runs/{run_id}").json()["data"]["run"]
+        status = run_payload["status"]
         if status != "running":
             break
         time.sleep(0.05)
     assert status == "completed"
+    assert run_payload["progress"]["progress_pct"] == 100.0
 
     results = client.get(f"/api/runs/{run_id}/results").json()
     assert results["ok"] is True
@@ -100,6 +102,20 @@ def test_run_lifecycle_maps_world_inputs_and_returns_visuals(tmp_path: Path) -> 
     assert visuals[0]["visuals"][0]["render"] == "table"
     logs = client.get(f"/api/runs/{run_id}/logs").json()
     assert logs["data"]["logs"]
+    assert any("progress" in entry["message"] for entry in logs["data"]["logs"])
+
+
+def test_active_run_results_remain_compatible_empty_payload(tmp_path: Path) -> None:
+    lab = _write_lab(tmp_path / "lab")
+    client, session = _client(lab)
+    run = RunRecord(id="run-active", lab_id="lab", parameters=None, simulation_config=None)
+    run.status = "running"
+    session._runs[run.id] = run
+
+    response = client.get(f"/api/runs/{run.id}/results")
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "data": {"results": {}}, "error": None}
 
 
 def test_api_error_envelope_for_missing_run(tmp_path: Path) -> None:
