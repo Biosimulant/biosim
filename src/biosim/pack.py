@@ -1436,14 +1436,32 @@ def _select_alias_override(
     if not isinstance(payload, Mapping):
         return {}
     overrides = payload.get(alias)
+    flat_prefix = f"{alias}."
+    legacy_flat = {
+        str(key)[len(flat_prefix):]: value
+        for key, value in payload.items()
+        if isinstance(key, str)
+        and key.startswith(flat_prefix)
+        and len(key) > len(flat_prefix)
+        and not isinstance(value, Mapping)
+    }
     if not allow_global:
-        return dict(overrides) if isinstance(overrides, Mapping) else {}
+        if isinstance(overrides, Mapping):
+            merged = dict(legacy_flat)
+            merged.update(dict(overrides))
+            return merged
+        return legacy_flat
 
     global_values = {
         key: value
         for key, value in payload.items()
-        if key != alias and not isinstance(value, Mapping)
+        if key != alias
+        and isinstance(key, str)
+        and "." not in key
+        and not isinstance(value, Mapping)
     }
+    if legacy_flat:
+        global_values.update(legacy_flat)
     if isinstance(overrides, Mapping):
         merged = dict(global_values)
         merged.update(dict(overrides))

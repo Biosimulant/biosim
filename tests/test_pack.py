@@ -700,6 +700,24 @@ wiring: []
 
     assert result["package"] == "local/input-lab"
     assert result["modules"] == [{"alias": "accumulator", "path": "models/accumulator"}]
+    assert result["visuals"][0]["visuals"][0]["data"]["rows"][0]["total"] == 7.0
+
+
+def test_lab_package_run_accepts_legacy_flat_initial_inputs(tmp_path: Path):
+    lab_dir = _write_lab(tmp_path / "source-lab")
+    manifest = pack_module._safe_yaml_load((lab_dir / "lab.yaml").read_bytes())
+    manifest["wiring"] = []
+    manifest["runtime"]["initial_inputs"] = {"accumulator.value": 7.0}
+    (lab_dir / "lab.yaml").write_bytes(pack_module._safe_yaml_dump(manifest))
+
+    package_path = build_package(
+        lab_dir, package_name="local/flat-input-lab", version="1.0.0"
+    )
+    result = run_package(package_path, install_deps=False)
+
+    assert result["package"] == "local/flat-input-lab"
+    assert result["visuals"][0]["module"] == "accumulator"
+    assert result["visuals"][0]["visuals"][0]["data"]["rows"][0]["total"] == 7.0
 
 
 def test_lab_build_rejects_nested_package_refs(tmp_path: Path):
@@ -787,7 +805,22 @@ def test_package_private_helpers_cover_source_and_alias_edges(tmp_path: Path) ->
 
     assert pack_module._select_alias_override(None, "model") == {}
     assert pack_module._select_alias_override({"model": {"x": 1}}, "model") == {"x": 1}
+    assert pack_module._select_alias_override({"model.x": 1}, "model") == {"x": 1}
+    assert pack_module._select_alias_override(
+        {"model.x": 1, "model": {"x": 2, "y": 3}},
+        "model",
+    ) == {"x": 2, "y": 3}
     assert pack_module._select_alias_override({"x": 1}, "model", allow_global=True) == {"x": 1}
+    assert pack_module._select_alias_override(
+        {"x": 1, "model.x": 2},
+        "model",
+        allow_global=True,
+    ) == {"x": 2}
+    assert pack_module._select_alias_override(
+        {"other.x": 9},
+        "model",
+        allow_global=True,
+    ) == {}
     assert pack_module._select_alias_override(
         {"model": {"x": 2}, "x": 1},
         "model",

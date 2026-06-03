@@ -154,7 +154,7 @@ See [`docs/packaging.md`](docs/packaging.md) for the full package layout, recomm
 
 ## Provisional Runtime Helpers
 
-`biosimulant.runtime` is the provisional public home for package interpretation helpers shared by the open-source CLI and Biosimulant platform executors. It owns entrypoint loading, typed `runtime.initial_inputs` coercion, communication-step resolution, and source-neutral lab flattening. Import these helpers from `biosimulant.runtime`; the legacy `biosim.runtime` path remains available for compatibility.
+`biosimulant.runtime` is the provisional public home for package interpretation helpers shared by the open-source CLI and Biosimulant platform executors. It owns entrypoint loading, typed run input coercion, communication-step resolution, and source-neutral lab flattening. Import these helpers from `biosimulant.runtime`; the legacy `biosim.runtime` path remains available for compatibility.
 
 ## BioModule Convenience Layers
 

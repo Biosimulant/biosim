@@ -126,7 +126,7 @@ compatibility by building into a temporary directory.
 Package execution uses the provisional `biosimulant.runtime` helpers for behavior that must match other Biosimulant runtimes:
 
 - entrypoints are loaded from the model directory with file-spec loading when possible, so multiple models can each use a `src/` namespace-style layout in one process
-- `runtime.initial_inputs` are coerced into typed `BioSignal` objects against each module's declared `inputs()`
+- run input payloads are coerced into typed `BioSignal` objects against each module's declared `inputs()`
 - `communication_step` is resolved using the same precedence chain as platform executors: runtime override, simulation config, base runtime, then explicit fallback
 - `settle_steps` is resolved with the same runtime precedence and defaults to `0`
 - nested child labs are flattened with canonical alias scoping and `io.maps_to` remapping

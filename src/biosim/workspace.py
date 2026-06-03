@@ -112,7 +112,6 @@ version: 0.1.0
 runtime:
   communication_step: 1.0
   duration: 1.0
-  initial_inputs: {{}}
 """
     (target / "lab.yaml").write_text(lab_yaml, encoding="utf-8")
     metadata = _ensure_lab_metadata(target, local_id=local_id)

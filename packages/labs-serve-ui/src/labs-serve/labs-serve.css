@@ -2232,6 +2232,78 @@ th {
   white-space: normal;
 }
 
+/* === World connection editor === */
+
+.connection-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.connection-description {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.connection-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.connection-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-alt);
+}
+
+.connection-row-body {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  flex: 1;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.connection-icon,
+.connection-arrow {
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+.connection-ref {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  font-family: ui-monospace, "SF Mono", monospace;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--text);
+}
+
+.connection-draft {
+  align-items: flex-end;
+}
+
+.connection-draft .port-row-fields {
+  grid-template-columns: 1fr 1fr;
+}
+
+.connection-add-button {
+  align-self: stretch;
+  justify-content: flex-start;
+  border-radius: 6px;
+}
+
 .port-disabled-note {
   padding: 3px 6px;
   font-style: italic;

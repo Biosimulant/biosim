@@ -1,5 +1,5 @@
 import * as React from "react";
-import { ChevronRight, Plus, Save, Trash2, X } from "lucide-react";
+import { ArrowRight, Cable, ChevronRight, Plus, Save, Trash2, X } from "lucide-react";
 import type {
   LabChildEntry,
   LabModelEntry,
@@ -156,6 +156,23 @@ function PortListBody({ ports }: { ports: string[] }) {
   );
 }
 
+function InterfaceSummary({ inputs, outputs }: { inputs: string[]; outputs: string[] }) {
+  return (
+    <div className="port-list">
+      <div className="property-row">
+        <span>inputs</span>
+        <code>{String(inputs.length)}</code>
+      </div>
+      <PortListBody ports={inputs} />
+      <div className="property-row">
+        <span>outputs</span>
+        <code>{String(outputs.length)}</code>
+      </div>
+      <PortListBody ports={outputs} />
+    </div>
+  );
+}
+
 function parseEndpointForInspector(value: unknown): { node: string; port?: string } | null {
   if (typeof value !== "string" || value.trim().length === 0) return null;
   const trimmed = value.trim();
@@ -175,106 +192,29 @@ function asTargetListForInspector(value: unknown): string[] {
   return [];
 }
 
-function collectIncomingSources(lab: LocalLab, alias: string): Map<string, string[]> {
-  const result = new Map<string, string[]>();
-  for (const wire of lab.manifest.wiring ?? []) {
-    const source = parseEndpointForInspector(wire.from ?? wire.source);
-    if (!source) continue;
-    const sourceRef = source.port ? `${source.node}.${source.port}` : source.node;
-    for (const targetStr of asTargetListForInspector(wire.to ?? wire.target)) {
-      const target = parseEndpointForInspector(targetStr);
-      if (!target || target.node !== alias || !target.port) continue;
-      const list = result.get(target.port) ?? [];
-      list.push(sourceRef);
-      result.set(target.port, list);
-    }
-  }
-  return result;
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function collectOutgoingTargets(lab: LocalLab, alias: string): Map<string, string[]> {
-  const result = new Map<string, string[]>();
-  for (const wire of lab.manifest.wiring ?? []) {
-    const source = parseEndpointForInspector(wire.from ?? wire.source);
-    if (!source || source.node !== alias || !source.port) continue;
-    for (const targetStr of asTargetListForInspector(wire.to ?? wire.target)) {
-      const target = parseEndpointForInspector(targetStr);
-      if (!target) continue;
-      const ref = target.port ? `${target.node}.${target.port}` : target.node;
-      const list = result.get(source.port) ?? [];
-      list.push(ref);
-      result.set(source.port, list);
-    }
-  }
-  return result;
+function countSavedInitialInputs(lab: LocalLab): number {
+  const initial = lab.manifest.runtime?.initial_inputs;
+  if (!isObjectRecord(initial)) return 0;
+  return Object.values(initial).reduce((total, raw) => {
+    if (isObjectRecord(raw)) return total + Object.keys(raw).length;
+    return total + 1;
+  }, 0);
 }
 
-function collectInitialInputs(lab: LocalLab, alias: string): Map<string, string> {
-  const result = new Map<string, string>();
-  const initial = (lab.manifest.runtime?.initial_inputs ?? {}) as Record<string, unknown>;
-  for (const [key, raw] of Object.entries(initial)) {
-    const parsed = parseEndpointForInspector(key);
-    if (!parsed || parsed.node !== alias || !parsed.port) continue;
-    result.set(parsed.port, valueToString(raw));
-  }
-  return result;
-}
-
-function collectLabEndpoints(lab: LocalLab, excludeAlias: string): {
-  outputs: string[];
-  inputs: string[];
-} {
-  const outputs: string[] = [];
-  const inputs: string[] = [];
-  const seenOut = new Set<string>();
-  const seenIn = new Set<string>();
-  for (const model of lab.manifest.models ?? []) {
-    if (model.alias === excludeAlias) continue;
-    const ports = getModelPorts(lab, model);
-    for (const port of ports.outputs) {
-      const ref = `${model.alias}.${port}`;
-      if (!seenOut.has(ref)) {
-        seenOut.add(ref);
-        outputs.push(ref);
-      }
-    }
-    for (const port of ports.inputs) {
-      const ref = `${model.alias}.${port}`;
-      if (!seenIn.has(ref)) {
-        seenIn.add(ref);
-        inputs.push(ref);
-      }
-    }
-  }
-  for (const child of lab.manifest.children ?? []) {
-    if (child.alias === excludeAlias) continue;
-    const ports = getLabPorts(lab, child);
-    for (const port of ports.outputs) {
-      const ref = `${child.alias}.${port}`;
-      if (!seenOut.has(ref)) {
-        seenOut.add(ref);
-        outputs.push(ref);
-      }
-    }
-    for (const port of ports.inputs) {
-      const ref = `${child.alias}.${port}`;
-      if (!seenIn.has(ref)) {
-        seenIn.add(ref);
-        inputs.push(ref);
-      }
-    }
-  }
-  return { outputs, inputs };
-}
-
-function expandWires(wires: WiringEntry[]): Array<{ from: string; to: string; entryIndex: number; targetIndex: number }> {
-  const out: Array<{ from: string; to: string; entryIndex: number; targetIndex: number }> = [];
-  wires.forEach((wire, entryIndex) => {
+function expandWires(wires: WiringEntry[]): Array<{ from: string; to: string }> {
+  const out: Array<{ from: string; to: string }> = [];
+  wires.forEach((wire) => {
     const fromRaw = wire.from ?? wire.source;
     if (typeof fromRaw !== "string" || !fromRaw.trim()) return;
     const targets = asTargetListForInspector(wire.to ?? wire.target);
-    targets.forEach((to, targetIndex) => {
-      out.push({ from: fromRaw.trim(), to, entryIndex, targetIndex });
+    targets.forEach((to) => {
+      const trimmedTarget = to.trim();
+      if (!trimmedTarget) return;
+      out.push({ from: fromRaw.trim(), to: trimmedTarget });
     });
   });
   return out;
@@ -284,255 +224,30 @@ function flattenWires(wires: WiringEntry[]): WiringEntry[] {
   return expandWires(wires).map(({ from, to }) => ({ from, to }));
 }
 
+function aliasFromWireRef(ref: string): string {
+  return parseEndpointForInspector(ref)?.node ?? "";
+}
+
+function canAddWire(wires: WiringEntry[], from: string, to: string): boolean {
+  const source = from.trim();
+  const target = to.trim();
+  if (!source || !target || source === target) return false;
+  const sourceAlias = aliasFromWireRef(source);
+  const targetAlias = aliasFromWireRef(target);
+  if (sourceAlias && targetAlias && sourceAlias === targetAlias) return false;
+  return !flattenWires(wires).some((entry) => entry.from === source && entry.to === target);
+}
+
 function addWire(wires: WiringEntry[], from: string, to: string): WiringEntry[] {
   const flat = flattenWires(wires);
-  if (flat.some((entry) => entry.from === from && entry.to === to)) return flat;
-  return [...flat, { from, to }];
+  const source = from.trim();
+  const target = to.trim();
+  if (!canAddWire(flat, source, target)) return flat;
+  return [...flat, { from: source, to: target }];
 }
 
 function removeWire(wires: WiringEntry[], from: string, to: string): WiringEntry[] {
   return flattenWires(wires).filter((entry) => !(entry.from === from && entry.to === to));
-}
-
-function replaceIncomingForPort(
-  wires: WiringEntry[],
-  targetRef: string,
-  newSource: string | null,
-): WiringEntry[] {
-  const flat = flattenWires(wires).filter((entry) => entry.to !== targetRef);
-  if (newSource) flat.push({ from: newSource, to: targetRef });
-  return flat;
-}
-
-function ModelInputPortListEditable({
-  lab,
-  alias,
-  ports,
-  onSaveWorld,
-}: {
-  lab: LocalLab;
-  alias: string;
-  ports: string[];
-  onSaveWorld?: InspectorProps["onSaveWorld"];
-}) {
-  const incomingByPort = React.useMemo(() => collectIncomingSources(lab, alias), [lab, alias]);
-  const initialInputsByPort = React.useMemo(
-    () => collectInitialInputs(lab, alias),
-    [lab, alias],
-  );
-  const endpoints = React.useMemo(() => collectLabEndpoints(lab, alias), [lab, alias]);
-  const [pendingValue, setPendingValue] = React.useState<Record<string, string>>({});
-
-  if (ports.length === 0) return <p className="muted small">none</p>;
-  const wires = lab.manifest.wiring ?? [];
-  const runtime = (lab.manifest.runtime ?? {}) as Record<string, unknown>;
-  const initialInputs = (runtime.initial_inputs ?? {}) as Record<string, unknown>;
-
-  async function commitSourceChange(port: string, newSource: string) {
-    if (!onSaveWorld) return;
-    const targetRef = `${alias}.${port}`;
-    const nextWiring = replaceIncomingForPort(wires, targetRef, newSource || null);
-    const nextInitial = { ...initialInputs };
-    delete nextInitial[targetRef];
-    await onSaveWorld({
-      wiring: nextWiring,
-      runtime: { ...runtime, initial_inputs: nextInitial },
-    });
-  }
-
-  async function removeIncoming(port: string, source: string) {
-    if (!onSaveWorld) return;
-    const targetRef = `${alias}.${port}`;
-    const nextWiring = removeWire(wires, source, targetRef);
-    await onSaveWorld({ wiring: nextWiring });
-  }
-
-  async function commitValueChange(port: string, raw: string) {
-    if (!onSaveWorld) return;
-    const targetRef = `${alias}.${port}`;
-    const nextInitial = { ...initialInputs };
-    const trimmed = raw.trim();
-    if (trimmed.length === 0) {
-      delete nextInitial[targetRef];
-    } else {
-      const n = Number(trimmed);
-      nextInitial[targetRef] =
-        Number.isFinite(n) && /^-?\d+(\.\d+)?(e[+-]?\d+)?$/i.test(trimmed) ? n : trimmed;
-    }
-    await onSaveWorld({ runtime: { ...runtime, initial_inputs: nextInitial } });
-  }
-
-  return (
-    <div className="port-list">
-      {ports.map((name) => {
-        const sources = incomingByPort.get(name) ?? [];
-        const savedValue = initialInputsByPort.get(name) ?? "";
-        const draftValue = pendingValue[name];
-        const valueText = draftValue !== undefined ? draftValue : savedValue;
-        const isConnected = sources.length > 0;
-        const targetRef = `${alias}.${name}`;
-        return (
-          <div key={name} className="port-list-item port-list-item-detailed" title={name}>
-            <div className="port-list-name">{name}</div>
-            {isConnected ? (
-              <div className="port-connected-list">
-                {sources.map((src) => (
-                  <div key={src} className="port-connected-row">
-                    <code className="port-display">{src}</code>
-                    {onSaveWorld ? (
-                      <button
-                        type="button"
-                        className="icon-button tiny"
-                        title="Remove connection"
-                        onClick={() => void removeIncoming(name, src)}
-                      >
-                        <Trash2 size={11} />
-                      </button>
-                    ) : null}
-                  </div>
-                ))}
-                <p className="muted small port-disabled-note">
-                  Manual values are disabled for connected inputs.
-                </p>
-              </div>
-            ) : (
-              <div className="port-row-fields">
-                <label>
-                  <span>source</span>
-                  <select
-                    value=""
-                    onChange={(event) => {
-                      const next = event.target.value;
-                      if (!next) return;
-                      void commitSourceChange(name, next);
-                    }}
-                    disabled={!onSaveWorld}
-                  >
-                    <option value="">Connect source</option>
-                    {endpoints.outputs.map((ref) => (
-                      <option key={ref} value={ref}>
-                        {ref}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  <span>value</span>
-                  <input
-                    type="text"
-                    value={valueText}
-                    placeholder="Manual value"
-                    disabled={!onSaveWorld}
-                    onChange={(event) =>
-                      setPendingValue((current) => ({ ...current, [name]: event.target.value }))
-                    }
-                    onBlur={(event) => {
-                      const next = event.target.value;
-                      setPendingValue((current) => {
-                        const copy = { ...current };
-                        delete copy[name];
-                        return copy;
-                      });
-                      if (next === savedValue) return;
-                      void commitValueChange(name, next);
-                    }}
-                  />
-                </label>
-              </div>
-            )}
-            {/* targetRef kept for potential future hover affordance */}
-            <span hidden>{targetRef}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function ModelOutputPortListEditable({
-  lab,
-  alias,
-  ports,
-  onSaveWorld,
-}: {
-  lab: LocalLab;
-  alias: string;
-  ports: string[];
-  onSaveWorld?: InspectorProps["onSaveWorld"];
-}) {
-  const outgoingByPort = React.useMemo(() => collectOutgoingTargets(lab, alias), [lab, alias]);
-  const endpoints = React.useMemo(() => collectLabEndpoints(lab, alias), [lab, alias]);
-
-  if (ports.length === 0) return <p className="muted small">none</p>;
-  const wires = lab.manifest.wiring ?? [];
-
-  async function addOutgoing(port: string, target: string) {
-    if (!onSaveWorld || !target) return;
-    const sourceRef = `${alias}.${port}`;
-    const nextWiring = addWire(wires, sourceRef, target);
-    await onSaveWorld({ wiring: nextWiring });
-  }
-
-  async function removeOutgoing(port: string, target: string) {
-    if (!onSaveWorld) return;
-    const sourceRef = `${alias}.${port}`;
-    const nextWiring = removeWire(wires, sourceRef, target);
-    await onSaveWorld({ wiring: nextWiring });
-  }
-
-  return (
-    <div className="port-list">
-      {ports.map((name) => {
-        const targets = outgoingByPort.get(name) ?? [];
-        const available = endpoints.inputs.filter((ref) => !targets.includes(ref));
-        return (
-          <div key={name} className="port-list-item port-list-item-detailed" title={name}>
-            <div className="port-list-name">{name}</div>
-            {targets.length > 0 ? (
-              <div className="port-connected-list">
-                {targets.map((target) => (
-                  <div key={target} className="port-connected-row">
-                    <code className="port-display">{target}</code>
-                    {onSaveWorld ? (
-                      <button
-                        type="button"
-                        className="icon-button tiny"
-                        title="Remove connection"
-                        onClick={() => void removeOutgoing(name, target)}
-                      >
-                        <Trash2 size={11} />
-                      </button>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            ) : null}
-            <label className="port-row-single">
-              <span>target</span>
-              <select
-                value=""
-                onChange={(event) => {
-                  const next = event.target.value;
-                  if (!next) return;
-                  void addOutgoing(name, next);
-                }}
-                disabled={!onSaveWorld || available.length === 0}
-              >
-                <option value="">
-                  {available.length === 0 ? "No available targets" : "Connect target"}
-                </option>
-                {available.map((ref) => (
-                  <option key={ref} value={ref}>
-                    {ref}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-        );
-      })}
-    </div>
-  );
 }
 
 function DescriptorParameterField({
@@ -579,12 +294,10 @@ function ModelInspector({
   lab,
   entry,
   onSave,
-  onSaveWorld,
 }: {
   lab: LocalLab;
   entry: LabModelEntry;
   onSave?: InspectorProps["onSaveModel"];
-  onSaveWorld?: InspectorProps["onSaveWorld"];
 }) {
   const ports = getModelPorts(lab, entry);
   const descriptors = React.useMemo(() => getModelParameterDescriptors(entry), [entry]);
@@ -687,22 +400,8 @@ function ModelInspector({
         {entry.resolution_error ? <div className="property-warning">{entry.resolution_error}</div> : null}
       </section>
 
-      <PropertySection title="Inputs" count={ports.inputs.length}>
-        <ModelInputPortListEditable
-          lab={lab}
-          alias={entry.alias}
-          ports={ports.inputs}
-          onSaveWorld={onSaveWorld}
-        />
-      </PropertySection>
-
-      <PropertySection title="Outputs" count={ports.outputs.length}>
-        <ModelOutputPortListEditable
-          lab={lab}
-          alias={entry.alias}
-          ports={ports.outputs}
-          onSaveWorld={onSaveWorld}
-        />
+      <PropertySection title="Interface" count={ports.inputs.length + ports.outputs.length} defaultOpen>
+        <InterfaceSummary inputs={ports.inputs} outputs={ports.outputs} />
       </PropertySection>
 
       <PropertySection title="Parameters" count={descriptors.length} defaultOpen>
@@ -837,6 +536,193 @@ function collectComponentEndpoints(
   return refs;
 }
 
+type ConnectionDraft = {
+  source: string;
+  target: string;
+};
+
+function errorText(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+function WorldConnectionsSection({
+  lab,
+  inputEndpoints,
+  outputEndpoints,
+  onSave,
+}: {
+  lab: LocalLab;
+  inputEndpoints: string[];
+  outputEndpoints: string[];
+  onSave?: InspectorProps["onSaveWorld"];
+}) {
+  const wires = lab.manifest.wiring ?? [];
+  const connections = React.useMemo(() => flattenWires(wires), [wires]);
+  const [drafts, setDrafts] = React.useState<ConnectionDraft[]>([]);
+  const [saving, setSaving] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    setDrafts([]);
+    setError(null);
+  }, [lab.id, lab.updated_at]);
+
+  async function saveWiring(nextWiring: WiringEntry[]) {
+    if (!onSave) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await onSave({ wiring: nextWiring });
+    } catch (err) {
+      setError(errorText(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function appendDraft() {
+    setDrafts((current) => [...current, { source: "", target: "" }]);
+  }
+
+  function removeDraft(index: number) {
+    setDrafts((current) => current.filter((_, itemIndex) => itemIndex !== index));
+  }
+
+  function updateDraft(index: number, key: keyof ConnectionDraft, value: string, draft: ConnectionDraft) {
+    const nextDraft = { ...draft, [key]: value };
+    if (nextDraft.source && nextDraft.target) {
+      setDrafts((current) => current.filter((_, itemIndex) => itemIndex !== index));
+      if (canAddWire(wires, nextDraft.source, nextDraft.target)) {
+        void saveWiring(addWire(wires, nextDraft.source, nextDraft.target));
+      }
+      return;
+    }
+    setDrafts((current) =>
+      current.map((entry, itemIndex) => (itemIndex === index ? nextDraft : entry)),
+    );
+  }
+
+  function removeConnection(from: string, to: string) {
+    void saveWiring(removeWire(wires, from, to));
+  }
+
+  return (
+    <PropertySection title="Connections">
+      <div className="connection-section">
+        <p className="connection-description">
+          Connect an output from one component to an input on another component.
+        </p>
+
+        {connections.length > 0 || drafts.length > 0 ? (
+          <div className="connection-list">
+            {connections.map((connection, index) => (
+              <div
+                key={`${connection.from}->${connection.to}-${index}`}
+                className="connection-row"
+              >
+                <div className="connection-row-body">
+                  <Cable size={12} className="connection-icon" aria-hidden="true" />
+                  <code className="connection-ref">{connection.from}</code>
+                  <ArrowRight size={12} className="connection-arrow" aria-label="to" />
+                  <code className="connection-ref">{connection.to}</code>
+                </div>
+                {onSave ? (
+                  <button
+                    type="button"
+                    className="icon-button tiny"
+                    aria-label={`Remove connection ${connection.from} to ${connection.to}`}
+                    title="Remove connection"
+                    disabled={saving}
+                    onClick={() => removeConnection(connection.from, connection.to)}
+                  >
+                    <Trash2 size={11} />
+                  </button>
+                ) : null}
+              </div>
+            ))}
+
+            {drafts.map((draft, index) => {
+              const sourceAlias = aliasFromWireRef(draft.source);
+              const targetOptions = inputEndpoints.filter((ref) => {
+                const targetAlias = aliasFromWireRef(ref);
+                return !sourceAlias || !targetAlias || targetAlias !== sourceAlias;
+              });
+              return (
+                <div key={`draft-${index}`} className="port-row connection-draft">
+                  <div className="port-row-fields">
+                    <label>
+                      <span>source</span>
+                      <select
+                        value={draft.source}
+                        aria-label={`Draft connection ${index + 1} source`}
+                        disabled={!onSave || saving}
+                        onChange={(event) =>
+                          updateDraft(index, "source", event.target.value, draft)
+                        }
+                      >
+                        <option value="">Source output</option>
+                        {outputEndpoints.map((ref) => (
+                          <option key={ref} value={ref}>
+                            {ref}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>target</span>
+                      <select
+                        value={draft.target}
+                        aria-label={`Draft connection ${index + 1} target`}
+                        disabled={!onSave || saving}
+                        onChange={(event) =>
+                          updateDraft(index, "target", event.target.value, draft)
+                        }
+                      >
+                        <option value="">Target input</option>
+                        {targetOptions.map((ref) => (
+                          <option key={ref} value={ref}>
+                            {ref}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                  <button
+                    type="button"
+                    className="icon-button tiny"
+                    aria-label={`Remove draft connection ${index + 1}`}
+                    title="Remove draft connection"
+                    disabled={saving}
+                    onClick={() => removeDraft(index)}
+                  >
+                    <Trash2 size={11} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="muted small">No connections yet.</p>
+        )}
+
+        {onSave ? (
+          <button
+            type="button"
+            className="link-button connection-add-button"
+            aria-label="Add world connection"
+            disabled={saving}
+            onClick={appendDraft}
+          >
+            <Plus size={11} /> Add connection
+          </button>
+        ) : null}
+
+        {error ? <div className="property-error">{error}</div> : null}
+      </div>
+    </PropertySection>
+  );
+}
+
 function WorldInspector({
   lab,
   onSave,
@@ -857,6 +743,7 @@ function WorldInspector({
     () => collectComponentEndpoints(lab, "outputs"),
     [lab],
   );
+  const savedInputCount = React.useMemo(() => countSavedInitialInputs(lab), [lab]);
 
   React.useEffect(() => {
     setDraft(buildWorldDraft(lab));
@@ -921,6 +808,12 @@ function WorldInspector({
       <p className="muted">{lab.description || "Lab runtime and public interface"}</p>
 
       <PropertySection title="Runtime" defaultOpen>
+        {savedInputCount > 0 ? (
+          <div className="property-warning">
+            {savedInputCount} saved input default{savedInputCount === 1 ? "" : "s"} remain active
+            for compatibility. Edit the manifest to change them.
+          </div>
+        ) : null}
         {Object.keys(draft.runtime).length === 0 ? (
           <p className="muted small">No runtime config.</p>
         ) : (
@@ -935,6 +828,13 @@ function WorldInspector({
           ))
         )}
       </PropertySection>
+
+      <WorldConnectionsSection
+        lab={lab}
+        inputEndpoints={inputEndpoints}
+        outputEndpoints={outputEndpoints}
+        onSave={onSave}
+      />
 
       <PropertySection title="World inputs" count={draft.inputs.length}>
         {draft.inputs.map((port, index) => (
@@ -1062,7 +962,6 @@ export function Inspector(props: InspectorProps) {
                 lab={lab}
                 entry={entry}
                 onSave={onSaveModel}
-                onSaveWorld={onSaveWorld}
               />
             );
           })()

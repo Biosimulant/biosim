@@ -7,6 +7,17 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [0.0.17] - 2026-06-03
+
+### Changed
+
+- Remove normal UI support for persistent manual input defaults while keeping
+  runtime compatibility for existing `runtime.initial_inputs`.
+- Consolidate lab wiring authoring into the World inspector and simplify model
+  inspectors to read-only interface summaries.
+- Keep run-modal input overrides ephemeral and prevent `Save & Run` from
+  persisting input defaults.
+
 ## [0.0.16] - 2026-06-03
 
 ### Added
@@ -112,7 +123,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Preserve the legacy `biosim` import path and `python -m biosim` compatibility
   command for existing model packages.
 
-[Unreleased]: https://github.com/Biosimulant/biosim/compare/v0.0.16...HEAD
+[Unreleased]: https://github.com/Biosimulant/biosim/compare/v0.0.17...HEAD
+[0.0.17]: https://github.com/Biosimulant/biosim/compare/v0.0.16...v0.0.17
 [0.0.16]: https://github.com/Biosimulant/biosim/compare/v0.0.15...v0.0.16
 [0.0.15]: https://github.com/Biosimulant/biosim/compare/v0.0.14...v0.0.15
 [0.0.14]: https://github.com/Biosimulant/biosim/compare/v0.0.13...v0.0.14

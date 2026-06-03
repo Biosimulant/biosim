@@ -68,3 +68,73 @@ it("submits settle steps from labs-serve pre-run runtime", () => {
     },
   });
 });
+
+it("submits world input values as ephemeral run overrides", () => {
+  const onSubmit = vi.fn();
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  const root = createRoot(container);
+  const lab = {
+    manifest: {
+      runtime: {},
+      io: { inputs: [{ name: "seed", maps_to: "target.value" }], outputs: [] },
+      models: [
+        {
+          alias: "target",
+          resolved_model: { io: { inputs: [{ name: "value" }], outputs: [] } },
+        },
+      ],
+    },
+  } as unknown as LocalLab;
+
+  act(() => {
+    root.render(
+      <PreRunModal
+        lab={lab}
+        busy={false}
+        onCancel={() => undefined}
+        onSubmit={onSubmit}
+      />,
+    );
+  });
+
+  cleanup = () => {
+    act(() => root.unmount());
+    container.remove();
+  };
+
+  const worldInputsButton = Array.from(container.querySelectorAll("button")).find((candidate) =>
+    candidate.textContent?.includes("World Inputs"),
+  );
+  expect(worldInputsButton).toBeInstanceOf(HTMLButtonElement);
+
+  act(() => {
+    worldInputsButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+
+  const input = container.querySelector(".modal-input-row-value");
+  expect(input).toBeInstanceOf(HTMLInputElement);
+  act(() => {
+    const valueSetter = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value",
+    )?.set;
+    valueSetter?.call(input, "4");
+    input!.dispatchEvent(new Event("input", { bubbles: true }));
+    input!.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+
+  const submitButton = Array.from(container.querySelectorAll("button")).find((candidate) =>
+    candidate.textContent?.includes("Start run"),
+  );
+  expect(submitButton).toBeInstanceOf(HTMLButtonElement);
+
+  act(() => {
+    submitButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+
+  expect(onSubmit).toHaveBeenCalledWith({
+    parameters: { initial_inputs: { seed: 4 }, per_model: {} },
+    simulation_config: {},
+  });
+});

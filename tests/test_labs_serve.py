@@ -62,11 +62,38 @@ def test_lab_api_enriches_payload_and_persists_edits(tmp_path: Path) -> None:
     layout = json.loads((lab / "wiring-layout.json").read_text(encoding="utf-8"))
     assert layout["nodes"][0]["position"] == {"x": 10, "y": 20}
 
+    world_saved = client.put(
+        "/api/lab/world",
+        json={"wiring": [{"from": "source.count", "to": "accumulator.value"}]},
+    ).json()
+    assert world_saved["ok"] is True
+    manifest = _safe_yaml_load((lab / "lab.yaml").read_bytes())
+    assert manifest["wiring"] == [{"from": "source.count", "to": "accumulator.value"}]
+
+
+def test_run_overrides_map_world_inputs_to_alias_nested_shape() -> None:
+    manifest = {
+        "models": [{"alias": "accumulator"}],
+        "io": {"inputs": [{"name": "seed", "maps_to": "accumulator.value"}]},
+    }
+
+    overlay = server._map_initial_inputs(
+        manifest,
+        {
+            "seed": 4,
+            "accumulator.extra": 2,
+            "accumulator": {"other": 1},
+        },
+    )
+
+    assert overlay == {"accumulator": {"value": 4, "extra": 2, "other": 1}}
+
 
 def test_run_lifecycle_maps_world_inputs_and_returns_visuals(tmp_path: Path) -> None:
     lab = _write_lab(tmp_path / "lab")
     manifest = _safe_yaml_load((lab / "lab.yaml").read_bytes())
     manifest["io"] = {"inputs": [{"name": "seed", "maps_to": "accumulator.value"}], "outputs": []}
+    manifest["wiring"] = []
     (lab / "lab.yaml").write_bytes(_safe_yaml_dump(manifest))
     client, session = _client(lab)
 
@@ -100,9 +127,54 @@ def test_run_lifecycle_maps_world_inputs_and_returns_visuals(tmp_path: Path) -> 
     visuals = results["data"]["results"]["visuals"]
     assert visuals[0]["module"] == "accumulator"
     assert visuals[0]["visuals"][0]["render"] == "table"
+    assert visuals[0]["visuals"][0]["data"]["rows"][0]["total"] == 4.0
     logs = client.get(f"/api/runs/{run_id}/logs").json()
     assert logs["data"]["logs"]
     assert any("progress" in entry["message"] for entry in logs["data"]["logs"])
+
+
+def test_run_overrides_normalize_world_inputs_and_deep_merge() -> None:
+    manifest = {
+        "models": [{"alias": "accumulator"}],
+        "io": {
+            "inputs": [
+                {"name": "seed", "maps_to": "accumulator.value"},
+                {"name": "label", "maps_to": "accumulator.label"},
+            ]
+        },
+        "runtime": {
+            "initial_inputs": {
+                "accumulator": {"value": 1, "other": 2},
+            }
+        },
+    }
+
+    server._apply_run_overrides(
+        manifest,
+        parameters={"initial_inputs": {"seed": 4, "label": "run"}},
+        simulation_config={},
+    )
+
+    assert manifest["runtime"]["initial_inputs"] == {
+        "accumulator": {"value": 4, "other": 2, "label": "run"}
+    }
+
+
+def test_run_overrides_preserve_dotted_alias_input_refs() -> None:
+    manifest = {
+        "models": [{"alias": "nested.counter"}],
+        "runtime": {"initial_inputs": {}},
+    }
+
+    server._apply_run_overrides(
+        manifest,
+        parameters={"initial_inputs": {"nested.counter.value": 5}},
+        simulation_config={},
+    )
+
+    assert manifest["runtime"]["initial_inputs"] == {
+        "nested.counter": {"value": 5}
+    }
 
 
 def test_active_run_results_remain_compatible_empty_payload(tmp_path: Path) -> None:
