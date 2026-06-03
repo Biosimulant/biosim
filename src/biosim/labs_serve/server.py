@@ -580,7 +580,7 @@ class LabServeSession:
                 raise PackageError(f"Another model already uses alias '{new_alias}'")
             target["alias"] = new_alias
             _rewrite_alias_references(manifest, alias, new_alias)
-        for key in ("parameters", "module_config"):
+        for key in ("parameters",):
             if key in body:
                 if body[key] is None:
                     target.pop(key, None)

@@ -32,8 +32,6 @@ def _model_entry(model: LabTreeModel, alias: str) -> dict[str, Any]:
         entry["ref"] = model.ref
     if model.parameters:
         entry["parameters"] = dict(model.parameters)
-    if model.module_config:
-        entry["module_config"] = dict(model.module_config)
     return entry
 
 

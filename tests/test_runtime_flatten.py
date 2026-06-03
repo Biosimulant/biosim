@@ -61,14 +61,13 @@ def test_flatten_lab_tree_rejects_excessive_depth() -> None:
         flatten_lab_tree(root, max_depth=5)
 
 
-def test_flatten_lab_tree_preserves_model_ref_and_config_and_child_io_override() -> None:
+def test_flatten_lab_tree_preserves_model_ref_parameters_and_child_io_override() -> None:
     child = LabTree(
         models=[
             LabTreeModel(
                 alias="m",
                 ref="plain-ref",
                 parameters={"alpha": 1},
-                module_config={"seed": 2},
             )
         ],
         wiring=[LabTreeWire(from_ref="m.out", to_refs=["m.in"])],
@@ -91,7 +90,6 @@ def test_flatten_lab_tree_preserves_model_ref_and_config_and_child_io_override()
             "alias": "child.m",
             "ref": "plain-ref",
             "parameters": {"alpha": 1},
-            "module_config": {"seed": 2},
         }
     ]
     assert {"from": "child.m.in", "to": ["child.m.out"]} in flat.wiring

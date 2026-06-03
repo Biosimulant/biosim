@@ -1227,17 +1227,11 @@ def _embedded_lab_tree_from_dir(
             if isinstance(entry.get("parameters"), Mapping)
             else None
         )
-        module_config = (
-            entry.get("module_config")
-            if isinstance(entry.get("module_config"), Mapping)
-            else None
-        )
         tree_models.append(
             LabTreeModel(
                 alias=alias,
                 ref={"model_dir": str(model_dir)},
                 parameters=parameters,
-                module_config=module_config,
             )
         )
 

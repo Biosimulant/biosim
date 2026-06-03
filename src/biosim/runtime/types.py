@@ -33,7 +33,6 @@ class LabTreeModel:
     alias: str
     ref: Mapping[str, Any] | Any | None = None
     parameters: Mapping[str, Any] | None = None
-    module_config: Mapping[str, Any] | None = None
 
 
 @dataclass

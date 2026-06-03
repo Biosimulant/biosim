@@ -19,7 +19,6 @@ export type LabModelEntry = {
   package?: string;
   version?: string;
   parameters?: Record<string, unknown>;
-  module_config?: Record<string, unknown>;
   resolved_model?: {
     title?: string;
     description?: string | null;

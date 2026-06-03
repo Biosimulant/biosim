@@ -17,7 +17,7 @@ export type InspectorProps = {
   onClose: () => void;
   onSaveModel?: (
     alias: string,
-    body: { parameters?: Record<string, unknown>; module_config?: Record<string, unknown> },
+    body: { parameters?: Record<string, unknown> },
   ) => Promise<void>;
   onSaveWorld?: (body: {
     inputs?: WorldIoPort[];
@@ -589,39 +589,22 @@ function ModelInspector({
   const ports = getModelPorts(lab, entry);
   const descriptors = React.useMemo(() => getModelParameterDescriptors(entry), [entry]);
   const baseParameters = (entry.parameters as Record<string, unknown> | undefined) ?? {};
-  const baseModuleConfig = (entry.module_config as Record<string, unknown> | undefined) ?? {};
 
   // paramValues is a sparse map of edits — it only contains a key when the user has typed
   // something. Untouched descriptors fall back to baseParameters[name] then descriptor.value.
   const [paramValues, setParamValues] = React.useState<Record<string, string>>({});
-  const [moduleValues, setModuleValues] = React.useState<Record<string, string>>(() =>
-    Object.fromEntries(Object.entries(baseModuleConfig).map(([k, v]) => [k, valueToString(v)])),
-  );
   const [aliasDraft, setAliasDraft] = React.useState(entry.alias);
-  const [newModuleKey, setNewModuleKey] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
 
   // Reset when the selected entry changes or after a successful save bumps updated_at.
   React.useEffect(() => {
     setParamValues({});
-    setModuleValues(
-      Object.fromEntries(Object.entries(baseModuleConfig).map(([k, v]) => [k, valueToString(v)])),
-    );
     setAliasDraft(entry.alias);
-    setNewModuleKey("");
     setError(null);
     // The deep-equality comparison via JSON keeps this from firing on every render of the parent.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entry.alias, JSON.stringify(baseParameters), JSON.stringify(baseModuleConfig)]);
-
-  function buildRecord(values: Record<string, string>, original: Record<string, unknown>): Record<string, unknown> {
-    const out: Record<string, unknown> = {};
-    for (const [key, text] of Object.entries(values)) {
-      out[key] = stringToValue(text, original[key]);
-    }
-    return out;
-  }
+  }, [entry.alias, JSON.stringify(baseParameters)]);
 
   // Merge sparse edits over the existing override, so untouched descriptors keep whatever the
   // lab manifest already had (or are simply absent if there was no override before).
@@ -637,13 +620,11 @@ function ModelInspector({
       ? n
       : stringToValue(trimmed, baseParameters[name]);
   }
-  const nextModule = buildRecord(moduleValues, baseModuleConfig);
   const trimmedAlias = aliasDraft.trim();
   const aliasChanged = trimmedAlias.length > 0 && trimmedAlias !== entry.alias;
   const dirty =
     aliasChanged ||
-    !recordsEqual(nextParameters, baseParameters) ||
-    !recordsEqual(nextModule, baseModuleConfig);
+    !recordsEqual(nextParameters, baseParameters);
   const aliasInvalid = aliasDraft.length > 0 && trimmedAlias.length === 0;
 
   async function handleSave() {
@@ -653,7 +634,6 @@ function ModelInspector({
     try {
       await onSave(entry.alias, {
         parameters: nextParameters,
-        module_config: nextModule,
         ...(aliasChanged ? { alias: trimmedAlias } : {}),
       });
     } catch (err) {
@@ -661,21 +641,6 @@ function ModelInspector({
     } finally {
       setBusy(false);
     }
-  }
-
-  function addModuleKey() {
-    const key = newModuleKey.trim();
-    if (!key) return;
-    setModuleValues((current) => (key in current ? current : { ...current, [key]: "" }));
-    setNewModuleKey("");
-  }
-
-  function removeModuleKey(key: string) {
-    setModuleValues((current) => {
-      const next = { ...current };
-      delete next[key];
-      return next;
-    });
   }
 
   return (
@@ -766,41 +731,6 @@ function ModelInspector({
             );
           })
         )}
-      </PropertySection>
-
-      <PropertySection title="Module config" count={Object.keys(moduleValues).length}>
-        {Object.keys(moduleValues).length === 0 ? (
-          <p className="muted small">No module config.</p>
-        ) : (
-          Object.entries(moduleValues).map(([key, val]) => (
-            <ParameterField
-              key={key}
-              name={key}
-              original={baseModuleConfig[key]}
-              value={val}
-              onChange={(next) => setModuleValues((current) => ({ ...current, [key]: next }))}
-              onRemove={onSave ? () => removeModuleKey(key) : undefined}
-            />
-          ))
-        )}
-        {onSave ? (
-          <div className="param-add">
-            <input
-              placeholder="add module key…"
-              value={newModuleKey}
-              onChange={(e) => setNewModuleKey(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  addModuleKey();
-                }
-              }}
-            />
-            <button type="button" className="icon-button small" onClick={() => addModuleKey()} title="Add">
-              <Plus size={12} />
-            </button>
-          </div>
-        ) : null}
       </PropertySection>
 
       {error ? <div className="property-error">{error}</div> : null}

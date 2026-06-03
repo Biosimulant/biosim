@@ -30,7 +30,6 @@ export type CreateRunBody = {
 export type UpdateModelBody = {
   alias?: string;
   parameters?: Record<string, unknown>;
-  module_config?: Record<string, unknown>;
 };
 
 export type UpdateWorldBody = {
