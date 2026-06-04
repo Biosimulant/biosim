@@ -55,6 +55,8 @@ def test_public_registry_client_builds_urls_and_decodes_json(monkeypatch) -> Non
     request, timeout = requests[0]
     assert timeout == 60
     assert request.method == "GET"
+    assert request.get_header("User-agent") == registry.REGISTRY_USER_AGENT
+    assert request.get_header("Accept") == registry.REGISTRY_JSON_ACCEPT
     assert request.full_url.startswith("https://registry.test/api/labs?")
     assert "scope=discover" in request.full_url
     assert "search=immune" in request.full_url
@@ -63,10 +65,10 @@ def test_public_registry_client_builds_urls_and_decodes_json(monkeypatch) -> Non
 
 
 def test_public_registry_client_resolves_and_downloads_packages(monkeypatch) -> None:
-    seen_urls: list[str] = []
+    requests = []
 
     def fake_urlopen(request, timeout):
-        seen_urls.append(request.full_url)
+        requests.append(request)
         if "/download" in request.full_url:
             return _Response(b"package-bytes")
         return _Response(json.dumps({"id": "pkg-1"}).encode("utf-8"))
@@ -77,8 +79,18 @@ def test_public_registry_client_resolves_and_downloads_packages(monkeypatch) -> 
     assert client.resolve_package("demo/immune", "1.2.3") == {"id": "pkg-1"}
     assert client.download_package("pkg-1") == b"package-bytes"
 
-    assert seen_urls[0] == "https://registry.test/api/packages/resolve/demo/immune?version=1.2.3"
-    assert seen_urls[1] == "https://registry.test/api/packages/pkg-1/download"
+    assert (
+        requests[0].full_url
+        == "https://registry.test/api/packages/resolve/demo/immune?version=1.2.3"
+    )
+    assert requests[0].get_header("User-agent") == registry.REGISTRY_USER_AGENT
+    assert requests[0].get_header("Accept") == registry.REGISTRY_JSON_ACCEPT
+    assert (
+        requests[1].full_url
+        == "https://registry.test/api/packages/pkg-1/download"
+    )
+    assert requests[1].get_header("User-agent") == registry.REGISTRY_USER_AGENT
+    assert requests[1].get_header("Accept") == registry.REGISTRY_PACKAGE_ACCEPT
 
 
 def test_lab_info_and_versions_handle_package_and_lab_refs(monkeypatch) -> None:
@@ -217,6 +229,22 @@ def test_registry_http_errors_are_actionable(monkeypatch, code, message) -> None
 
     with pytest.raises(RegistryError, match=message):
         PublicRegistryClient("https://registry.test/api").get_lab("lab-1")
+
+
+def test_registry_cloudflare_1010_error_identifies_transport_block(monkeypatch) -> None:
+    def fake_urlopen(request, timeout):
+        raise HTTPError(
+            request.full_url,
+            403,
+            "error",
+            hdrs={},
+            fp=BytesIO(b"error code: 1010"),
+        )
+
+    monkeypatch.setattr(registry, "urlopen", fake_urlopen)
+
+    with pytest.raises(RegistryError, match="Cloudflare browser integrity"):
+        PublicRegistryClient("https://registry.test/api").download_package("pkg-1")
 
 
 def test_registry_transport_and_payload_errors(monkeypatch) -> None:

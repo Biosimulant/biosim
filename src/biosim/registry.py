@@ -10,6 +10,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, quote
 from urllib.request import Request, urlopen
 
+from .__about__ import __version__
 from .pack import PackageError
 
 
@@ -17,6 +18,9 @@ DEFAULT_REGISTRY_URL = "https://prod-api.biosimulant.com/api"
 REGISTRY_URL_ENV = "BIOSIMULANT_REGISTRY_URL"
 LEGACY_API_BASE_ENV = "BIOSIMULANT_API_BASE_URL"
 LAB_CACHE_DIR_ENV = "BIOSIMULANT_LAB_CACHE_DIR"
+REGISTRY_USER_AGENT = f"biosimulant-cli/{__version__}"
+REGISTRY_JSON_ACCEPT = "application/json"
+REGISTRY_PACKAGE_ACCEPT = "application/zip, application/octet-stream, */*"
 _PACKAGE_NAME_RE = re.compile(
     r"^[a-z0-9][a-z0-9._-]*/[a-z0-9][a-z0-9._-]*(?:@[A-Za-z0-9][A-Za-z0-9.+_-]*)?$"
 )
@@ -116,7 +120,11 @@ class PublicRegistryClient:
         return self._json("GET", f"/labs/{quote(lab_id, safe='')}")
 
     def download_package(self, artifact_id: str) -> bytes:
-        return self._bytes("GET", f"/packages/{quote(artifact_id, safe='')}/download")
+        return self._bytes(
+            "GET",
+            f"/packages/{quote(artifact_id, safe='')}/download",
+            accept=REGISTRY_PACKAGE_ACCEPT,
+        )
 
     def _url(
         self, path: str, *, params: list[tuple[str, str | int | None]] | None = None
@@ -149,9 +157,11 @@ class PublicRegistryClient:
         path: str,
         *,
         params: list[tuple[str, str | int | None]] | None = None,
+        accept: str = REGISTRY_JSON_ACCEPT,
     ) -> bytes:
         request = Request(self._url(path, params=params), method=method)
-        request.add_header("accept", "application/json")
+        request.add_header("User-Agent", REGISTRY_USER_AGENT)
+        request.add_header("Accept", accept)
         try:
             with urlopen(request, timeout=60) as response:
                 return response.read()
@@ -162,6 +172,15 @@ class PublicRegistryClient:
                     "Registry item requires authentication (HTTP 401)"
                 ) from exc
             if exc.code == 403:
+                body_lower = body.lower()
+                if "error code: 1010" in body_lower or (
+                    "cloudflare" in body_lower and "1010" in body_lower
+                ):
+                    raise RegistryError(
+                        "Registry request was blocked by Cloudflare browser integrity checks "
+                        "(HTTP 403 / error 1010). Upgrade the Biosimulant CLI or ask the "
+                        "registry operator to allow biosimulant-cli requests."
+                    ) from exc
                 raise RegistryError(
                     "Registry item is private or access is forbidden (HTTP 403)"
                 ) from exc
