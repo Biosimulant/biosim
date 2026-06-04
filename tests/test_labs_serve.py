@@ -274,6 +274,47 @@ def test_run_streams_dependency_logs_to_run_logs_and_terminal(
     assert "runtime: Runtime prepared" in terminal
 
 
+def test_run_streams_structured_model_progress_to_run_logs(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    lab = _write_lab(tmp_path / "lab")
+    client, session = _client(lab)
+
+    class ProgressWorld(_RuntimeWorld):
+        def run(self, *, duration: float) -> None:
+            print("raw model output")
+            print(
+                'BSIM_PROGRESS:{"message":"Boltz-2 prediction is still running",'
+                '"phase":"inference","duration":30.0}'
+            )
+
+    class PreparedProgressRuntime(_PreparedRuntime):
+        world = ProgressWorld()
+
+    monkeypatch.setattr(
+        server,
+        "prepare_lab_package",
+        lambda *_args, **_kwargs: PreparedProgressRuntime(),
+    )
+
+    created = client.post("/api/runs", json={}).json()
+    assert created["ok"] is True
+    run = session.get_run(created["data"]["run"]["id"])
+    assert run.thread is not None
+    run.thread.join(timeout=2)
+
+    model_logs = [entry for entry in run.logs if entry["source"] == "inference"]
+    assert [entry["message"] for entry in model_logs] == [
+        "Boltz-2 prediction is still running (30s elapsed)"
+    ]
+    assert not any(entry["message"] == "raw model output" for entry in run.logs)
+    terminal = capsys.readouterr().out
+    assert "raw model output" in terminal
+    assert "BSIM_PROGRESS:" in terminal
+
+
 def test_serve_lab_disables_uvicorn_access_logs(tmp_path: Path, monkeypatch) -> None:
     lab = _write_lab(tmp_path / "lab")
     configs: list[dict[str, object]] = []

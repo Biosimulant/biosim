@@ -1106,7 +1106,7 @@ th {
 .right-stack > .run-status {
   flex: 1 1 auto;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
   border-bottom: 1px solid var(--border);
 }
 
@@ -1228,6 +1228,8 @@ th {
 /* === Run status (visuals/logs/json tabs) === */
 
 .run-status {
+  height: 100%;
+  min-height: 0;
   padding: 12px;
   display: flex;
   flex-direction: column;
@@ -1302,7 +1304,24 @@ th {
 }
 
 .tab-body {
+  flex: 1 1 auto;
   min-height: 0;
+  overflow: hidden;
+}
+
+.tab-body > .visual-stack,
+.tab-body > .runs-history,
+.tab-body > .json-block,
+.tab-body > .empty-card {
+  max-height: 100%;
+  overflow: auto;
+}
+
+.tab-body > .logs-list {
+  height: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
 }
 
 /* === Canvas / ReactFlow nodes === */

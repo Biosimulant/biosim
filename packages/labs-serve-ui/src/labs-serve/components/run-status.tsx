@@ -25,13 +25,18 @@ function compactJson(value: unknown) {
 function extractProgress(logs: RunLogEntry[], run: LocalRun | null): number {
   if (!run) return 0;
   if (run.status === "completed") return 100;
+  const running = run.status === "running" || run.status === "queued" || run.status === "pending";
   if (run.progress?.progress_pct != null) {
-    return Math.min(100, Math.max(0, Number(run.progress.progress_pct)));
+    const progress = Math.min(100, Math.max(0, Number(run.progress.progress_pct)));
+    return running ? Math.min(95, progress) : progress;
   }
   const progressLog = [...logs].reverse().find((entry) => /\((\d+(?:\.\d+)?)%\)/.test(entry.message));
   const match = progressLog?.message.match(/\((\d+(?:\.\d+)?)%\)/);
-  if (match) return Math.min(100, Math.max(0, Number(match[1])));
-  return run.status === "running" || run.status === "queued" || run.status === "pending" ? 5 : 0;
+  if (match) {
+    const progress = Math.min(100, Math.max(0, Number(match[1])));
+    return running ? Math.min(95, progress) : progress;
+  }
+  return running ? 5 : 0;
 }
 
 export type RunStatusProps = {

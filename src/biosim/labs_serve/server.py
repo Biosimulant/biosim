@@ -4,12 +4,13 @@ import copy
 import json
 import shutil
 import socket
+import sys
 import tempfile
 import threading
 import time
 import uuid
 import webbrowser
-from contextlib import contextmanager
+from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterator, Mapping
@@ -52,6 +53,37 @@ def _api_error(message: str, *, status_code: int = 400) -> JSONResponse:
         status_code=status_code,
         content={"ok": False, "data": None, "error": {"message": message}},
     )
+
+
+class _RunOutputBridge:
+    def __init__(self, stream: Any, line_handler: Any) -> None:
+        self._stream = stream
+        self._line_handler = line_handler
+        self._buffer = ""
+        self._lock = threading.Lock()
+        self.encoding = getattr(stream, "encoding", None)
+        self.errors = getattr(stream, "errors", None)
+
+    def write(self, text: str) -> int:
+        if not isinstance(text, str):
+            text = str(text)
+        with self._lock:
+            self._stream.write(text)
+            self._buffer += text
+            while "\n" in self._buffer:
+                line, self._buffer = self._buffer.split("\n", 1)
+                self._line_handler(line.rstrip("\r"))
+        return len(text)
+
+    def flush(self) -> None:
+        with self._lock:
+            if self._buffer:
+                self._line_handler(self._buffer.rstrip("\r"))
+                self._buffer = ""
+            self._stream.flush()
+
+    def isatty(self) -> bool:
+        return bool(getattr(self._stream, "isatty", lambda: False)())
 
 
 async def _request_object(request: Request) -> dict[str, Any] | JSONResponse:
@@ -604,6 +636,50 @@ class LabServeSession:
         if echo_terminal:
             print(f"[{run.id}] {source}: {message}", flush=True)
 
+    def _record_runtime_output_line(self, run: RunRecord, line: str) -> None:
+        line = line.strip()
+        if not line.startswith("BSIM_PROGRESS:"):
+            return
+        raw_payload = line.removeprefix("BSIM_PROGRESS:").strip()
+        level = "info"
+        source = "model"
+        message = raw_payload
+        try:
+            payload = json.loads(raw_payload)
+        except json.JSONDecodeError:
+            pass
+        else:
+            if isinstance(payload, Mapping):
+                phase = payload.get("phase")
+                if isinstance(phase, str) and phase.strip():
+                    source = phase.strip()
+                    if source == "error":
+                        level = "error"
+                raw_message = payload.get("message")
+                if isinstance(raw_message, str) and raw_message.strip():
+                    message = raw_message.strip()
+                duration = payload.get("duration")
+                if isinstance(duration, (int, float)):
+                    message = f"{message} ({duration:g}s elapsed)"
+        self._log_run(run, level, message, source=source)
+
+    @contextmanager
+    def _capture_run_output(self, run: RunRecord) -> Iterator[None]:
+        stdout_bridge = _RunOutputBridge(
+            sys.stdout,
+            lambda line: self._record_runtime_output_line(run, line),
+        )
+        stderr_bridge = _RunOutputBridge(
+            sys.stderr,
+            lambda line: self._record_runtime_output_line(run, line),
+        )
+        with redirect_stdout(stdout_bridge), redirect_stderr(stderr_bridge):
+            try:
+                yield
+            finally:
+                stdout_bridge.flush()
+                stderr_bridge.flush()
+
     def _enrich_model_entry(
         self,
         entry: dict[str, Any],
@@ -872,7 +948,11 @@ class LabServeSession:
                             if should_log:
                                 run.last_progress_log_at = now
                                 run.last_progress_log_pct = pct
-                                run.add_log("info", f"progress ({pct:.1f}%)", source="world")
+                                run.add_log(
+                                    "info",
+                                    f"simulation window progress ({pct:.1f}%)",
+                                    source="world",
+                                )
                         return
                     with self._lock:
                         if event == WorldEvent.STARTED:
@@ -885,7 +965,12 @@ class LabServeSession:
                                 "progress": payload.get("progress"),
                                 "progress_pct": payload.get("progress_pct"),
                             }
-                        run.add_log("info", event.value, source="world")
+                        message = event.value
+                        if event == WorldEvent.STARTED:
+                            message = "simulation window started"
+                        elif event == WorldEvent.FINISHED:
+                            message = "simulation window complete"
+                        run.add_log("info", message, source="world")
 
                 world.on(listener)
                 with self._lock:
@@ -898,10 +983,34 @@ class LabServeSession:
                     echo_terminal=True,
                 )
                 try:
-                    world.run(duration=prepared.duration)
+                    with self._capture_run_output(run):
+                        world.run(duration=prepared.duration)
                     if prepared.settle_steps:
-                        world.settle(prepared.settle_steps)
-                    visuals = _sanitize_visuals(world.collect_visuals())
+                        self._log_run(
+                            run,
+                            "info",
+                            "Finalizing outputs...",
+                            source="runtime",
+                            echo_terminal=True,
+                        )
+                        with self._capture_run_output(run):
+                            world.settle(prepared.settle_steps)
+                        self._log_run(
+                            run,
+                            "info",
+                            "Output finalization complete",
+                            source="runtime",
+                            echo_terminal=True,
+                        )
+                    self._log_run(
+                        run,
+                        "info",
+                        "Collecting visuals...",
+                        source="runtime",
+                        echo_terminal=True,
+                    )
+                    with self._capture_run_output(run):
+                        visuals = _sanitize_visuals(world.collect_visuals())
                     return {
                         "visuals": visuals,
                         "duration": prepared.duration,
