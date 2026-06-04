@@ -136,6 +136,7 @@ export function App() {
           <Panel defaultSize={showInspector ? "44%" : "60%"} minSize="30%">
             <Canvas
               lab={labState.lab}
+              loading={labState.refreshing && !labState.lab}
               selection={selection}
               onSelect={setSelection}
               onLayoutChange={handleLayoutChange}

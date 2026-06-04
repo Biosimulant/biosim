@@ -32,5 +32,14 @@ export function useLab(): LabState {
     void refresh();
   }, [refresh]);
 
+  React.useEffect(() => {
+    const status = lab?.runtime_metadata_status;
+    if (status !== "pending" && status !== "running") return;
+    const timer = window.setTimeout(() => {
+      void refresh();
+    }, 1500);
+    return () => window.clearTimeout(timer);
+  }, [lab?.runtime_metadata_status, refresh]);
+
   return { lab, error, refreshing, refresh, setLab };
 }

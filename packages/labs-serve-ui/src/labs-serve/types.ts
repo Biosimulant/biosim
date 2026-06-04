@@ -82,6 +82,8 @@ export type LocalLab = {
   description: string | null;
   tags: string[];
   file_path?: string | null;
+  runtime_metadata_status?: "pending" | "running" | "ready" | "failed";
+  runtime_metadata_error?: string | null;
   manifest: {
     title?: string;
     description?: string;

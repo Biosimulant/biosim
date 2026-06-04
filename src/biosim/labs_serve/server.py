@@ -482,12 +482,20 @@ class LabServeSession:
         self.lab_path = lab_path.expanduser().resolve()
         self.install_deps = install_deps
         self._lock = threading.RLock()
+        self._runtime_prepare_lock = threading.Lock()
         self._runs: dict[str, RunRecord] = {}
+        self._runtime_port_payloads: dict[str, dict[str, list[dict[str, Any]]]] | None = None
+        self._runtime_metadata_status = "pending"
+        self._runtime_metadata_error: str | None = None
+        self._runtime_metadata_thread: threading.Thread | None = None
+        self._runtime_metadata_generation = 0
 
     def lab_payload(self) -> dict[str, Any]:
         record = workspace_get_lab(self.lab_path)
         manifest = _load_lab_manifest(self.lab_path)
         enriched_manifest = self._enriched_manifest(manifest)
+        self._ensure_runtime_metadata()
+        runtime_status = self._runtime_metadata_snapshot()
         metadata = record.metadata or {}
         timestamp = _now()
         return {
@@ -498,13 +506,16 @@ class LabServeSession:
             "file_path": str(record.path),
             "manifest": enriched_manifest,
             "wiring_layout": _load_wiring_layout(self.lab_path),
+            "runtime_metadata_status": runtime_status["status"],
+            "runtime_metadata_error": runtime_status["error"],
             "created_at": metadata.get("created_at") or timestamp,
             "updated_at": metadata.get("updated_at") or timestamp,
         }
 
     def _enriched_manifest(self, manifest: Mapping[str, Any]) -> dict[str, Any]:
         enriched = copy.deepcopy(dict(manifest))
-        port_payloads = self._introspected_ports()
+        with self._lock:
+            port_payloads = copy.deepcopy(self._runtime_port_payloads or {})
         models = enriched.get("models")
         if isinstance(models, list):
             for entry in models:
@@ -519,20 +530,65 @@ class LabServeSession:
                 self._enrich_child_entry(entry)
         return enriched
 
-    def _introspected_ports(self) -> dict[str, dict[str, list[dict[str, Any]]]]:
+    def _runtime_metadata_snapshot(self) -> dict[str, str | None]:
+        with self._lock:
+            return {
+                "status": self._runtime_metadata_status,
+                "error": self._runtime_metadata_error,
+            }
+
+    def _ensure_runtime_metadata(self) -> None:
+        with self._lock:
+            if self._runtime_metadata_status != "pending":
+                return
+            self._runtime_metadata_status = "running"
+            self._runtime_metadata_error = None
+            generation = self._runtime_metadata_generation
+            thread = threading.Thread(
+                target=self._runtime_metadata_worker,
+                args=(generation,),
+                name="biosim-runtime-metadata",
+                daemon=True,
+            )
+            self._runtime_metadata_thread = thread
+        thread.start()
+
+    def _invalidate_runtime_metadata(self) -> None:
+        with self._lock:
+            self._runtime_metadata_generation += 1
+            self._runtime_port_payloads = None
+            self._runtime_metadata_status = "pending"
+            self._runtime_metadata_error = None
+
+    def _runtime_metadata_worker(self, generation: int) -> None:
         try:
-            with (
-                _package_file_for_lab(self.lab_path) as package_file,
-                tempfile.TemporaryDirectory(prefix="biosim-serve-introspect-") as unpack_dir,
-            ):
+            port_payloads = self._introspected_ports()
+        except Exception as exc:
+            with self._lock:
+                if generation != self._runtime_metadata_generation:
+                    return
+                self._runtime_metadata_status = "failed"
+                self._runtime_metadata_error = str(exc)
+            return
+        with self._lock:
+            if generation != self._runtime_metadata_generation:
+                return
+            self._runtime_port_payloads = port_payloads
+            self._runtime_metadata_status = "ready"
+            self._runtime_metadata_error = None
+
+    def _introspected_ports(self) -> dict[str, dict[str, list[dict[str, Any]]]]:
+        with (
+            _package_file_for_lab(self.lab_path) as package_file,
+            tempfile.TemporaryDirectory(prefix="biosim-serve-introspect-") as unpack_dir,
+        ):
+            with self._runtime_prepare_lock:
                 prepared = prepare_lab_package(
                     package_file,
                     install_deps=self.install_deps,
                     unpack_root=unpack_dir,
                 )
-                return _extract_world_ports(prepared.world)
-        except Exception:
-            return {}
+            return _extract_world_ports(prepared.world)
 
     def _enrich_model_entry(
         self,
@@ -651,6 +707,7 @@ class LabServeSession:
                     target[key] = body[key]
         _write_lab_manifest(self.lab_path, manifest)
         workspace_save_lab(self.lab_path, allow_draft=True)
+        self._invalidate_runtime_metadata()
         return self.lab_payload()
 
     def update_world(self, body: Mapping[str, Any]) -> dict[str, Any]:
@@ -672,6 +729,7 @@ class LabServeSession:
             manifest["wiring"] = body["wiring"]
         _write_lab_manifest(self.lab_path, manifest)
         workspace_save_lab(self.lab_path, allow_draft=True)
+        self._invalidate_runtime_metadata()
         return self.lab_payload()
 
     def save_layout(self, body: Mapping[str, Any]) -> dict[str, Any]:
@@ -730,11 +788,16 @@ class LabServeSession:
                 _package_file_for_lab(source) as package_file,
                 tempfile.TemporaryDirectory(prefix="biosim-serve-unpack-") as unpack_dir,
             ):
-                prepared = prepare_lab_package(
-                    package_file,
-                    install_deps=self.install_deps,
-                    unpack_root=unpack_dir,
-                )
+                with self._lock:
+                    run.add_log("info", "Preparing runtime/dependencies...")
+                with self._runtime_prepare_lock:
+                    prepared = prepare_lab_package(
+                        package_file,
+                        install_deps=self.install_deps,
+                        unpack_root=unpack_dir,
+                    )
+                with self._lock:
+                    run.add_log("info", "Runtime prepared")
                 world = prepared.world
 
                 def listener(event: WorldEvent, payload: dict[str, Any]) -> None:

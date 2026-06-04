@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import threading
 import time
 from pathlib import Path
 
@@ -15,6 +16,53 @@ from tests.test_pack import _write_lab
 def _client(lab: Path) -> tuple[TestClient, LabServeSession]:
     session = LabServeSession(lab, install_deps=False)
     return TestClient(create_app(session)), session
+
+
+class _RuntimeSpec:
+    def __init__(self, description: str, *, units: list[str] | None = None) -> None:
+        self.description = description
+        self.units = units or []
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "description": self.description,
+            "accepted_profiles": [{"accepted_units": self.units}] if self.units else [],
+        }
+
+
+class _RuntimeModule:
+    input_specs = {"runtime_in": _RuntimeSpec("runtime input", units=["mM"])}
+    output_specs = {"runtime_out": _RuntimeSpec("runtime output")}
+
+
+class _RuntimeWorld:
+    _modules = {"counter": _RuntimeModule()}
+
+    def __init__(self) -> None:
+        self._listeners: list[object] = []
+
+    def on(self, listener) -> None:
+        self._listeners.append(listener)
+
+    def off(self, listener) -> None:
+        self._listeners.remove(listener)
+
+    def run(self, *, duration: float) -> None:
+        return None
+
+    def settle(self, steps: int) -> None:
+        return None
+
+    def collect_visuals(self) -> list[dict[str, object]]:
+        return []
+
+
+class _PreparedRuntime:
+    world = _RuntimeWorld()
+    duration = 0.1
+    communication_step = 0.01
+    settle_steps = 0
+    modules: list[dict[str, object]] = []
 
 
 def test_root_html_static_assets_and_legacy_ui_redirect(tmp_path: Path, monkeypatch) -> None:
@@ -38,7 +86,7 @@ def test_root_html_static_assets_and_legacy_ui_redirect(tmp_path: Path, monkeypa
 
 def test_lab_api_enriches_payload_and_persists_edits(tmp_path: Path) -> None:
     lab = _write_lab(tmp_path / "lab")
-    client, _session = _client(lab)
+    client, session = _client(lab)
 
     payload = client.get("/api/lab").json()
     assert payload["ok"] is True
@@ -46,6 +94,11 @@ def test_lab_api_enriches_payload_and_persists_edits(tmp_path: Path) -> None:
     assert lab_payload["title"] == "Test: Lab"
     counter = lab_payload["manifest"]["models"][0]
     assert counter["alias"] == "counter"
+    assert counter["resolved_model"]["title"] == "Test: Counter"
+    if session._runtime_metadata_thread is not None:
+        session._runtime_metadata_thread.join(timeout=2)
+    payload = client.get("/api/lab").json()
+    counter = payload["data"]["lab"]["manifest"]["models"][0]
     assert counter["resolved_model"]["io"]["outputs"][0]["name"] == "count"
 
     renamed = client.put("/api/lab/models/counter", json={"alias": "source"}).json()
@@ -69,6 +122,115 @@ def test_lab_api_enriches_payload_and_persists_edits(tmp_path: Path) -> None:
     assert world_saved["ok"] is True
     manifest = _safe_yaml_load((lab / "lab.yaml").read_bytes())
     assert manifest["wiring"] == [{"from": "source.count", "to": "accumulator.value"}]
+
+
+def test_lab_api_returns_manifest_payload_before_runtime_metadata_is_ready(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    lab = _write_lab(tmp_path / "lab")
+    client, session = _client(lab)
+    started = threading.Event()
+    release = threading.Event()
+
+    def slow_prepare(*_args, **_kwargs):
+        started.set()
+        release.wait(timeout=5)
+        return _PreparedRuntime()
+
+    monkeypatch.setattr(server, "prepare_lab_package", slow_prepare)
+
+    try:
+        began = time.monotonic()
+        payload = client.get("/api/lab").json()
+        elapsed = time.monotonic() - began
+
+        assert elapsed < 0.5
+        assert payload["ok"] is True
+        lab_payload = payload["data"]["lab"]
+        assert lab_payload["runtime_metadata_status"] == "running"
+        counter = lab_payload["manifest"]["models"][0]
+        assert counter["resolved_model"]["title"] == "Test: Counter"
+        assert started.wait(timeout=1)
+    finally:
+        release.set()
+        if session._runtime_metadata_thread is not None:
+            session._runtime_metadata_thread.join(timeout=2)
+
+
+def test_lab_api_uses_cached_runtime_metadata_when_ready(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    lab = _write_lab(tmp_path / "lab")
+    client, session = _client(lab)
+
+    monkeypatch.setattr(server, "prepare_lab_package", lambda *_args, **_kwargs: _PreparedRuntime())
+
+    first = client.get("/api/lab").json()["data"]["lab"]
+    assert first["runtime_metadata_status"] in {"running", "ready"}
+    assert session._runtime_metadata_thread is not None
+    session._runtime_metadata_thread.join(timeout=2)
+
+    payload = client.get("/api/lab").json()
+
+    assert payload["ok"] is True
+    lab_payload = payload["data"]["lab"]
+    assert lab_payload["runtime_metadata_status"] == "ready"
+    counter = lab_payload["manifest"]["models"][0]
+    assert counter["resolved_model"]["io"]["inputs"][0]["name"] == "runtime_in"
+    assert counter["resolved_model"]["io"]["inputs"][0]["accepted_units"] == ["mM"]
+    assert counter["resolved_model"]["io"]["outputs"][0]["name"] == "runtime_out"
+
+
+def test_run_runtime_preparation_waits_for_active_metadata_enrichment(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    lab = _write_lab(tmp_path / "lab")
+    client, session = _client(lab)
+    background_started = threading.Event()
+    release_background = threading.Event()
+    calls: list[float] = []
+
+    def prepare(*_args, **_kwargs):
+        calls.append(time.monotonic())
+        if len(calls) == 1:
+            background_started.set()
+            release_background.wait(timeout=5)
+        return _PreparedRuntime()
+
+    monkeypatch.setattr(server, "prepare_lab_package", prepare)
+
+    try:
+        client.get("/api/lab")
+        assert background_started.wait(timeout=1)
+
+        created = client.post("/api/runs", json={}).json()
+        assert created["ok"] is True
+        run = session.get_run(created["data"]["run"]["id"])
+
+        for _ in range(20):
+            messages = [entry["message"] for entry in run.logs]
+            if "Preparing runtime/dependencies..." in messages:
+                break
+            time.sleep(0.05)
+        assert "Preparing runtime/dependencies..." in [entry["message"] for entry in run.logs]
+        time.sleep(0.1)
+        assert len(calls) == 1
+
+        release_background.set()
+        if session._runtime_metadata_thread is not None:
+            session._runtime_metadata_thread.join(timeout=2)
+        assert run.thread is not None
+        run.thread.join(timeout=2)
+
+        assert len(calls) == 2
+        assert run.status == "completed"
+        messages = [entry["message"] for entry in run.logs]
+        assert "Runtime prepared" in messages
+    finally:
+        release_background.set()
 
 
 def test_run_overrides_map_world_inputs_to_alias_nested_shape() -> None:

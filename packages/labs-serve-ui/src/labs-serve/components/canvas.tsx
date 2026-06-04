@@ -13,7 +13,7 @@ import {
   type Node,
   type NodeProps,
 } from "@xyflow/react";
-import { FlaskConical, GitBranch, Globe2, Plus, WandSparkles } from "lucide-react";
+import { FlaskConical, GitBranch, Globe2, Loader2, Plus, WandSparkles } from "lucide-react";
 import "@xyflow/react/dist/style.css";
 import { WORLD_INPUT_RAIL_ID, WORLD_OUTPUT_RAIL_ID, type LocalLab, type Selection } from "../types";
 import {
@@ -187,9 +187,10 @@ export type CanvasProps = {
   onAddClick?: () => void;
   onLayoutChange?: (nodes: Array<{ id: string; position: { x: number; y: number } }>) => void;
   readOnly?: boolean;
+  loading?: boolean;
 };
 
-function CanvasInner({ lab, selection, onSelect, onAddClick, onLayoutChange, readOnly }: CanvasProps) {
+function CanvasInner({ lab, selection, onSelect, onAddClick, onLayoutChange, readOnly, loading }: CanvasProps) {
   const initial = React.useMemo(
     () => (lab ? buildGraph(lab) : { nodes: [] as Node[], edges: [] as Edge[] }),
     [lab],
@@ -273,6 +274,14 @@ function CanvasInner({ lab, selection, onSelect, onAddClick, onLayoutChange, rea
     [],
   );
 
+  const runtimeMetadataStatus = lab?.runtime_metadata_status;
+  const runtimeMetadataLabel =
+    runtimeMetadataStatus === "pending" || runtimeMetadataStatus === "running"
+      ? "Preparing runtime metadata..."
+      : runtimeMetadataStatus === "failed"
+        ? "Runtime metadata unavailable"
+        : null;
+
   return (
     <HoverToastContext.Provider value={hoverHandlers}>
     <div className="serve-canvas">
@@ -285,8 +294,23 @@ function CanvasInner({ lab, selection, onSelect, onAddClick, onLayoutChange, rea
         <span className="canvas-toolbar-stat">{lab?.manifest.models?.length ?? 0} models</span>
         <span className="canvas-toolbar-stat">{lab?.manifest.children?.length ?? 0} nested labs</span>
         <span className="canvas-toolbar-stat">{lab?.manifest.wiring?.length ?? 0} wires</span>
+        {runtimeMetadataLabel ? (
+          <span
+            className={`canvas-toolbar-stat runtime-metadata ${runtimeMetadataStatus}`}
+            title={lab?.runtime_metadata_error || runtimeMetadataLabel}
+          >
+            {runtimeMetadataStatus === "failed" ? null : <Loader2 size={11} className="spin" />}
+            {runtimeMetadataLabel}
+          </span>
+        ) : null}
       </div>
-      {decoratedNodes.length === 0 ? (
+      {loading ? (
+        <div className="empty-state loading-state">
+          <Loader2 size={28} className="spin" />
+          <h2>Loading lab...</h2>
+          <p>Reading the local lab manifest and canvas layout.</p>
+        </div>
+      ) : decoratedNodes.length === 0 ? (
         <div className="empty-state">
           <FlaskConical size={28} />
           <h2>No modules in this lab</h2>

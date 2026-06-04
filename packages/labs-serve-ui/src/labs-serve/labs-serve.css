@@ -1355,6 +1355,7 @@ th {
 .canvas-toolbar-stat {
   display: inline-flex;
   align-items: center;
+  gap: 5px;
   height: 24px;
   padding: 0 8px;
   border-radius: 999px;
@@ -1362,6 +1363,11 @@ th {
   border: 1px solid var(--border);
   color: var(--muted);
   font-size: 11px;
+}
+
+.canvas-toolbar-stat.runtime-metadata.failed {
+  color: var(--warning);
+  border-color: color-mix(in srgb, var(--warning) 35%, var(--border));
 }
 
 .canvas-add-button {
