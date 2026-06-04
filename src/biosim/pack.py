@@ -9,11 +9,12 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from collections import deque
 from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any, Callable, Iterable, Mapping
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 from .modules import BioModule
@@ -52,6 +53,7 @@ _SEMVER_RE = re.compile(
     r"(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$"
 )
 _PACKAGE_SEGMENT_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$")
+DependencyLogger = Callable[[str], None]
 
 
 class PackageError(ValueError):
@@ -1123,10 +1125,13 @@ def _validate_embedded_lab_package_dir(
 
 
 def _run_model_loaded_package(
-    loaded: _LoadedPackage, *, install_deps: bool = True
+    loaded: _LoadedPackage,
+    *,
+    install_deps: bool = True,
+    dependency_logger: DependencyLogger | None = None,
 ) -> dict[str, Any]:
     if install_deps:
-        _install_declared_dependencies(loaded.manifest)
+        _install_declared_dependencies(loaded.manifest, dependency_logger=dependency_logger)
     module, meta = _instantiate_model_from_package(loaded)
     module.setup(meta["setup"])
     runtime = (
@@ -1286,7 +1291,10 @@ def _embedded_lab_tree_from_dir(
 
 
 def _prepare_lab_loaded_package(
-    loaded: _LoadedPackage, *, install_deps: bool = True
+    loaded: _LoadedPackage,
+    *,
+    install_deps: bool = True,
+    dependency_logger: DependencyLogger | None = None,
 ) -> LabPackageRuntime:
     runtime = loaded.manifest.get("runtime")
     if not isinstance(runtime, Mapping):
@@ -1317,7 +1325,7 @@ def _prepare_lab_loaded_package(
         model_path = Path(model_dir)
         manifest = _load_model_manifest_from_dir(model_path)
         if install_deps:
-            _install_declared_dependencies(manifest)
+            _install_declared_dependencies(manifest, dependency_logger=dependency_logger)
         parameters = (
             entry.get("parameters")
             if isinstance(entry.get("parameters"), Mapping)
@@ -1403,9 +1411,16 @@ def _prepare_lab_loaded_package(
 
 
 def _run_lab_loaded_package(
-    loaded: _LoadedPackage, *, install_deps: bool = True
+    loaded: _LoadedPackage,
+    *,
+    install_deps: bool = True,
+    dependency_logger: DependencyLogger | None = None,
 ) -> dict[str, Any]:
-    prepared = _prepare_lab_loaded_package(loaded, install_deps=install_deps)
+    prepared = _prepare_lab_loaded_package(
+        loaded,
+        install_deps=install_deps,
+        dependency_logger=dependency_logger,
+    )
     world = prepared.world
     duration = prepared.duration
     settle_steps = prepared.settle_steps
@@ -1495,7 +1510,11 @@ def _port_remap_for_child(
     return remap
 
 
-def _install_declared_dependencies(manifest: Mapping[str, Any]) -> None:
+def _install_declared_dependencies(
+    manifest: Mapping[str, Any],
+    *,
+    dependency_logger: DependencyLogger | None = None,
+) -> None:
     runtime = manifest.get("runtime")
     if not isinstance(runtime, Mapping):
         return
@@ -1510,13 +1529,43 @@ def _install_declared_dependencies(manifest: Mapping[str, Any]) -> None:
     ]
     if bad:
         raise PackageError(f"All dependencies must use exact pins: {bad}")
-    subprocess.run(
-        [sys.executable, "-m", "pip", "install", *packages],
-        check=True,
+    command = [sys.executable, "-m", "pip", "install", *packages]
+    if dependency_logger is None:
+        subprocess.run(
+            command,
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        return
+
+    dependency_logger(f"Installing dependencies: {' '.join(packages)}")
+    recent: deque[str] = deque(maxlen=40)
+    process = subprocess.Popen(
+        command,
         stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
         text=True,
+        bufsize=1,
     )
+    assert process.stdout is not None
+    try:
+        for raw_line in process.stdout:
+            line = raw_line.rstrip()
+            if not line:
+                continue
+            recent.append(line)
+            dependency_logger(line)
+    finally:
+        process.stdout.close()
+    returncode = process.wait()
+    if returncode != 0:
+        tail = "\n".join(recent) if recent else "No pip output captured."
+        raise PackageError(
+            f"Dependency installation failed with exit code {returncode}.\n"
+            f"Recent pip output:\n{tail}"
+        )
 
 
 def run_package(
@@ -1524,6 +1573,7 @@ def run_package(
     *,
     install_deps: bool = True,
     unpack_root: str | Path | None = None,
+    dependency_logger: DependencyLogger | None = None,
 ) -> dict[str, Any]:
     if unpack_root is None:
         with tempfile.TemporaryDirectory(prefix="biosim-pack-") as temp_dir:
@@ -1531,15 +1581,24 @@ def run_package(
                 path,
                 install_deps=install_deps,
                 unpack_root=temp_dir,
+                dependency_logger=dependency_logger,
             )
     loaded = _loaded_package_from_path(
         Path(path).expanduser().resolve(),
         unpack_root=Path(unpack_root).expanduser().resolve(),
     )
     if loaded.package_type == "model":
-        return _run_model_loaded_package(loaded, install_deps=install_deps)
+        return _run_model_loaded_package(
+            loaded,
+            install_deps=install_deps,
+            dependency_logger=dependency_logger,
+        )
     if loaded.package_type == "lab":
-        return _run_lab_loaded_package(loaded, install_deps=install_deps)
+        return _run_lab_loaded_package(
+            loaded,
+            install_deps=install_deps,
+            dependency_logger=dependency_logger,
+        )
     raise PackageError(f"Unsupported package type: {loaded.package_type}")
 
 
@@ -1548,6 +1607,7 @@ def prepare_lab_package(
     *,
     install_deps: bool = True,
     unpack_root: str | Path | None = None,
+    dependency_logger: DependencyLogger | None = None,
 ) -> LabPackageRuntime:
     loaded = _loaded_package_from_path(
         Path(path).expanduser().resolve(),
@@ -1559,7 +1619,11 @@ def prepare_lab_package(
     )
     if loaded.package_type != "lab":
         raise PackageError(f"Expected a lab package, got: {loaded.package_type}")
-    return _prepare_lab_loaded_package(loaded, install_deps=install_deps)
+    return _prepare_lab_loaded_package(
+        loaded,
+        install_deps=install_deps,
+        dependency_logger=dependency_logger,
+    )
 
 
 def _validate_model_manifest(manifest: Mapping[str, Any]) -> None:

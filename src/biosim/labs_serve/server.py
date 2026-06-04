@@ -585,10 +585,24 @@ class LabServeSession:
             with self._runtime_prepare_lock:
                 prepared = prepare_lab_package(
                     package_file,
-                    install_deps=self.install_deps,
+                    install_deps=False,
                     unpack_root=unpack_dir,
                 )
             return _extract_world_ports(prepared.world)
+
+    def _log_run(
+        self,
+        run: RunRecord,
+        level: str,
+        message: str,
+        *,
+        source: str = "biosimulant",
+        echo_terminal: bool = False,
+    ) -> None:
+        with self._lock:
+            run.add_log(level, message, source=source)
+        if echo_terminal:
+            print(f"[{run.id}] {source}: {message}", flush=True)
 
     def _enrich_model_entry(
         self,
@@ -745,17 +759,17 @@ class LabServeSession:
         with self._lock:
             run.status = "running"
             run.started_at = _now()
-            run.add_log("info", "Run started")
+        self._log_run(run, "info", "Run started", echo_terminal=True)
         try:
             result = self._execute_run(run)
             finished = time.time()
             with self._lock:
                 if run.cancel_requested:
                     run.status = "cancelled"
-                    run.add_log("info", "Run cancelled")
+                    completion_log = ("info", "Run cancelled")
                 else:
                     run.status = "completed"
-                    run.add_log("info", "Run completed")
+                    completion_log = ("info", "Run completed")
                 run.results = result
                 run.results_summary = {
                     "visual_modules": len(result.get("visuals", [])),
@@ -763,6 +777,12 @@ class LabServeSession:
                 run.duration_seconds = finished - started
                 run.completed_at = _now()
                 run.world = None
+            self._log_run(
+                run,
+                completion_log[0],
+                completion_log[1],
+                echo_terminal=True,
+            )
         except Exception as exc:
             finished = time.time()
             with self._lock:
@@ -771,7 +791,7 @@ class LabServeSession:
                 run.duration_seconds = finished - started
                 run.completed_at = _now()
                 run.world = None
-                run.add_log("error", str(exc))
+            self._log_run(run, "error", str(exc), source="runtime", echo_terminal=True)
 
     def _execute_run(self, run: RunRecord) -> dict[str, Any]:
         with tempfile.TemporaryDirectory(prefix="biosim-serve-run-") as temp_dir:
@@ -788,16 +808,45 @@ class LabServeSession:
                 _package_file_for_lab(source) as package_file,
                 tempfile.TemporaryDirectory(prefix="biosim-serve-unpack-") as unpack_dir,
             ):
-                with self._lock:
-                    run.add_log("info", "Preparing runtime/dependencies...")
-                with self._runtime_prepare_lock:
+                self._log_run(
+                    run,
+                    "info",
+                    "Preparing runtime/dependencies...",
+                    source="runtime",
+                    echo_terminal=True,
+                )
+                lock_acquired = self._runtime_prepare_lock.acquire(blocking=False)
+                if not lock_acquired:
+                    self._log_run(
+                        run,
+                        "info",
+                        "Waiting for existing runtime preparation...",
+                        source="runtime",
+                        echo_terminal=True,
+                    )
+                    self._runtime_prepare_lock.acquire()
+                try:
                     prepared = prepare_lab_package(
                         package_file,
                         install_deps=self.install_deps,
                         unpack_root=unpack_dir,
+                        dependency_logger=lambda line: self._log_run(
+                            run,
+                            "info",
+                            line,
+                            source="pip",
+                            echo_terminal=True,
+                        ),
                     )
-                with self._lock:
-                    run.add_log("info", "Runtime prepared")
+                finally:
+                    self._runtime_prepare_lock.release()
+                self._log_run(
+                    run,
+                    "info",
+                    "Runtime prepared",
+                    source="runtime",
+                    echo_terminal=True,
+                )
                 world = prepared.world
 
                 def listener(event: WorldEvent, payload: dict[str, Any]) -> None:
@@ -841,6 +890,13 @@ class LabServeSession:
                 world.on(listener)
                 with self._lock:
                     run.world = world
+                self._log_run(
+                    run,
+                    "info",
+                    "Simulation started",
+                    source="runtime",
+                    echo_terminal=True,
+                )
                 try:
                     world.run(duration=prepared.duration)
                     if prepared.settle_steps:
@@ -995,6 +1051,9 @@ def serve_lab(
         except Exception:
             pass
 
-    config = uvicorn.Config(app, host=host, port=actual_port)
+    config = uvicorn.Config(app, host=host, port=actual_port, access_log=False)
     server = uvicorn.Server(config)
-    server.run(sockets=[sock])
+    try:
+        server.run(sockets=[sock])
+    except KeyboardInterrupt:
+        return

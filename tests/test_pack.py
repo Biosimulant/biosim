@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import os
 from pathlib import Path
 from zipfile import ZipFile
@@ -923,6 +924,61 @@ def test_install_declared_dependencies_validation_and_command(monkeypatch) -> No
     monkeypatch.setattr(pack_module.subprocess, "run", fake_run)
     pack_module._install_declared_dependencies({"runtime": {"dependencies": {"packages": ["numpy==1.26.0"]}}})
     assert calls[0][0][2:] == ["pip", "install", "numpy==1.26.0"]
+
+
+def test_install_declared_dependencies_streams_output(monkeypatch) -> None:
+    calls = []
+
+    class FakeProcess:
+        def __init__(self) -> None:
+            self.stdout = io.StringIO("Collecting demo\nInstalling collected packages\n")
+
+        def wait(self) -> int:
+            return 0
+
+    def fake_popen(args, **kwargs):
+        calls.append((args, kwargs))
+        return FakeProcess()
+
+    lines: list[str] = []
+    monkeypatch.setattr(pack_module.subprocess, "Popen", fake_popen)
+
+    pack_module._install_declared_dependencies(
+        {"runtime": {"dependencies": {"packages": ["demo==1.0.0"]}}},
+        dependency_logger=lines.append,
+    )
+
+    assert calls[0][0][2:] == ["pip", "install", "demo==1.0.0"]
+    assert calls[0][1]["stderr"] is pack_module.subprocess.STDOUT
+    assert lines == [
+        "Installing dependencies: demo==1.0.0",
+        "Collecting demo",
+        "Installing collected packages",
+    ]
+
+
+def test_install_declared_dependencies_streaming_failure_includes_tail(monkeypatch) -> None:
+    class FakeProcess:
+        def __init__(self) -> None:
+            self.stdout = io.StringIO("".join(f"line-{index}\n" for index in range(50)))
+
+        def wait(self) -> int:
+            return 2
+
+    monkeypatch.setattr(pack_module.subprocess, "Popen", lambda *_args, **_kwargs: FakeProcess())
+    lines: list[str] = []
+
+    with pytest.raises(PackageError) as exc_info:
+        pack_module._install_declared_dependencies(
+            {"runtime": {"dependencies": {"packages": ["demo==1.0.0"]}}},
+            dependency_logger=lines.append,
+        )
+
+    message = str(exc_info.value)
+    assert "Dependency installation failed with exit code 2" in message
+    assert "line-49" in message
+    assert "line-0" not in message
+    assert lines[-1] == "line-49"
 
 
 @pytest.mark.parametrize(

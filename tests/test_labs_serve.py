@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import sys
 import threading
 import time
+import types
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -193,11 +195,14 @@ def test_run_runtime_preparation_waits_for_active_metadata_enrichment(
     release_background = threading.Event()
     calls: list[float] = []
 
-    def prepare(*_args, **_kwargs):
+    def prepare(*_args, **kwargs):
         calls.append(time.monotonic())
         if len(calls) == 1:
+            assert kwargs["install_deps"] is False
             background_started.set()
             release_background.wait(timeout=5)
+        elif kwargs.get("dependency_logger"):
+            kwargs["dependency_logger"]("Installing demo dependency")
         return _PreparedRuntime()
 
     monkeypatch.setattr(server, "prepare_lab_package", prepare)
@@ -229,8 +234,111 @@ def test_run_runtime_preparation_waits_for_active_metadata_enrichment(
         assert run.status == "completed"
         messages = [entry["message"] for entry in run.logs]
         assert "Runtime prepared" in messages
+        assert "Waiting for existing runtime preparation..." in messages
+        pip_logs = [entry for entry in run.logs if entry["source"] == "pip"]
+        assert pip_logs[0]["message"] == "Installing demo dependency"
     finally:
         release_background.set()
+
+
+def test_run_streams_dependency_logs_to_run_logs_and_terminal(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    lab = _write_lab(tmp_path / "lab")
+    client, session = _client(lab)
+
+    def prepare(*_args, **kwargs):
+        logger = kwargs.get("dependency_logger")
+        if logger:
+            logger("Collecting demo==1.0.0")
+            logger("Successfully installed demo")
+        return _PreparedRuntime()
+
+    monkeypatch.setattr(server, "prepare_lab_package", prepare)
+
+    created = client.post("/api/runs", json={}).json()
+    assert created["ok"] is True
+    run = session.get_run(created["data"]["run"]["id"])
+    assert run.thread is not None
+    run.thread.join(timeout=2)
+
+    pip_logs = [entry for entry in run.logs if entry["source"] == "pip"]
+    assert [entry["message"] for entry in pip_logs] == [
+        "Collecting demo==1.0.0",
+        "Successfully installed demo",
+    ]
+    terminal = capsys.readouterr().out
+    assert "pip: Collecting demo==1.0.0" in terminal
+    assert "runtime: Runtime prepared" in terminal
+
+
+def test_serve_lab_disables_uvicorn_access_logs(tmp_path: Path, monkeypatch) -> None:
+    lab = _write_lab(tmp_path / "lab")
+    configs: list[dict[str, object]] = []
+
+    class FakeConfig:
+        def __init__(self, *_args, **kwargs) -> None:
+            configs.append(kwargs)
+
+    class FakeServer:
+        def __init__(self, _config) -> None:
+            return None
+
+        def run(self, *, sockets) -> None:
+            for sock in sockets:
+                sock.close()
+
+    monkeypatch.setitem(
+        sys.modules,
+        "uvicorn",
+        types.SimpleNamespace(Config=FakeConfig, Server=FakeServer),
+    )
+
+    server.serve_lab(
+        lab,
+        host="127.0.0.1",
+        port=0,
+        open_browser=False,
+        install_deps=False,
+    )
+
+    assert configs[0]["access_log"] is False
+
+
+def test_serve_lab_treats_keyboard_interrupt_as_clean_shutdown(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    lab = _write_lab(tmp_path / "lab")
+
+    class FakeConfig:
+        def __init__(self, *_args, **_kwargs) -> None:
+            return None
+
+    class FakeServer:
+        def __init__(self, _config) -> None:
+            return None
+
+        def run(self, *, sockets) -> None:
+            for sock in sockets:
+                sock.close()
+            raise KeyboardInterrupt
+
+    monkeypatch.setitem(
+        sys.modules,
+        "uvicorn",
+        types.SimpleNamespace(Config=FakeConfig, Server=FakeServer),
+    )
+
+    server.serve_lab(
+        lab,
+        host="127.0.0.1",
+        port=0,
+        open_browser=False,
+        install_deps=False,
+    )
 
 
 def test_run_overrides_map_world_inputs_to_alias_nested_shape() -> None:
