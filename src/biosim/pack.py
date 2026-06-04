@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import warnings
 from collections import deque
 from copy import deepcopy
 from dataclasses import dataclass, field
@@ -43,6 +44,7 @@ DEFAULT_REGISTRY_ENV = "BIOSIM_PACKAGE_REGISTRY_DIR"
 DEFAULT_CACHE_ENV = "BIOSIM_PACKAGE_CACHE_DIR"
 DEFAULT_CACHE_HOME = Path.home() / ".cache" / "biosim" / "packages"
 FIXED_ZIP_TIME = (2020, 1, 1, 0, 0, 0)
+SUPPORTED_LAB_PYTHON_VERSIONS = frozenset({"3.11", "3.12"})
 _FORBIDDEN_LEGACY_SOURCE_KEYS = frozenset(
     {"repo", "manifest_path", "upstream_repo", "upstream_manifest_path"}
 )
@@ -197,7 +199,9 @@ def _validate_lab_release_identity(
     elif allow_default_identity and source_path is not None:
         package_name = _validate_package_ref(_default_lab_package_name(source_path))
     else:
-        raise PackageError("lab.yaml must declare a non-empty package or pass --package")
+        raise PackageError(
+            "lab.yaml must declare a non-empty package or pass --package"
+        )
 
     if version_override is not None:
         version = _validate_version(version_override)
@@ -210,7 +214,9 @@ def _validate_lab_release_identity(
     elif allow_default_identity:
         version = DEFAULT_PACKAGE_VERSION
     else:
-        raise PackageError("lab.yaml must declare a non-empty version or pass --version")
+        raise PackageError(
+            "lab.yaml must declare a non-empty version or pass --version"
+        )
     return package_name, version
 
 
@@ -251,6 +257,61 @@ def _validate_dependencies(manifest: Mapping[str, Any]) -> None:
     for dep in packages:
         if not isinstance(dep, str) or not _is_exact_pin(dep):
             raise PackageError(f"Dependency '{dep}' must be pinned with == only")
+
+
+def _declared_lab_python_version(manifest: Mapping[str, Any]) -> str | None:
+    runtime = manifest.get("runtime")
+    if not isinstance(runtime, Mapping):
+        return None
+    raw = runtime.get("python_version")
+    if raw is None:
+        return None
+    if isinstance(raw, bool) or not isinstance(raw, (str, int, float)):
+        raise PackageError(
+            "Lab manifest runtime.python_version must be a string or number like '3.11'"
+        )
+    version = str(raw).strip()
+    if not version:
+        raise PackageError("Lab manifest runtime.python_version must not be empty")
+    return version
+
+
+def _unsupported_lab_python_version_warning(version: str) -> str:
+    supported = ", ".join(sorted(SUPPORTED_LAB_PYTHON_VERSIONS))
+    return (
+        f"Lab manifest runtime.python_version '{version}' is not supported by this "
+        f"biosim version. Supported versions: {supported}. Local OSS commands will "
+        "continue with the active Python interpreter, but managed desktop or remote "
+        "runners may reject this lab."
+    )
+
+
+def _lab_python_version_warnings(manifest: Mapping[str, Any]) -> list[str]:
+    declared = _declared_lab_python_version(manifest)
+    if declared is None or declared in SUPPORTED_LAB_PYTHON_VERSIONS:
+        return []
+    return [_unsupported_lab_python_version_warning(declared)]
+
+
+def _current_python_minor() -> str:
+    return f"{sys.version_info[0]}.{sys.version_info[1]}"
+
+
+def _warn_if_lab_python_version_mismatch(manifest: Mapping[str, Any]) -> None:
+    declared = _declared_lab_python_version(manifest)
+    if declared is None:
+        return
+    for message in _lab_python_version_warnings(manifest):
+        warnings.warn(message, RuntimeWarning, stacklevel=2)
+    current = _current_python_minor()
+    if declared != current:
+        warnings.warn(
+            "Lab manifest declares Python "
+            f"{declared}, but this process is running Python {current}. "
+            "Continuing with the active interpreter for local OSS execution.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
 
 
 def _manifest_fingerprint(manifest: Mapping[str, Any]) -> str:
@@ -671,7 +732,9 @@ def validate_package(path: str | Path) -> PackageValidationResult:
             actual_logical_hash = _logical_hash(entries)
             declared_hash = package_yaml.get("sha256")
             if declared_hash and declared_hash != actual_logical_hash:
-                legacy_logical_hash = _legacy_logical_hash_with_project_metadata(entries)
+                legacy_logical_hash = _legacy_logical_hash_with_project_metadata(
+                    entries
+                )
                 if declared_hash != legacy_logical_hash:
                     raise PackageError(
                         "Logical package hash does not match package.yaml sha256"
@@ -685,6 +748,7 @@ def validate_package(path: str | Path) -> PackageValidationResult:
                 _validate_dependencies(manifest)
             elif package_type == "lab":
                 _validate_lab_manifest(manifest)
+                result.warnings.extend(_lab_python_version_warnings(manifest))
                 _validate_embedded_lab_package(entries, manifest, entry_manifest)
             else:
                 raise PackageError(f"Unsupported package_type: {package_type}")
@@ -710,6 +774,7 @@ def validate_lab_source(path: str | Path) -> PackageValidationResult:
         manifest_path = _find_manifest_in_dir(source_path, ("lab.yaml", "lab.yml"))
         manifest = _safe_yaml_load(manifest_path.read_bytes())
         _validate_lab_manifest(manifest)
+        result.warnings.extend(_lab_python_version_warnings(manifest))
         _validate_lab_source_dir(
             source_root=source_path,
             current_lab_dir=source_path,
@@ -1131,7 +1196,9 @@ def _run_model_loaded_package(
     dependency_logger: DependencyLogger | None = None,
 ) -> dict[str, Any]:
     if install_deps:
-        _install_declared_dependencies(loaded.manifest, dependency_logger=dependency_logger)
+        _install_declared_dependencies(
+            loaded.manifest, dependency_logger=dependency_logger
+        )
     module, meta = _instantiate_model_from_package(loaded)
     module.setup(meta["setup"])
     runtime = (
@@ -1299,6 +1366,7 @@ def _prepare_lab_loaded_package(
     runtime = loaded.manifest.get("runtime")
     if not isinstance(runtime, Mapping):
         raise PackageError("Lab manifest must contain models, wiring, and runtime")
+    _warn_if_lab_python_version_mismatch(loaded.manifest)
     models, wiring, parsed_lab = _flatten_embedded_lab_dir(
         payload_root=loaded.payload_root,
         current_lab_dir=loaded.payload_root,
@@ -1325,7 +1393,9 @@ def _prepare_lab_loaded_package(
         model_path = Path(model_dir)
         manifest = _load_model_manifest_from_dir(model_path)
         if install_deps:
-            _install_declared_dependencies(manifest, dependency_logger=dependency_logger)
+            _install_declared_dependencies(
+                manifest, dependency_logger=dependency_logger
+            )
         parameters = (
             entry.get("parameters")
             if isinstance(entry.get("parameters"), Mapping)
@@ -1453,7 +1523,7 @@ def _select_alias_override(
     overrides = payload.get(alias)
     flat_prefix = f"{alias}."
     legacy_flat = {
-        str(key)[len(flat_prefix):]: value
+        str(key)[len(flat_prefix) :]: value
         for key, value in payload.items()
         if isinstance(key, str)
         and key.startswith(flat_prefix)
@@ -1701,6 +1771,7 @@ def _validate_lab_manifest(manifest: Mapping[str, Any]) -> None:
     runtime = manifest.get("runtime")
     if not isinstance(runtime, Mapping):
         raise PackageError("Lab manifest must contain a runtime mapping")
+    _declared_lab_python_version(manifest)
     if "tick_dt" in runtime:
         raise PackageError("Lab manifest runtime.tick_dt is not supported")
     communication_step = runtime.get("communication_step")
@@ -1713,9 +1784,7 @@ def _validate_lab_manifest(manifest: Mapping[str, Any]) -> None:
             "Lab manifest runtime.communication_step must be numeric"
         ) from exc
     if communication_step_value <= 0:
-        raise PackageError(
-            "Lab manifest runtime.communication_step must be positive"
-        )
+        raise PackageError("Lab manifest runtime.communication_step must be positive")
     extract_settle_steps(None, runtime, error_cls=PackageError)
 
 
