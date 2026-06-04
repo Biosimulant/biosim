@@ -238,10 +238,81 @@ def test_labs_serve_auto_pulls_public_lab_ref(monkeypatch, tmp_path: Path, capsy
         ],
         prog="biosimulant",
     )
-    payload = json.loads(capsys.readouterr().out)
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
 
     assert payload["url"] == "http://127.0.0.1:9999/"
+    assert captured.err == ""
     assert (target / "lab.yaml").is_file()
     assert calls
     assert calls[0]["kwargs"]["port"] == 9999
     assert calls[0]["path"] == target.resolve()
+
+
+def test_labs_serve_auto_pull_reports_human_status(
+    monkeypatch,
+    tmp_path: Path,
+    capsys,
+) -> None:
+    package_file = build_package(
+        _write_lab_release_identity(
+            _write_lab(tmp_path / "source-lab"),
+            "demo/immune",
+            "1.0.0",
+        ),
+        package_name="demo/immune",
+        version="1.0.0",
+    )
+    package_bytes = package_file.read_bytes()
+    sha256 = hashlib.sha256(package_bytes).hexdigest()
+    calls: list[dict[str, object]] = []
+
+    class FakeRegistryClient:
+        base_url = "https://registry.test/api"
+
+        def __init__(self, base_url: str | None = None) -> None:
+            if base_url:
+                self.base_url = base_url
+
+        def resolve_package(self, package_name, version):
+            return {
+                "id": "pkg-1",
+                "package": package_name,
+                "version": version,
+                "package_type": "lab",
+                "sha256": sha256,
+            }
+
+        def download_package(self, package_id):
+            assert package_id == "pkg-1"
+            return package_bytes
+
+    def fake_serve_lab(path, **kwargs):
+        calls.append({"path": path, "kwargs": kwargs})
+
+    target = tmp_path / "served-lab"
+    monkeypatch.setattr(cli_main, "PublicRegistryClient", FakeRegistryClient)
+    monkeypatch.setattr(cli_main, "serve_lab", fake_serve_lab)
+
+    main(
+        [
+            "labs",
+            "serve",
+            "demo/immune@1.0.0",
+            "--target",
+            str(target),
+            "--port",
+            "9999",
+            "--no-open",
+            "--no-install-deps",
+        ],
+        prog="biosimulant",
+    )
+    captured = capsys.readouterr()
+
+    assert "Resolving demo/immune@1.0.0..." in captured.err
+    assert "Downloading package..." in captured.err
+    assert "Validating package..." in captured.err
+    assert f"Extracting lab to {target.resolve()}..." in captured.err
+    assert (target / "lab.yaml").is_file()
+    assert calls

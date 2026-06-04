@@ -664,6 +664,7 @@ def _main_labs(argv: list[str], *, prog: str = "biosimulant labs") -> None:
                 target=args.target,
                 force=args.force,
                 registry_url=args.registry_url,
+                emit_status=not args.json_output,
             )
             _print_registry_result(payload, json_output=args.json_output)
             return
@@ -720,6 +721,7 @@ def _main_labs(argv: list[str], *, prog: str = "biosimulant labs") -> None:
                 target=args.target,
                 force=args.force,
                 registry_url=args.registry_url,
+                emit_status=not args.json_output,
             )
             with _package_file_for_lab(lab_path) as package_file:
                 result = run_package(package_file, install_deps=not args.no_install_deps)
@@ -737,6 +739,7 @@ def _main_labs(argv: list[str], *, prog: str = "biosimulant labs") -> None:
                 target=args.target,
                 force=args.force,
                 registry_url=args.registry_url,
+                emit_status=not args.json_output,
             )
             resolved_lab_path = lab_path.expanduser().resolve()
             if resolved_lab_path.is_file():
@@ -989,28 +992,35 @@ def _pull_public_lab(
     target: Path | None,
     force: bool,
     registry_url: str | None,
+    emit_status: bool = False,
+    client: PublicRegistryClient | None = None,
+    artifact: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     parsed = parse_package_reference(reference, allow_missing_version=True)
     if parsed is None:
         raise PackageError("labs pull requires a package reference: namespace/name[@version]")
-    client = PublicRegistryClient(registry_url)
-    artifact = client.resolve_package(parsed.package_name, parsed.version)
+    registry_client = client or PublicRegistryClient(registry_url)
+    if artifact is None:
+        _print_registry_status(f"Resolving {reference}...", enabled=emit_status)
+        artifact = registry_client.resolve_package(parsed.package_name, parsed.version)
     if artifact.get("package_type") != "lab":
         raise PackageError(
             f"Package {reference} is type `{artifact.get('package_type')}`, expected `lab`"
         )
-    archive_bytes = client.download_package(str(artifact["id"]))
+    destination = lab_destination_for_reference(reference, target)
+    if destination.exists() and not force:
+        raise PackageError(
+            f"Target already exists: {destination}; re-run with --force to replace it"
+        )
+
+    _print_registry_status("Downloading package...", enabled=emit_status)
+    archive_bytes = registry_client.download_package(str(artifact["id"]))
     actual_sha = hashlib.sha256(archive_bytes).hexdigest()
     expected_sha = str(artifact.get("sha256") or "")
     if expected_sha and actual_sha != expected_sha:
         raise PackageError("Downloaded lab package hash does not match registry metadata")
 
-    destination = lab_destination_for_reference(reference, target)
     if destination.exists():
-        if not force:
-            raise PackageError(
-                f"Target already exists: {destination}; re-run with --force to replace it"
-            )
         if destination.is_dir():
             shutil.rmtree(destination)
         else:
@@ -1020,6 +1030,7 @@ def _pull_public_lab(
         temp_path = Path(temp_dir)
         archive_path = temp_path / "download.bsilab"
         archive_path.write_bytes(archive_bytes)
+        _print_registry_status("Validating package...", enabled=emit_status)
         validation = validate_package(archive_path)
         if not validation.valid:
             raise PackageError("; ".join(validation.errors))
@@ -1027,12 +1038,13 @@ def _pull_public_lab(
         payload_dir = unpacked / "payload"
         if not payload_dir.is_dir():
             raise PackageError("Downloaded lab package is missing payload/")
+        _print_registry_status(f"Extracting lab to {destination}...", enabled=emit_status)
         shutil.copytree(payload_dir, destination)
 
     save_result = workspace_save_lab(destination)
     return {
         "command": "labs.pull",
-        "registry_url": client.base_url,
+        "registry_url": registry_client.base_url,
         "reference": reference,
         "path": str(destination),
         "artifact": artifact,
@@ -1044,12 +1056,18 @@ def _lab_manifest_exists(path: Path) -> bool:
     return path.joinpath("lab.yaml").is_file() or path.joinpath("lab.yml").is_file()
 
 
+def _print_registry_status(message: str, *, enabled: bool) -> None:
+    if enabled:
+        print(message, file=sys.stderr, flush=True)
+
+
 def _resolve_runtime_lab_path(
     lab: Path,
     *,
     target: Path | None,
     force: bool,
     registry_url: str | None,
+    emit_status: bool = False,
 ) -> tuple[Path, dict[str, Any] | None]:
     local_candidate = lab.expanduser()
     if local_candidate.exists():
@@ -1061,6 +1079,7 @@ def _resolve_runtime_lab_path(
         return lab, None
 
     client = PublicRegistryClient(registry_url)
+    _print_registry_status(f"Resolving {reference}...", enabled=emit_status)
     artifact = client.resolve_package(parsed.package_name, parsed.version)
     if artifact.get("package_type") != "lab":
         raise PackageError(
@@ -1073,6 +1092,7 @@ def _resolve_runtime_lab_path(
         else cached_lab_destination_for_reference(reference, artifact)
     )
     if destination.exists() and _lab_manifest_exists(destination) and not force:
+        _print_registry_status(f"Using cached lab at {destination}", enabled=emit_status)
         return destination, {
             "command": "labs.pull",
             "registry_url": client.base_url,
@@ -1091,6 +1111,9 @@ def _resolve_runtime_lab_path(
         target=destination,
         force=force,
         registry_url=registry_url,
+        emit_status=emit_status,
+        client=client,
+        artifact=artifact,
     )
     return destination, pull_result
 
