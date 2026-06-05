@@ -50,6 +50,10 @@ from .extensions import (
     run_extension_command,
 )
 from .labs_serve import serve_lab
+from .managed_runtime import (
+    run_labs_serve_with_managed_python,
+    run_package_with_managed_python,
+)
 from .package_repo import build_package_repo, validate_package_repo
 from .pack import (
     DEFAULT_PACKAGE_NAMESPACE,
@@ -86,6 +90,36 @@ from .workspace import (
 
 _ARGCOMPLETE_ENV = "_ARGCOMPLETE"
 _TOP_LEVEL_COMPLETION_COMMANDS = ("labs",)
+
+
+def _run_package_for_cli(
+    package_file: str | Path,
+    *,
+    install_deps: bool,
+) -> dict[str, Any]:
+    return run_package_with_managed_python(
+        package_file,
+        install_deps=install_deps,
+        in_process_runner=lambda path: run_package(path, install_deps=install_deps),
+    )
+
+
+def _labs_serve_child_argv(args: argparse.Namespace, resolved_lab_path: Path) -> list[str]:
+    child_argv = [
+        "labs",
+        "serve",
+        str(resolved_lab_path),
+        "--host",
+        args.host,
+        "--port",
+        str(args.port),
+    ]
+    child_argv.append("--open" if args.open_browser else "--no-open")
+    if args.no_install_deps:
+        child_argv.append("--no-install-deps")
+    if args.json_output:
+        child_argv.append("--json")
+    return child_argv
 
 
 def _is_completion_request() -> bool:
@@ -724,7 +758,10 @@ def _main_labs(argv: list[str], *, prog: str = "biosimulant labs") -> None:
                 emit_status=not args.json_output,
             )
             with _package_file_for_lab(lab_path) as package_file:
-                result = run_package(package_file, install_deps=not args.no_install_deps)
+                result = _run_package_for_cli(
+                    package_file,
+                    install_deps=not args.no_install_deps,
+                )
                 if args.results_file:
                     args.results_file.parent.mkdir(parents=True, exist_ok=True)
                     args.results_file.write_text(
@@ -742,6 +779,15 @@ def _main_labs(argv: list[str], *, prog: str = "biosimulant labs") -> None:
                 emit_status=not args.json_output,
             )
             resolved_lab_path = lab_path.expanduser().resolve()
+            with _package_file_for_lab(resolved_lab_path) as package_file:
+                managed_exit = run_labs_serve_with_managed_python(
+                    package_file,
+                    _labs_serve_child_argv(args, resolved_lab_path),
+                )
+                if managed_exit is not None:
+                    if managed_exit != 0:
+                        raise SystemExit(managed_exit)
+                    return
             if resolved_lab_path.is_file():
                 with tempfile.TemporaryDirectory(prefix="biosim-serve-package-") as temp_dir:
                     unpacked = unpack_package(resolved_lab_path, dest=Path(temp_dir) / "unpacked")
@@ -814,7 +860,10 @@ def _main_packages(argv: list[str], *, prog: str = "biosimulant packages") -> No
             _print_package_repo_build_success(built, json_output=args.json_output)
             return
         if args.command == "run":
-            result = run_package(args.package_file, install_deps=not args.no_install_deps)
+            result = _run_package_for_cli(
+                args.package_file,
+                install_deps=not args.no_install_deps,
+            )
             _print_run_result(args.package_file, result, json_output=args.json_output)
             return
     except PackageError as exc:
@@ -898,7 +947,10 @@ def _main_pack(argv: list[str], *, prog: str = "biosimulant pack") -> None:
             )
             return
         if args.command == "run":
-            result = run_package(args.package_file, install_deps=not args.no_install_deps)
+            result = _run_package_for_cli(
+                args.package_file,
+                install_deps=not args.no_install_deps,
+            )
             _print_run_result(args.package_file, result, json_output=args.json_output)
             return
     except PackageError as exc:

@@ -25,7 +25,11 @@ function compactJson(value: unknown) {
 function extractProgress(logs: RunLogEntry[], run: LocalRun | null): number {
   if (!run) return 0;
   if (run.status === "completed") return 100;
-  const running = run.status === "running" || run.status === "queued" || run.status === "pending";
+  const running =
+    run.status === "running" ||
+    run.status === "queued" ||
+    run.status === "pending" ||
+    run.status === "cancelling";
   if (run.progress?.progress_pct != null) {
     const progress = Math.min(100, Math.max(0, Number(run.progress.progress_pct)));
     return running ? Math.min(95, progress) : progress;

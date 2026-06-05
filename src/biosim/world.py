@@ -385,6 +385,8 @@ class BioWorld:
 
         frontier = set(self._last_published_refs)
         for _ in range(steps):
+            if self._stop_requested:
+                break
             if not frontier:
                 break
 
@@ -400,6 +402,8 @@ class BioWorld:
             pending_outputs: Dict[str, Dict[str, BioSignal]] = {}
             window_time = self._current_time
             for name, entry in self._modules.items():
+                if self._stop_requested:
+                    break
                 if name not in target_names:
                     continue
                 inputs = self._collect_inputs(name, window_time)
@@ -422,6 +426,11 @@ class BioWorld:
     def request_stop(self) -> None:
         self._stop_requested = True
         self._run_event.set()
+        for entry in list(self._modules.values()):
+            try:
+                entry.module.request_stop()
+            except Exception:
+                logger.exception("BioModule.request_stop raised for %s", entry.name)
 
     def request_pause(self) -> None:
         self._run_event.clear()

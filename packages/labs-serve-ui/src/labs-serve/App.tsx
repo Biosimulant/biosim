@@ -103,7 +103,7 @@ export function App() {
     <div className="serve-root">
       <Header
         lab={labState.lab}
-        selectedRun={runsState.selectedRun}
+        activeRun={runsState.activeRun}
         busy={runsState.busy}
         onToggleLeft={() => setLeftOpen((v) => !v)}
         onToggleRight={() => setRightOpen((v) => !v)}
@@ -198,12 +198,8 @@ export function App() {
   );
 }
 
-const UPGRADE_DISMISS_KEY = "biosimulant.labsServe.upgradeDismissed";
-
-function UpgradeBanner() {
-  const [dismissed, setDismissed] = React.useState<boolean>(() =>
-    typeof window === "undefined" ? false : window.localStorage.getItem(UPGRADE_DISMISS_KEY) === "1",
-  );
+export function UpgradeBanner() {
+  const [dismissed, setDismissed] = React.useState(false);
   if (dismissed) return null;
   return (
     <div className="upgrade-banner">
@@ -218,10 +214,7 @@ function UpgradeBanner() {
         type="button"
         className="upgrade-banner-dismiss"
         aria-label="Dismiss"
-        onClick={() => {
-          window.localStorage.setItem(UPGRADE_DISMISS_KEY, "1");
-          setDismissed(true);
-        }}
+        onClick={() => setDismissed(true)}
       >
         ×
       </button>

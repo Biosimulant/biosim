@@ -8,6 +8,7 @@ export type RunStatus =
   | "queued"
   | "pending"
   | "running"
+  | "cancelling"
   | "completed"
   | "failed"
   | "cancelled"

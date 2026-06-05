@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import os
 from pathlib import Path
+from types import SimpleNamespace
 from zipfile import ZipFile
 
 import pytest
@@ -17,7 +18,6 @@ from biosim.pack import (
     publish_package,
     run_package,
     unpack_package,
-    validate_lab_source,
     validate_package,
 )
 
@@ -937,6 +937,7 @@ def test_install_declared_dependencies_validation_and_command(monkeypatch) -> No
 
     def fake_run(args, **kwargs):
         calls.append((args, kwargs))
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
 
     pack_module._install_declared_dependencies({})
     pack_module._install_declared_dependencies(
@@ -948,11 +949,121 @@ def test_install_declared_dependencies_validation_and_command(monkeypatch) -> No
             {"runtime": {"dependencies": {"packages": ["numpy>=1"]}}}
         )
 
+    monkeypatch.setattr(pack_module, "_uv_module_available", lambda: True)
     monkeypatch.setattr(pack_module.subprocess, "run", fake_run)
     pack_module._install_declared_dependencies(
         {"runtime": {"dependencies": {"packages": ["numpy==1.26.0"]}}}
     )
-    assert calls[0][0][2:] == ["pip", "install", "numpy==1.26.0"]
+    assert calls[0][0] == [
+        pack_module.sys.executable,
+        "-m",
+        "uv",
+        "pip",
+        "install",
+        "--python",
+        pack_module.sys.executable,
+        "numpy==1.26.0",
+    ]
+
+
+def test_install_declared_dependencies_falls_back_to_pip_when_uv_unavailable(
+    monkeypatch,
+) -> None:
+    calls = []
+
+    def fake_run(args, **kwargs):
+        calls.append((args, kwargs))
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(pack_module, "_uv_module_available", lambda: False)
+    monkeypatch.setattr(pack_module.subprocess, "run", fake_run)
+
+    pack_module._install_declared_dependencies(
+        {"runtime": {"dependencies": {"packages": ["demo==1.0.0"]}}}
+    )
+
+    assert calls[0][0] == [
+        pack_module.sys.executable,
+        "-m",
+        "pip",
+        "install",
+        "demo==1.0.0",
+    ]
+
+
+def test_install_declared_dependencies_checks_uv_with_current_python(
+    monkeypatch,
+) -> None:
+    calls = []
+
+    def fake_run(args, **kwargs):
+        calls.append((args, kwargs))
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(pack_module.subprocess, "run", fake_run)
+
+    assert pack_module._uv_module_available() is True
+    assert calls[0][0] == [
+        pack_module.sys.executable,
+        "-m",
+        "uv",
+        "--version",
+    ]
+    assert calls[0][1]["stdout"] is pack_module.subprocess.DEVNULL
+    assert calls[0][1]["stderr"] is pack_module.subprocess.DEVNULL
+
+
+def test_install_declared_dependencies_no_logger_failure_reports_output(
+    monkeypatch,
+) -> None:
+    def fake_run(args, **kwargs):
+        return SimpleNamespace(
+            returncode=1,
+            stdout="stdout-line\n",
+            stderr="stderr-line\n",
+        )
+
+    monkeypatch.setattr(pack_module, "_uv_module_available", lambda: False)
+    monkeypatch.setattr(pack_module.subprocess, "run", fake_run)
+
+    with pytest.raises(PackageError) as exc_info:
+        pack_module._install_declared_dependencies(
+            {"runtime": {"dependencies": {"packages": ["demo==1.0.0"]}}},
+        )
+
+    message = str(exc_info.value)
+    assert "Dependency installation failed with exit code 1" in message
+    assert "stdout-line" in message
+    assert "stderr-line" in message
+
+
+def test_install_declared_dependencies_managed_runtime_uses_uv_without_pip(
+    monkeypatch,
+) -> None:
+    calls = []
+
+    def fake_run(args, **kwargs):
+        calls.append((args, kwargs))
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(pack_module.sys, "executable", "/runtime/python")
+    monkeypatch.setattr(pack_module, "_uv_module_available", lambda: True)
+    monkeypatch.setattr(pack_module.subprocess, "run", fake_run)
+
+    pack_module._install_declared_dependencies(
+        {"runtime": {"dependencies": {"packages": ["demo==1.0.0"]}}},
+    )
+
+    assert calls[0][0] == [
+        "/runtime/python",
+        "-m",
+        "uv",
+        "pip",
+        "install",
+        "--python",
+        "/runtime/python",
+        "demo==1.0.0",
+    ]
 
 
 def test_install_declared_dependencies_streams_output(monkeypatch) -> None:
@@ -972,6 +1083,7 @@ def test_install_declared_dependencies_streams_output(monkeypatch) -> None:
         return FakeProcess()
 
     lines: list[str] = []
+    monkeypatch.setattr(pack_module, "_uv_module_available", lambda: True)
     monkeypatch.setattr(pack_module.subprocess, "Popen", fake_popen)
 
     pack_module._install_declared_dependencies(
@@ -979,7 +1091,16 @@ def test_install_declared_dependencies_streams_output(monkeypatch) -> None:
         dependency_logger=lines.append,
     )
 
-    assert calls[0][0][2:] == ["pip", "install", "demo==1.0.0"]
+    assert calls[0][0] == [
+        pack_module.sys.executable,
+        "-m",
+        "uv",
+        "pip",
+        "install",
+        "--python",
+        pack_module.sys.executable,
+        "demo==1.0.0",
+    ]
     assert calls[0][1]["stderr"] is pack_module.subprocess.STDOUT
     assert lines == [
         "Installing dependencies: demo==1.0.0",
@@ -1001,6 +1122,7 @@ def test_install_declared_dependencies_streaming_failure_includes_tail(
     monkeypatch.setattr(
         pack_module.subprocess, "Popen", lambda *_args, **_kwargs: FakeProcess()
     )
+    monkeypatch.setattr(pack_module, "_uv_module_available", lambda: True)
     lines: list[str] = []
 
     with pytest.raises(PackageError) as exc_info:
@@ -1017,23 +1139,25 @@ def test_install_declared_dependencies_streaming_failure_includes_tail(
 
 
 def test_validate_lab_manifest_accepts_supported_python_version() -> None:
-    pack_module._validate_lab_manifest(
-        {
-            "models": [{"alias": "a", "path": "models/a"}],
-            "wiring": [],
-            "runtime": {"communication_step": 0.1, "python_version": "3.11"},
-        }
-    )
+    for version in ("3.10", "3.11", "3.12", "3.13", "3.14"):
+        pack_module._validate_lab_manifest(
+            {
+                "models": [{"alias": "a", "path": "models/a"}],
+                "wiring": [],
+                "runtime": {"communication_step": 0.1, "python_version": version},
+            }
+        )
 
 
-def test_validate_lab_manifest_allows_unsupported_python_version() -> None:
-    pack_module._validate_lab_manifest(
-        {
-            "models": [{"alias": "a", "path": "models/a"}],
-            "wiring": [],
-            "runtime": {"communication_step": 0.1, "python_version": "3.13"},
-        }
-    )
+def test_validate_lab_manifest_rejects_unsupported_python_version() -> None:
+    with pytest.raises(PackageError, match="runtime.python_version"):
+        pack_module._validate_lab_manifest(
+            {
+                "models": [{"alias": "a", "path": "models/a"}],
+                "wiring": [],
+                "runtime": {"communication_step": 0.1, "python_version": "3.15"},
+            }
+        )
 
 
 def test_validate_lab_manifest_rejects_invalid_python_version_type() -> None:
@@ -1050,37 +1174,6 @@ def test_validate_lab_manifest_rejects_invalid_python_version_type() -> None:
         )
 
 
-def test_validate_lab_source_warns_on_unsupported_python_version(tmp_path: Path) -> None:
-    lab_dir = _write_lab(tmp_path / "unsupported-version-lab")
-    manifest_path = lab_dir / "lab.yaml"
-    manifest = pack_module._safe_yaml_load(manifest_path.read_bytes())
-    manifest["runtime"]["python_version"] = "3.13"
-    manifest_path.write_bytes(pack_module._safe_yaml_dump(manifest))
-
-    result = validate_lab_source(lab_dir)
-
-    assert result.valid
-    assert any("runtime.python_version '3.13'" in warning for warning in result.warnings)
-
-
-def test_validate_package_warns_on_unsupported_python_version(tmp_path: Path) -> None:
-    lab_dir = _write_lab(tmp_path / "unsupported-version-package")
-    manifest_path = lab_dir / "lab.yaml"
-    manifest = pack_module._safe_yaml_load(manifest_path.read_bytes())
-    manifest["runtime"]["python_version"] = "3.13"
-    manifest_path.write_bytes(pack_module._safe_yaml_dump(manifest))
-
-    package_path = build_package(
-        lab_dir,
-        package_name="local/unsupported-version-package",
-        version="1.0.0",
-    )
-    result = validate_package(package_path)
-
-    assert result.valid
-    assert any("runtime.python_version '3.13'" in warning for warning in result.warnings)
-
-
 def test_validate_lab_manifest_keeps_missing_python_version_optional() -> None:
     pack_module._validate_lab_manifest(
         {
@@ -1091,12 +1184,12 @@ def test_validate_lab_manifest_keeps_missing_python_version_optional() -> None:
     )
 
 
-def test_lab_python_version_runtime_check_warns_on_interpreter_mismatch(
+def test_lab_python_version_runtime_check_reports_interpreter_mismatch(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(pack_module.sys, "version_info", (9, 9, 0, "final", 0))
-    with pytest.warns(RuntimeWarning, match="declares Python 3.11"):
-        pack_module._warn_if_lab_python_version_mismatch(
+    with pytest.raises(PackageError, match="requires Python 3.11"):
+        pack_module._ensure_lab_python_version_matches_current(
             {"runtime": {"python_version": "3.11"}}
         )
 

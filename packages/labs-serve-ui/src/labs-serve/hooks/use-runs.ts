@@ -2,7 +2,7 @@ import * as React from "react";
 import { serveApi, type CreateRunBody } from "../api";
 import type { LocalRun, RunLogEntry, ServeResults } from "../types";
 
-const ACTIVE_RUN_STATUSES = new Set(["queued", "pending", "running"]);
+const ACTIVE_RUN_STATUSES = new Set(["queued", "pending", "running", "cancelling"]);
 
 export function isActive(run: LocalRun | null | undefined): boolean {
   return Boolean(run && ACTIVE_RUN_STATUSES.has(run.status));
@@ -12,6 +12,7 @@ export type RunsState = {
   runs: LocalRun[];
   selectedRunId: string | null;
   selectedRun: LocalRun | null;
+  activeRun: LocalRun | null;
   results: ServeResults | null;
   logs: RunLogEntry[];
   busy: boolean;
@@ -72,13 +73,18 @@ export function useRuns(): RunsState {
     void refresh();
   }, [refresh]);
 
+  const activeRun = React.useMemo(
+    () => runs.find((run) => isActive(run)) ?? (isActive(selectedRun) ? selectedRun : null),
+    [runs, selectedRun],
+  );
+
   React.useEffect(() => {
-    const interval = isActive(selectedRun) ? 1250 : 3500;
+    const interval = activeRun ? 1250 : 3500;
     const timer = window.setInterval(() => {
       void refresh().catch(() => undefined);
     }, interval);
     return () => window.clearInterval(timer);
-  }, [refresh, selectedRun]);
+  }, [activeRun, refresh]);
 
   const startRun = React.useCallback(
     async (body: CreateRunBody = {}) => {
@@ -87,6 +93,9 @@ export function useRuns(): RunsState {
         const { run } = await serveApi.createRun(body);
         await refresh(run.id);
         return run;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+        throw err;
       } finally {
         setBusy(false);
       }
@@ -95,20 +104,24 @@ export function useRuns(): RunsState {
   );
 
   const cancelRun = React.useCallback(async () => {
-    if (!selectedRun || !isActive(selectedRun)) return;
+    if (!activeRun) return;
     setBusy(true);
     try {
-      await serveApi.cancel(selectedRun.id);
-      await refresh(selectedRun.id);
+      await serveApi.cancel(activeRun.id);
+      await refresh(activeRun.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      throw err;
     } finally {
       setBusy(false);
     }
-  }, [refresh, selectedRun]);
+  }, [activeRun, refresh]);
 
   return {
     runs,
     selectedRunId,
     selectedRun,
+    activeRun,
     results,
     logs,
     busy,

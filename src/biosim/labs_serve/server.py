@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
+import os
+import signal
 import shutil
 import socket
+import subprocess
 import sys
 import tempfile
 import threading
@@ -14,6 +18,7 @@ from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterator, Mapping
+from urllib.parse import quote
 
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
@@ -33,7 +38,7 @@ from biosim.workspace import save_lab as workspace_save_lab
 from biosim.world import WorldEvent
 
 
-ACTIVE_STATUSES = {"queued", "pending", "running"}
+ACTIVE_STATUSES = {"queued", "pending", "running", "cancelling"}
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 
@@ -84,6 +89,83 @@ class _RunOutputBridge:
 
     def isatty(self) -> bool:
         return bool(getattr(self._stream, "isatty", lambda: False)())
+
+
+class RunCancelled(Exception):
+    """Raised internally when a local run is cancelled."""
+
+
+class RunConflictError(PackageError):
+    """Raised when a new local run conflicts with an active run."""
+
+
+def _terminate_process_tree(process: subprocess.Popen[Any], *, grace_seconds: float = 2.0) -> None:
+    if process.poll() is not None:
+        return
+    if os.name == "posix":
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            return
+        except Exception:
+            process.terminate()
+    else:
+        process.terminate()
+
+    deadline = time.monotonic() + grace_seconds
+    while process.poll() is None and time.monotonic() < deadline:
+        time.sleep(0.05)
+
+    if process.poll() is not None:
+        return
+    if os.name == "posix":
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            return
+        except Exception:
+            process.kill()
+    else:
+        process.kill()
+
+
+class _RunCancellationController:
+    def __init__(self) -> None:
+        self._lock = threading.RLock()
+        self._cancel_requested = False
+        self._processes: set[subprocess.Popen[Any]] = set()
+
+    @property
+    def cancel_requested(self) -> bool:
+        with self._lock:
+            return self._cancel_requested
+
+    def check_cancelled(self) -> None:
+        if self.cancel_requested:
+            raise RunCancelled()
+
+    def request_cancel(self) -> None:
+        with self._lock:
+            self._cancel_requested = True
+            processes = list(self._processes)
+        for process in processes:
+            _terminate_process_tree(process)
+
+    @contextmanager
+    def track_process(self, process: subprocess.Popen[Any]) -> Iterator[None]:
+        terminate_now = False
+        with self._lock:
+            if self._cancel_requested:
+                terminate_now = True
+            else:
+                self._processes.add(process)
+        if terminate_now:
+            _terminate_process_tree(process)
+        try:
+            yield
+        finally:
+            with self._lock:
+                self._processes.discard(process)
 
 
 async def _request_object(request: Request) -> dict[str, Any] | JSONResponse:
@@ -432,7 +514,57 @@ def _apply_run_overrides(
                     entry["parameters"] = dict(overlay)
 
 
-def _sanitize_visuals(visuals: Any) -> list[dict[str, Any]]:
+def _artifact_id_for_path(path: Path) -> str:
+    return hashlib.sha1(str(path).encode("utf-8")).hexdigest()
+
+
+def _artifact_url(run_id: str, artifact_id: str) -> str:
+    return f"/api/runs/{quote(run_id, safe='')}/artifacts/{quote(artifact_id, safe='')}"
+
+
+def _coerce_artifact_path(value: Any) -> Path | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        return Path(value).expanduser().resolve()
+    except (OSError, RuntimeError):
+        return None
+
+
+def _rewrite_structure_artifact_source(
+    data: dict[str, Any],
+    *,
+    run_id: str | None,
+    artifacts: dict[str, Path] | None,
+) -> None:
+    source = data.get("source")
+    if not isinstance(source, Mapping):
+        return
+    next_source = dict(source)
+    data["source"] = next_source
+    if isinstance(next_source.get("url"), str) and str(next_source.get("url")).strip():
+        return
+    path = _coerce_artifact_path(next_source.get("path"))
+    if path is None:
+        return
+    artifact_id = next_source.get("artifact_id")
+    if not isinstance(artifact_id, str) or not artifact_id.strip():
+        artifact_id = _artifact_id_for_path(path)
+    artifact_id = artifact_id.strip()
+    next_source["artifact_id"] = artifact_id
+    next_source["path"] = str(path)
+    if run_id is None or artifacts is None or not path.is_file():
+        return
+    artifacts[artifact_id] = path
+    next_source["url"] = _artifact_url(run_id, artifact_id)
+
+
+def _sanitize_visuals(
+    visuals: Any,
+    *,
+    run_id: str | None = None,
+    artifacts: dict[str, Path] | None = None,
+) -> list[dict[str, Any]]:
     if not isinstance(visuals, list):
         return []
     sanitized: list[dict[str, Any]] = []
@@ -442,10 +574,105 @@ def _sanitize_visuals(visuals: Any) -> list[dict[str, Any]]:
         next_entry = {"module": entry.get("module"), "visuals": []}
         for visual in entry.get("visuals") or []:
             if isinstance(visual, Mapping):
-                next_entry["visuals"].append(dict(visual))
+                next_visual = dict(visual)
+                data = next_visual.get("data")
+                if isinstance(data, Mapping):
+                    next_data = dict(data)
+                    next_visual["data"] = next_data
+                    render = next_visual.get("render")
+                    if isinstance(render, str) and render.lower() == "structure3d":
+                        _rewrite_structure_artifact_source(
+                            next_data,
+                            run_id=run_id,
+                            artifacts=artifacts,
+                        )
+                next_entry["visuals"].append(next_visual)
         if next_entry["visuals"]:
             sanitized.append(next_entry)
     return sanitized
+
+
+RUN_STORE_SCHEMA_VERSION = 1
+RUN_INTERRUPTED_MESSAGE = "Run interrupted because labs serve stopped before completion."
+
+
+def _write_json_atomic(path: Path, payload: Mapping[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    temp_path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    os.replace(temp_path, path)
+
+
+def _safe_artifact_filename(
+    artifact_id: str,
+    source_name: str,
+    used_names: set[str],
+) -> str:
+    stem = "".join(
+        char if char.isalnum() or char in "._-" else "-"
+        for char in artifact_id.strip()
+    ).strip("._-")
+    if not stem:
+        stem = hashlib.sha1(artifact_id.encode("utf-8")).hexdigest()[:12]
+    suffix = Path(source_name).suffix
+    candidate = f"{stem[:96]}{suffix}" if suffix and not stem.endswith(suffix) else stem[:96]
+    if not candidate:
+        candidate = "artifact"
+    name = candidate
+    counter = 2
+    while name in used_names:
+        base = Path(candidate).stem
+        ext = Path(candidate).suffix
+        name = f"{base}-{counter}{ext}"
+        counter += 1
+    used_names.add(name)
+    return name
+
+
+def _rewrite_result_artifact_sources(
+    results: dict[str, Any],
+    *,
+    run_id: str,
+    artifacts: Mapping[str, Path],
+) -> None:
+    visuals = results.get("visuals")
+    if not isinstance(visuals, list):
+        return
+    for module in visuals:
+        if not isinstance(module, Mapping):
+            continue
+        module_visuals = module.get("visuals")
+        if not isinstance(module_visuals, list):
+            continue
+        for visual in module_visuals:
+            if not isinstance(visual, dict):
+                continue
+            render = visual.get("render")
+            if not isinstance(render, str) or render.lower() != "structure3d":
+                continue
+            data = visual.get("data")
+            if not isinstance(data, dict):
+                continue
+            source = data.get("source")
+            if not isinstance(source, dict):
+                continue
+            artifact_id = source.get("artifact_id")
+            if not isinstance(artifact_id, str):
+                continue
+            path = artifacts.get(artifact_id)
+            if path is None:
+                continue
+            source["path"] = str(path)
+            source["url"] = _artifact_url(run_id, artifact_id)
+
+
+def _copytree_ignore_run_history(src: str, names: list[str]) -> set[str]:
+    if Path(src).name == ".biosimulant" and "runs" in names:
+        return {"runs"}
+    return set()
 
 
 @dataclass
@@ -467,9 +694,11 @@ class RunRecord:
     created_at: str = field(default_factory=_now)
     results: dict[str, Any] = field(default_factory=dict)
     logs: list[dict[str, Any]] = field(default_factory=list)
+    artifacts: dict[str, Path] = field(default_factory=dict)
     seq: int = 0
     world: Any = None
     cancel_requested: bool = False
+    cancellation: _RunCancellationController = field(default_factory=_RunCancellationController)
     thread: threading.Thread | None = None
     last_progress_log_at: float = 0.0
     last_progress_log_pct: float = -10.0
@@ -509,13 +738,210 @@ class RunRecord:
         )
 
 
+class _LocalRunStore:
+    def __init__(self, lab_path: Path) -> None:
+        self.root = lab_path / ".biosimulant" / "runs"
+
+    def load_runs(self) -> dict[str, RunRecord]:
+        if not self.root.is_dir():
+            return {}
+        runs: dict[str, RunRecord] = {}
+        for run_dir in sorted(self.root.iterdir()):
+            if not run_dir.is_dir():
+                continue
+            try:
+                run, interrupted = self._load_run_dir(run_dir)
+            except Exception:
+                continue
+            runs[run.id] = run
+            if interrupted:
+                self.save_run(run)
+                self.replace_logs(run)
+        return runs
+
+    def save_run(self, run: RunRecord) -> None:
+        run_dir = self._run_dir(run.id)
+        payload = {
+            "schema_version": RUN_STORE_SCHEMA_VERSION,
+            "run": run.to_dict(),
+            "artifacts": self._artifact_manifest(run, run_dir),
+        }
+        _write_json_atomic(run_dir / "run.json", payload)
+
+    def save_results(self, run: RunRecord) -> None:
+        _write_json_atomic(self._run_dir(run.id) / "results.json", run.results)
+
+    def append_log(self, run: RunRecord, entry: Mapping[str, Any]) -> None:
+        run_dir = self._run_dir(run.id)
+        run_dir.mkdir(parents=True, exist_ok=True)
+        with (run_dir / "logs.jsonl").open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(dict(entry), sort_keys=True) + "\n")
+
+    def replace_logs(self, run: RunRecord) -> None:
+        run_dir = self._run_dir(run.id)
+        run_dir.mkdir(parents=True, exist_ok=True)
+        path = run_dir / "logs.jsonl"
+        temp_path = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+        with temp_path.open("w", encoding="utf-8") as handle:
+            for entry in run.logs:
+                handle.write(json.dumps(dict(entry), sort_keys=True) + "\n")
+        os.replace(temp_path, path)
+
+    def persist_artifacts(
+        self,
+        run_id: str,
+        artifacts: Mapping[str, Path],
+        results: dict[str, Any],
+    ) -> dict[str, Path]:
+        run_dir = self._run_dir(run_id)
+        artifact_dir = run_dir / "artifacts"
+        used_names: set[str] = set()
+        durable: dict[str, Path] = {}
+        for artifact_id, source in artifacts.items():
+            if not isinstance(artifact_id, str) or not artifact_id.strip():
+                continue
+            source_path = source.expanduser().resolve()
+            if not source_path.is_file():
+                continue
+            artifact_dir.mkdir(parents=True, exist_ok=True)
+            filename = _safe_artifact_filename(
+                artifact_id,
+                source_path.name,
+                used_names,
+            )
+            destination = (artifact_dir / filename).resolve()
+            if source_path != destination:
+                shutil.copy2(source_path, destination)
+            durable[artifact_id] = destination
+        _rewrite_result_artifact_sources(results, run_id=run_id, artifacts=durable)
+        return durable
+
+    def _load_run_dir(self, run_dir: Path) -> tuple[RunRecord, bool]:
+        payload = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
+        if not isinstance(payload, Mapping):
+            raise ValueError("run.json must contain an object")
+        raw_run = payload.get("run") if isinstance(payload.get("run"), Mapping) else payload
+        if not isinstance(raw_run, Mapping):
+            raise ValueError("run record must contain an object")
+        run_id = str(raw_run.get("id") or run_dir.name)
+        if run_id != run_dir.name:
+            run_id = run_dir.name
+        lab_id = raw_run.get("lab_id")
+        run = RunRecord(
+            id=run_id,
+            lab_id=str(lab_id) if lab_id is not None else "",
+            parameters=(
+                dict(raw_run.get("parameters"))
+                if isinstance(raw_run.get("parameters"), Mapping)
+                else None
+            ),
+            simulation_config=(
+                dict(raw_run.get("simulation_config"))
+                if isinstance(raw_run.get("simulation_config"), Mapping)
+                else None
+            ),
+        )
+        self._apply_run_metadata(run, raw_run)
+        run.results = self._load_results(run_dir)
+        run.logs = self._load_logs(run_dir)
+        run.seq = max((int(entry.get("seq", 0)) for entry in run.logs), default=0)
+        run.artifacts = self._load_artifacts(run_dir, payload.get("artifacts"))
+        interrupted = run.status in ACTIVE_STATUSES
+        if interrupted:
+            run.status = "interrupted"
+            run.error_message = RUN_INTERRUPTED_MESSAGE
+            run.completed_at = run.completed_at or _now()
+            run.add_log("warning", RUN_INTERRUPTED_MESSAGE, source="runtime")
+        return run, interrupted
+
+    def _apply_run_metadata(self, run: RunRecord, raw_run: Mapping[str, Any]) -> None:
+        status = raw_run.get("status")
+        if isinstance(status, str) and status.strip():
+            run.status = status.strip()
+        execution_target = raw_run.get("execution_target")
+        if execution_target in {"local", "remote"}:
+            run.execution_target = str(execution_target)
+        for field_name in (
+            "hub_run_id",
+            "results_summary",
+            "results_path",
+            "error_message",
+            "duration_seconds",
+            "progress",
+            "started_at",
+            "completed_at",
+            "created_at",
+        ):
+            value = raw_run.get(field_name)
+            if field_name == "created_at" and not isinstance(value, str):
+                continue
+            setattr(run, field_name, value)
+
+    def _load_results(self, run_dir: Path) -> dict[str, Any]:
+        path = run_dir / "results.json"
+        if not path.is_file():
+            return {}
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        return dict(payload) if isinstance(payload, Mapping) else {}
+
+    def _load_logs(self, run_dir: Path) -> list[dict[str, Any]]:
+        path = run_dir / "logs.jsonl"
+        if not path.is_file():
+            return []
+        logs: list[dict[str, Any]] = []
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            payload = json.loads(line)
+            if isinstance(payload, Mapping):
+                logs.append(dict(payload))
+        return logs
+
+    def _load_artifacts(self, run_dir: Path, raw_artifacts: Any) -> dict[str, Path]:
+        if not isinstance(raw_artifacts, Mapping):
+            return {}
+        artifacts: dict[str, Path] = {}
+        for artifact_id, entry in raw_artifacts.items():
+            if not isinstance(artifact_id, str):
+                continue
+            raw_path: Any
+            if isinstance(entry, Mapping):
+                raw_path = entry.get("path")
+            else:
+                raw_path = entry
+            if not isinstance(raw_path, str) or not raw_path.strip():
+                continue
+            path = Path(raw_path)
+            if not path.is_absolute():
+                path = run_dir / path
+            artifacts[artifact_id] = path.expanduser().resolve()
+        return artifacts
+
+    def _artifact_manifest(self, run: RunRecord, run_dir: Path) -> dict[str, dict[str, str]]:
+        artifacts: dict[str, dict[str, str]] = {}
+        for artifact_id, path in run.artifacts.items():
+            if not isinstance(artifact_id, str):
+                continue
+            resolved = path.expanduser().resolve()
+            try:
+                stored_path = resolved.relative_to(run_dir).as_posix()
+            except ValueError:
+                stored_path = str(resolved)
+            artifacts[artifact_id] = {"path": stored_path}
+        return artifacts
+
+    def _run_dir(self, run_id: str) -> Path:
+        return self.root / run_id
+
+
 class LabServeSession:
     def __init__(self, lab_path: Path, *, install_deps: bool = True) -> None:
         self.lab_path = lab_path.expanduser().resolve()
         self.install_deps = install_deps
         self._lock = threading.RLock()
         self._runtime_prepare_lock = threading.Lock()
-        self._runs: dict[str, RunRecord] = {}
+        self._run_store = _LocalRunStore(self.lab_path)
+        self._runs: dict[str, RunRecord] = self._run_store.load_runs()
         self._runtime_port_payloads: dict[str, dict[str, list[dict[str, Any]]]] | None = None
         self._runtime_metadata_status = "pending"
         self._runtime_metadata_error: str | None = None
@@ -632,9 +1058,26 @@ class LabServeSession:
         echo_terminal: bool = False,
     ) -> None:
         with self._lock:
-            run.add_log(level, message, source=source)
+            self._append_run_log_locked(run, level, message, source=source)
         if echo_terminal:
             print(f"[{run.id}] {source}: {message}", flush=True)
+
+    def _append_run_log_locked(
+        self,
+        run: RunRecord,
+        level: str,
+        message: str,
+        *,
+        source: str = "biosimulant",
+    ) -> None:
+        run.add_log(level, message, source=source)
+        self._run_store.append_log(run, run.logs[-1])
+
+    def _persist_run_locked(self, run: RunRecord) -> None:
+        self._run_store.save_run(run)
+
+    def _persist_run_results_locked(self, run: RunRecord) -> None:
+        self._run_store.save_results(run)
 
     def _record_runtime_output_line(self, run: RunRecord, line: str) -> None:
         line = line.strip()
@@ -730,7 +1173,30 @@ class LabServeSession:
             except KeyError as exc:
                 raise PackageError(f"Run not found: {run_id}") from exc
 
+    def get_run_artifact(self, run_id: str, artifact_id: str) -> Path:
+        run = self.get_run(run_id)
+        with self._lock:
+            path = run.artifacts.get(artifact_id)
+        if path is None:
+            raise PackageError(f"Artifact not found for run {run_id}: {artifact_id}")
+        resolved = path.expanduser().resolve()
+        if not resolved.is_file():
+            raise PackageError(f"Artifact file is no longer available: {artifact_id}")
+        return resolved
+
+    def _active_run_locked(self) -> RunRecord | None:
+        for run in sorted(self._runs.values(), key=lambda item: item.created_at):
+            if run.status in ACTIVE_STATUSES:
+                return run
+        return None
+
     def create_run(self, body: Mapping[str, Any]) -> RunRecord:
+        with self._lock:
+            active = self._active_run_locked()
+            if active is not None:
+                raise RunConflictError(
+                    f"Run {active.id} is already {active.status}; cancel or wait for it before starting another local run."
+                )
         lab = self.lab_payload()
         run = RunRecord(
             id=f"run-{uuid.uuid4().hex[:12]}",
@@ -739,7 +1205,13 @@ class LabServeSession:
             simulation_config=dict(body.get("simulation_config")) if isinstance(body.get("simulation_config"), Mapping) else None,
         )
         with self._lock:
+            active = self._active_run_locked()
+            if active is not None:
+                raise RunConflictError(
+                    f"Run {active.id} is already {active.status}; cancel or wait for it before starting another local run."
+                )
             self._runs[run.id] = run
+            self._persist_run_locked(run)
         thread = threading.Thread(target=self._run_worker, args=(run,), daemon=True)
         run.thread = thread
         thread.start()
@@ -748,18 +1220,22 @@ class LabServeSession:
     def cancel_run(self, run_id: str) -> RunRecord:
         run = self.get_run(run_id)
         with self._lock:
-            run.cancel_requested = True
             if run.status not in ACTIVE_STATUSES:
                 return run
-            run.status = "cancelled"
-            run.completed_at = run.completed_at or _now()
-            run.add_log("info", "Cancellation requested")
+            already_requested = run.cancel_requested
+            run.cancel_requested = True
+            run.status = "cancelling"
+            if not already_requested:
+                self._append_run_log_locked(run, "info", "Cancellation requested")
+            self._persist_run_locked(run)
             world = run.world
+            cancellation = run.cancellation
         if world is not None:
             try:
                 world.request_stop()
             except Exception:
                 pass
+        cancellation.request_cancel()
         return run
 
     def update_model(self, alias: str, body: Mapping[str, Any]) -> dict[str, Any]:
@@ -833,8 +1309,9 @@ class LabServeSession:
     def _run_worker(self, run: RunRecord) -> None:
         started = time.time()
         with self._lock:
-            run.status = "running"
+            run.status = "cancelling" if run.cancel_requested else "running"
             run.started_at = _now()
+            self._persist_run_locked(run)
         self._log_run(run, "info", "Run started", echo_terminal=True)
         try:
             result = self._execute_run(run)
@@ -853,13 +1330,21 @@ class LabServeSession:
                 run.duration_seconds = finished - started
                 run.completed_at = _now()
                 run.world = None
+                self._persist_run_results_locked(run)
+                self._persist_run_locked(run)
             self._log_run(
                 run,
                 completion_log[0],
                 completion_log[1],
                 echo_terminal=True,
             )
+        except RunCancelled:
+            self._finalize_cancelled_run(run, started)
         except Exception as exc:
+            if run.cancel_requested:
+                run.cancellation.request_cancel()
+                self._finalize_cancelled_run(run, started)
+                return
             finished = time.time()
             with self._lock:
                 run.status = "failed"
@@ -867,12 +1352,25 @@ class LabServeSession:
                 run.duration_seconds = finished - started
                 run.completed_at = _now()
                 run.world = None
+                self._persist_run_locked(run)
             self._log_run(run, "error", str(exc), source="runtime", echo_terminal=True)
 
+    def _finalize_cancelled_run(self, run: RunRecord, started: float) -> None:
+        finished = time.time()
+        with self._lock:
+            run.status = "cancelled"
+            run.duration_seconds = finished - started
+            run.completed_at = _now()
+            run.world = None
+            run.error_message = None
+            self._persist_run_locked(run)
+        self._log_run(run, "info", "Run cancelled", echo_terminal=True)
+
     def _execute_run(self, run: RunRecord) -> dict[str, Any]:
+        run.cancellation.check_cancelled()
         with tempfile.TemporaryDirectory(prefix="biosim-serve-run-") as temp_dir:
             source = Path(temp_dir) / "lab"
-            shutil.copytree(self.lab_path, source)
+            shutil.copytree(self.lab_path, source, ignore=_copytree_ignore_run_history)
             manifest = _load_lab_manifest(source)
             _apply_run_overrides(
                 manifest,
@@ -900,8 +1398,11 @@ class LabServeSession:
                         source="runtime",
                         echo_terminal=True,
                     )
-                    self._runtime_prepare_lock.acquire()
+                    while not lock_acquired:
+                        run.cancellation.check_cancelled()
+                        lock_acquired = self._runtime_prepare_lock.acquire(timeout=0.1)
                 try:
+                    run.cancellation.check_cancelled()
                     prepared = prepare_lab_package(
                         package_file,
                         install_deps=self.install_deps,
@@ -913,9 +1414,13 @@ class LabServeSession:
                             source="pip",
                             echo_terminal=True,
                         ),
+                        dependency_process_tracker=run.cancellation.track_process,
+                        cancel_checker=run.cancellation.check_cancelled,
                     )
                 finally:
-                    self._runtime_prepare_lock.release()
+                    if lock_acquired:
+                        self._runtime_prepare_lock.release()
+                run.cancellation.check_cancelled()
                 self._log_run(
                     run,
                     "info",
@@ -948,11 +1453,13 @@ class LabServeSession:
                             if should_log:
                                 run.last_progress_log_at = now
                                 run.last_progress_log_pct = pct
-                                run.add_log(
+                                self._append_run_log_locked(
+                                    run,
                                     "info",
                                     f"simulation window progress ({pct:.1f}%)",
                                     source="world",
                                 )
+                                self._persist_run_locked(run)
                         return
                     with self._lock:
                         if event == WorldEvent.STARTED:
@@ -970,7 +1477,8 @@ class LabServeSession:
                             message = "simulation window started"
                         elif event == WorldEvent.FINISHED:
                             message = "simulation window complete"
-                        run.add_log("info", message, source="world")
+                        self._append_run_log_locked(run, "info", message, source="world")
+                        self._persist_run_locked(run)
 
                 world.on(listener)
                 with self._lock:
@@ -983,8 +1491,10 @@ class LabServeSession:
                     echo_terminal=True,
                 )
                 try:
+                    run.cancellation.check_cancelled()
                     with self._capture_run_output(run):
                         world.run(duration=prepared.duration)
+                    run.cancellation.check_cancelled()
                     if prepared.settle_steps:
                         self._log_run(
                             run,
@@ -995,6 +1505,7 @@ class LabServeSession:
                         )
                         with self._capture_run_output(run):
                             world.settle(prepared.settle_steps)
+                        run.cancellation.check_cancelled()
                         self._log_run(
                             run,
                             "info",
@@ -1009,21 +1520,40 @@ class LabServeSession:
                         source="runtime",
                         echo_terminal=True,
                     )
+                    run.cancellation.check_cancelled()
+                    artifacts: dict[str, Path] = {}
                     with self._capture_run_output(run):
-                        visuals = _sanitize_visuals(world.collect_visuals())
-                    return {
+                        visuals = _sanitize_visuals(
+                            world.collect_visuals(),
+                            run_id=run.id,
+                            artifacts=artifacts,
+                        )
+                    result = {
                         "visuals": visuals,
                         "duration": prepared.duration,
                         "communication_step": prepared.communication_step,
                         "settle_steps": prepared.settle_steps,
                         "modules": prepared.modules,
                     }
+                    durable_artifacts = self._run_store.persist_artifacts(
+                        run.id,
+                        artifacts,
+                        result,
+                    )
+                    with self._lock:
+                        run.artifacts = durable_artifacts
+                    run.cancellation.check_cancelled()
+                    return result
                 finally:
                     world.off(listener)
 
 
 def create_app(session: LabServeSession) -> FastAPI:
     app = FastAPI(title="Biosimulant Labs Serve")
+
+    @app.exception_handler(RunConflictError)
+    async def run_conflict_handler(_request: Request, exc: RunConflictError) -> JSONResponse:
+        return _api_error(str(exc), status_code=409)
 
     @app.exception_handler(PackageError)
     async def package_error_handler(_request: Request, exc: PackageError) -> JSONResponse:
@@ -1076,6 +1606,11 @@ def create_app(session: LabServeSession) -> FastAPI:
     @app.get("/api/runs/{run_id}/results")
     def get_run_results(run_id: str) -> JSONResponse:
         return _api_ok({"results": session.get_run(run_id).results})
+
+    @app.get("/api/runs/{run_id}/artifacts/{artifact_id}")
+    def get_run_artifact(run_id: str, artifact_id: str) -> FileResponse:
+        path = session.get_run_artifact(run_id, artifact_id)
+        return FileResponse(path)
 
     @app.get("/api/runs/{run_id}/logs")
     def get_run_logs(run_id: str, since_seq: int | None = None) -> JSONResponse:

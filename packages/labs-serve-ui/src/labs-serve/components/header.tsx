@@ -15,7 +15,7 @@ import type { ThemeMode } from "../hooks/use-theme";
 
 export type HeaderProps = {
   lab: LocalLab | null;
-  selectedRun: LocalRun | null;
+  activeRun: LocalRun | null;
   busy: boolean;
   onToggleLeft: () => void;
   onToggleRight: () => void;
@@ -36,7 +36,7 @@ function nextTheme(current: ThemeMode): ThemeMode {
 export function Header(props: HeaderProps) {
   const {
     lab,
-    selectedRun,
+    activeRun,
     busy,
     onToggleLeft,
     onToggleRight,
@@ -48,7 +48,8 @@ export function Header(props: HeaderProps) {
     saved,
   } = props;
 
-  const running = isActive(selectedRun);
+  const running = isActive(activeRun);
+  const cancelling = activeRun?.status === "cancelling";
 
   return (
     <header className="command-bar">
@@ -70,9 +71,9 @@ export function Header(props: HeaderProps) {
       <div className="command-actions">
         <span className={`saved-indicator ${saved ? "ok" : "dirty"}`}>{saved ? "Saved" : "Unsaved"}</span>
         {running ? (
-          <button className="button danger" disabled={busy} onClick={onCancel}>
-            <CircleStop size={14} />
-            Cancel
+          <button className="button danger" disabled={busy || cancelling} onClick={onCancel}>
+            {cancelling ? <Loader2 size={14} className="spin" /> : <CircleStop size={14} />}
+            {cancelling ? "Cancelling" : "Cancel"}
           </button>
         ) : (
           <button className="button primary" disabled={busy} onClick={onRunClick}>

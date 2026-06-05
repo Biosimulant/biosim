@@ -1,5 +1,7 @@
 import * as React from "react";
 import { GitBranch, Maximize2 } from "lucide-react";
+import "molstar/build/viewer/molstar.css";
+import type { Viewer as MolstarViewerInstance } from "molstar/lib/apps/viewer/app";
 import type { RunModuleVisuals, RunVisualSpec } from "../types";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -66,15 +68,26 @@ export function VisualsPanel({ visuals }: { visuals: RunModuleVisuals[] }) {
 
 export function VisualRenderer({ visual, expanded = false }: { visual: RunVisualSpec; expanded?: boolean }) {
   const render = visual.render.toLowerCase();
-  if (render === "table") return <TableVisual data={visual.data} />;
-  if (render === "image") return <ImageVisual data={visual.data} />;
-  if (render === "timeseries" || render === "line") return <SeriesVisual data={visual.data} expanded={expanded} />;
-  if (render === "bar") return <BarVisual data={visual.data} />;
-  if (render === "scatter") return <ScatterVisual data={visual.data} />;
-  if (render === "heatmap") return <HeatmapVisual data={visual.data} />;
-  if (render === "graph") return <GraphVisual data={visual.data} />;
-  return <pre className="json-block compact">{compactJson(visual.data)}</pre>;
+  const renderer = VISUAL_RENDERERS[render];
+  if (renderer) return renderer({ data: visual.data, expanded });
+  return <UnsupportedVisual render={visual.render} data={visual.data} />;
 }
+
+type VisualRendererFn = (props: { data: Record<string, unknown>; expanded: boolean }) => React.ReactNode;
+
+const VISUAL_RENDERERS: Record<string, VisualRendererFn> = {
+  table: ({ data }) => <TableVisual data={data} />,
+  image: ({ data }) => <ImageVisual data={data} />,
+  timeseries: ({ data, expanded }) => <SeriesVisual data={data} expanded={expanded} />,
+  line: ({ data, expanded }) => <SeriesVisual data={data} expanded={expanded} />,
+  bar: ({ data }) => <BarVisual data={data} />,
+  scatter: ({ data }) => <ScatterVisual data={data} />,
+  heatmap: ({ data }) => <HeatmapVisual data={data} />,
+  graph: ({ data }) => <GraphVisual data={data} />,
+  text: ({ data }) => <TextVisual data={data} />,
+  json: ({ data }) => <JsonVisual data={data} />,
+  structure3d: ({ data, expanded }) => <Structure3DVisual data={data} expanded={expanded} />,
+};
 
 function TableVisual({ data }: { data: Record<string, unknown> }) {
   // Accept three row shapes: array-row (`["Metric A", 1.0]`), record-row (`{Metric: "A", Value: 1}`),
@@ -119,6 +132,24 @@ function ImageVisual({ data }: { data: Record<string, unknown> }) {
     typeof data.url === "string" ? data.url : typeof data.src === "string" ? data.src : undefined;
   if (!src) return <pre className="json-block compact">{compactJson(data)}</pre>;
   return <img className="image-visual" src={src} alt={typeof data.alt === "string" ? data.alt : "visual"} />;
+}
+
+function TextVisual({ data }: { data: Record<string, unknown> }) {
+  const text = typeof data.text === "string" ? data.text : typeof data.value === "string" ? data.value : compactJson(data);
+  return <div className="text-visual">{text}</div>;
+}
+
+function JsonVisual({ data }: { data: Record<string, unknown> }) {
+  return <pre className="json-block compact">{compactJson(data)}</pre>;
+}
+
+function UnsupportedVisual({ render, data }: { render: string; data: Record<string, unknown> }) {
+  return (
+    <div className="visual-fallback">
+      <strong>Unsupported renderer: {render}</strong>
+      <pre className="json-block compact">{compactJson(data)}</pre>
+    </div>
+  );
 }
 
 export function getSeries(data: Record<string, unknown>) {
@@ -286,6 +317,103 @@ function GraphVisual({ data }: { data: Record<string, unknown> }) {
   return (
     <div className="graph-summary">
       <GitBranch size={14} /> {nodes.length} nodes / {edges.length} edges
+    </div>
+  );
+}
+
+type StructureFormat = "pdb" | "mmcif";
+type MolstarFormat = Parameters<MolstarViewerInstance["loadStructureFromUrl"]>[1];
+
+function normalizeStructureFormat(value: unknown): StructureFormat | null {
+  if (typeof value !== "string") return null;
+  const format = value.trim().toLowerCase();
+  if (format === "pdb") return "pdb";
+  if (format === "mmcif" || format === "cif") return "mmcif";
+  return null;
+}
+
+function structureSourceUrl(data: Record<string, unknown>): string | null {
+  const source = data.source;
+  if (isRecord(source)) {
+    const url = typeof source.url === "string" ? source.url : typeof source.src === "string" ? source.src : null;
+    if (url && url.trim()) return url;
+  }
+  const url = typeof data.url === "string" ? data.url : typeof data.src === "string" ? data.src : null;
+  return url && url.trim() ? url : null;
+}
+
+function structureAnnotations(data: Record<string, unknown>) {
+  const annotations = Array.isArray(data.annotations) ? data.annotations : [];
+  return annotations.flatMap((entry) => {
+    if (!isRecord(entry)) return [];
+    const label = typeof entry.label === "string" ? entry.label : null;
+    if (!label) return [];
+    return [{ label, value: entry.value == null ? "-" : String(entry.value) }];
+  });
+}
+
+function Structure3DVisual({ data, expanded }: { data: Record<string, unknown>; expanded: boolean }) {
+  const containerRef = React.useRef<HTMLDivElement | null>(null);
+  const [state, setState] = React.useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [error, setError] = React.useState<string | null>(null);
+  const url = structureSourceUrl(data);
+  const format = normalizeStructureFormat(data.format);
+  const annotations = structureAnnotations(data);
+
+  React.useEffect(() => {
+    const element = containerRef.current;
+    if (!element || !url || !format) return;
+    let disposed = false;
+    let viewer: MolstarViewerInstance | null = null;
+    setState("loading");
+    setError(null);
+    import("molstar/lib/apps/viewer/app")
+      .then(async ({ Viewer }) => {
+        if (disposed) return;
+        viewer = await Viewer.create(element, {
+          layoutShowControls: expanded,
+          layoutShowSequence: expanded,
+          viewportShowExpand: false,
+          collapseLeftPanel: !expanded,
+        });
+        if (disposed) {
+          viewer.dispose();
+          return;
+        }
+        await viewer.loadStructureFromUrl(url, format as MolstarFormat, false, {
+          label: typeof data.title === "string" ? data.title : undefined,
+        });
+        if (!disposed) setState("ready");
+      })
+      .catch((exc: unknown) => {
+        if (disposed) return;
+        setState("error");
+        setError(exc instanceof Error ? exc.message : String(exc));
+      });
+    return () => {
+      disposed = true;
+      viewer?.dispose();
+    };
+  }, [data.title, expanded, format, url]);
+
+  if (!url) return <div className="visual-fallback">Structure artifact URL is missing.</div>;
+  if (!format) return <div className="visual-fallback">Unsupported structure format.</div>;
+
+  return (
+    <div className={`structure-visual ${expanded ? "expanded" : ""}`}>
+      <div ref={containerRef} className="structure-viewport" />
+      {state === "loading" || state === "idle" ? <div className="structure-overlay">Loading structure...</div> : null}
+      {state === "error" ? <div className="structure-overlay error">Could not load structure: {error}</div> : null}
+      {annotations.length ? (
+        <dl className="structure-annotations">
+          {annotations.map((annotation) => (
+            <React.Fragment key={annotation.label}>
+              <dt>{annotation.label}</dt>
+              <dd>{annotation.value}</dd>
+            </React.Fragment>
+          ))}
+        </dl>
+      ) : null}
     </div>
   );
 }

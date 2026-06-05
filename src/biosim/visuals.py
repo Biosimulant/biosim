@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple, TypedDict, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple, TypedDict, Union
 import json
 
 
@@ -18,6 +18,7 @@ class VisualSpec(TypedDict, total=False):
 
 
 Visuals = Union[VisualSpec, List[VisualSpec]]
+VisualCapability = Literal["3d-capable", "non-3d", "no-visuals", "conditional"]
 
 
 def validate_visual_spec(spec: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
@@ -70,3 +71,19 @@ def normalize_visuals(visuals: Visuals) -> List[VisualSpec]:
                 normed["description"] = v["description"]
             out.append(normed)  # type: ignore[arg-type]
     return out
+
+
+def classify_visual_capability(
+    visuals: Visuals | None,
+    *,
+    conditional_when_empty: bool = False,
+) -> VisualCapability:
+    """Classify a module or lab visual payload for renderer coverage audits."""
+    if not visuals:
+        return "conditional" if conditional_when_empty else "no-visuals"
+    normalized = normalize_visuals(visuals)
+    if not normalized:
+        return "no-visuals"
+    if any(visual["render"].lower() == "structure3d" for visual in normalized):
+        return "3d-capable"
+    return "non-3d"

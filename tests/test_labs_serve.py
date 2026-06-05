@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 import threading
 import time
@@ -18,6 +19,13 @@ from tests.test_pack import _write_lab
 def _client(lab: Path) -> tuple[TestClient, LabServeSession]:
     session = LabServeSession(lab, install_deps=False)
     return TestClient(create_app(session)), session
+
+
+def _mark_runtime_metadata_ready(session: LabServeSession) -> None:
+    with session._lock:
+        session._runtime_metadata_status = "ready"
+        session._runtime_metadata_error = None
+        session._runtime_port_payloads = {}
 
 
 class _RuntimeSpec:
@@ -315,6 +323,181 @@ def test_run_streams_structured_model_progress_to_run_logs(
     assert "BSIM_PROGRESS:" in terminal
 
 
+def test_cancel_while_waiting_for_runtime_prepare_lock_does_not_prepare(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    lab = _write_lab(tmp_path / "lab")
+    client, session = _client(lab)
+    _mark_runtime_metadata_ready(session)
+    calls = 0
+
+    def prepare(*_args, **_kwargs):
+        nonlocal calls
+        calls += 1
+        return _PreparedRuntime()
+
+    monkeypatch.setattr(server, "prepare_lab_package", prepare)
+    session._runtime_prepare_lock.acquire()
+    try:
+        created = client.post("/api/runs", json={}).json()
+        run = session.get_run(created["data"]["run"]["id"])
+        for _ in range(30):
+            if any(entry["message"] == "Waiting for existing runtime preparation..." for entry in run.logs):
+                break
+            time.sleep(0.05)
+
+        response = client.post(f"/api/runs/{run.id}/cancel")
+
+        assert response.status_code == 200
+        assert response.json()["data"]["run"]["status"] == "cancelling"
+        assert run.thread is not None
+        run.thread.join(timeout=2)
+        assert run.status == "cancelled"
+        assert calls == 0
+    finally:
+        session._runtime_prepare_lock.release()
+
+
+def test_create_run_rejects_overlapping_active_run_and_allows_later_run(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    lab = _write_lab(tmp_path / "lab")
+    client, session = _client(lab)
+    _mark_runtime_metadata_ready(session)
+    started = threading.Event()
+    release = threading.Event()
+
+    def prepare(*_args, **_kwargs):
+        started.set()
+        release.wait(timeout=5)
+        return _PreparedRuntime()
+
+    monkeypatch.setattr(server, "prepare_lab_package", prepare)
+    try:
+        first = client.post("/api/runs", json={})
+        assert first.status_code == 201
+        first_run = session.get_run(first.json()["data"]["run"]["id"])
+        assert started.wait(timeout=1)
+
+        second = client.post("/api/runs", json={})
+
+        assert second.status_code == 409
+        assert "already running" in second.json()["error"]["message"]
+
+        release.set()
+        assert first_run.thread is not None
+        first_run.thread.join(timeout=2)
+        assert first_run.status == "completed"
+
+        third = client.post("/api/runs", json={})
+        assert third.status_code == 201
+        third_run = session.get_run(third.json()["data"]["run"]["id"])
+        assert third_run.thread is not None
+        third_run.thread.join(timeout=2)
+        assert third_run.status == "completed"
+    finally:
+        release.set()
+
+
+def test_cancel_during_dependency_preparation_kills_tracked_process(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    lab = _write_lab(tmp_path / "lab")
+    session = LabServeSession(lab, install_deps=True)
+    _mark_runtime_metadata_ready(session)
+    client = TestClient(create_app(session))
+    started = threading.Event()
+    process_holder: dict[str, subprocess.Popen[str]] = {}
+
+    def prepare(*_args, **kwargs):
+        process = subprocess.Popen(
+            [sys.executable, "-c", "import time; time.sleep(30)"],
+            start_new_session=True,
+        )
+        process_holder["process"] = process
+        started.set()
+        with kwargs["dependency_process_tracker"](process):
+            while process.poll() is None:
+                kwargs["cancel_checker"]()
+                time.sleep(0.02)
+        kwargs["cancel_checker"]()
+        return _PreparedRuntime()
+
+    monkeypatch.setattr(server, "prepare_lab_package", prepare)
+
+    created = client.post("/api/runs", json={}).json()
+    run = session.get_run(created["data"]["run"]["id"])
+    assert started.wait(timeout=1)
+
+    first_cancel = client.post(f"/api/runs/{run.id}/cancel")
+    second_cancel = client.post(f"/api/runs/{run.id}/cancel")
+
+    assert first_cancel.status_code == 200
+    assert second_cancel.status_code == 200
+    assert run.thread is not None
+    run.thread.join(timeout=3)
+    process = process_holder["process"]
+    assert process.poll() is not None
+    assert run.status == "cancelled"
+    assert [entry["message"] for entry in run.logs].count("Cancellation requested") == 1
+
+
+def test_cancel_during_settle_kills_world_module_process(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    lab = _write_lab(tmp_path / "lab")
+    client, session = _client(lab)
+    _mark_runtime_metadata_ready(session)
+    started = threading.Event()
+
+    class BlockingSettleWorld(_RuntimeWorld):
+        def __init__(self) -> None:
+            super().__init__()
+            self.process: subprocess.Popen[str] | None = None
+
+        def settle(self, steps: int) -> None:
+            self.process = subprocess.Popen(
+                [sys.executable, "-c", "import time; time.sleep(30)"],
+                start_new_session=True,
+            )
+            started.set()
+            while self.process.poll() is None:
+                time.sleep(0.02)
+
+        def request_stop(self) -> None:
+            if self.process is not None:
+                server._terminate_process_tree(self.process)
+
+    class PreparedBlockingRuntime(_PreparedRuntime):
+        def __init__(self) -> None:
+            self.world = BlockingSettleWorld()
+            self.duration = 0.1
+            self.communication_step = 0.01
+            self.settle_steps = 1
+            self.modules = []
+
+    monkeypatch.setattr(
+        server,
+        "prepare_lab_package",
+        lambda *_args, **_kwargs: PreparedBlockingRuntime(),
+    )
+
+    created = client.post("/api/runs", json={}).json()
+    run = session.get_run(created["data"]["run"]["id"])
+    assert started.wait(timeout=1)
+
+    response = client.post(f"/api/runs/{run.id}/cancel")
+
+    assert response.status_code == 200
+    assert run.thread is not None
+    run.thread.join(timeout=3)
+    assert run.status == "cancelled"
+
+
 def test_serve_lab_disables_uvicorn_access_logs(tmp_path: Path, monkeypatch) -> None:
     lab = _write_lab(tmp_path / "lab")
     configs: list[dict[str, object]] = []
@@ -488,6 +671,177 @@ def test_run_overrides_preserve_dotted_alias_input_refs() -> None:
     }
 
 
+def test_run_history_is_empty_without_persisted_runs(tmp_path: Path) -> None:
+    client, _session = _client(_write_lab(tmp_path / "lab"))
+
+    response = client.get("/api/runs")
+
+    assert response.status_code == 200
+    assert response.json()["data"]["runs"] == []
+
+
+def test_completed_run_history_persists_across_session_restart(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    lab = _write_lab(tmp_path / "lab")
+    client, session = _client(lab)
+    _mark_runtime_metadata_ready(session)
+    monkeypatch.setattr(
+        server,
+        "prepare_lab_package",
+        lambda *_args, **_kwargs: _PreparedRuntime(),
+    )
+
+    created = client.post("/api/runs", json={}).json()
+    run_id = created["data"]["run"]["id"]
+    run = session.get_run(run_id)
+    assert run.thread is not None
+    run.thread.join(timeout=2)
+    assert run.status == "completed"
+
+    restarted = LabServeSession(lab, install_deps=False)
+    restarted_client = TestClient(create_app(restarted))
+
+    runs = restarted_client.get("/api/runs").json()["data"]["runs"]
+    assert [item["id"] for item in runs] == [run_id]
+    assert runs[0]["status"] == "completed"
+    results = restarted_client.get(f"/api/runs/{run_id}/results").json()
+    assert results["data"]["results"]["duration"] == 0.1
+    logs = restarted_client.get(f"/api/runs/{run_id}/logs").json()["data"]["logs"]
+    assert any(entry["message"] == "Run completed" for entry in logs)
+
+
+def test_failed_run_history_persists_across_session_restart(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    lab = _write_lab(tmp_path / "lab")
+    client, session = _client(lab)
+    _mark_runtime_metadata_ready(session)
+
+    def fail_prepare(*_args, **_kwargs):
+        raise RuntimeError("dependency setup failed")
+
+    monkeypatch.setattr(server, "prepare_lab_package", fail_prepare)
+
+    created = client.post("/api/runs", json={}).json()
+    run_id = created["data"]["run"]["id"]
+    run = session.get_run(run_id)
+    assert run.thread is not None
+    run.thread.join(timeout=2)
+    assert run.status == "failed"
+
+    restarted = LabServeSession(lab, install_deps=False)
+    restarted_client = TestClient(create_app(restarted))
+
+    payload = restarted_client.get(f"/api/runs/{run_id}").json()["data"]["run"]
+    assert payload["status"] == "failed"
+    assert payload["error_message"] == "dependency setup failed"
+    logs = restarted_client.get(f"/api/runs/{run_id}/logs").json()["data"]["logs"]
+    assert any(entry["message"] == "dependency setup failed" for entry in logs)
+
+
+def test_active_persisted_run_reloads_as_interrupted(tmp_path: Path) -> None:
+    lab = _write_lab(tmp_path / "lab")
+    session = LabServeSession(lab, install_deps=False)
+    run = RunRecord(id="run-active", lab_id="lab", parameters=None, simulation_config=None)
+    run.status = "running"
+    run.started_at = "2026-06-05T00:00:00Z"
+    run.add_log("info", "Run started")
+    session._run_store.save_run(run)
+    session._run_store.replace_logs(run)
+
+    restarted = LabServeSession(lab, install_deps=False)
+    restarted_client = TestClient(create_app(restarted))
+
+    payload = restarted_client.get("/api/runs/run-active").json()["data"]["run"]
+    assert payload["status"] == "interrupted"
+    assert payload["error_message"] == server.RUN_INTERRUPTED_MESSAGE
+    assert payload["completed_at"]
+    logs = restarted_client.get("/api/runs/run-active/logs").json()["data"]["logs"]
+    assert logs[-1]["message"] == server.RUN_INTERRUPTED_MESSAGE
+    stored = json.loads(
+        (lab / ".biosimulant" / "runs" / "run-active" / "run.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert stored["run"]["status"] == "interrupted"
+
+
+def test_malformed_persisted_run_history_is_ignored(tmp_path: Path) -> None:
+    lab = _write_lab(tmp_path / "lab")
+    bad_dir = lab / ".biosimulant" / "runs" / "bad-run"
+    bad_dir.mkdir(parents=True)
+    (bad_dir / "run.json").write_text("{not-json", encoding="utf-8")
+
+    client = TestClient(create_app(LabServeSession(lab, install_deps=False)))
+
+    assert client.get("/api/runs").json()["data"]["runs"] == []
+
+
+def test_structure3d_run_artifact_persists_across_session_restart(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    lab = _write_lab(tmp_path / "lab")
+    source_artifact = tmp_path / "complex.cif"
+    source_artifact.write_text("data_complex\n", encoding="utf-8")
+
+    class StructureWorld(_RuntimeWorld):
+        def collect_visuals(self) -> list[dict[str, object]]:
+            return [
+                {
+                    "module": "visualisation",
+                    "visuals": [
+                        {
+                            "render": "structure3d",
+                            "data": {
+                                "title": "Predicted Complex Structure",
+                                "format": "mmcif",
+                                "source": {
+                                    "kind": "artifact",
+                                    "artifact_id": "complex-artifact",
+                                    "path": str(source_artifact),
+                                },
+                            },
+                        }
+                    ],
+                }
+            ]
+
+    class PreparedStructureRuntime(_PreparedRuntime):
+        world = StructureWorld()
+
+    client, session = _client(lab)
+    _mark_runtime_metadata_ready(session)
+    monkeypatch.setattr(
+        server,
+        "prepare_lab_package",
+        lambda *_args, **_kwargs: PreparedStructureRuntime(),
+    )
+
+    created = client.post("/api/runs", json={}).json()
+    run_id = created["data"]["run"]["id"]
+    run = session.get_run(run_id)
+    assert run.thread is not None
+    run.thread.join(timeout=2)
+    assert run.status == "completed"
+    source_artifact.unlink()
+
+    restarted = LabServeSession(lab, install_deps=False)
+    restarted_client = TestClient(create_app(restarted))
+    results = restarted_client.get(f"/api/runs/{run_id}/results").json()
+
+    source = results["data"]["results"]["visuals"][0]["visuals"][0]["data"]["source"]
+    assert source["artifact_id"] == "complex-artifact"
+    assert source["url"] == f"/api/runs/{run_id}/artifacts/complex-artifact"
+    assert ".biosimulant/runs" in source["path"]
+    response = restarted_client.get(source["url"])
+    assert response.status_code == 200
+    assert response.text == "data_complex\n"
+
+
 def test_active_run_results_remain_compatible_empty_payload(tmp_path: Path) -> None:
     lab = _write_lab(tmp_path / "lab")
     client, session = _client(lab)
@@ -499,6 +853,67 @@ def test_active_run_results_remain_compatible_empty_payload(tmp_path: Path) -> N
 
     assert response.status_code == 200
     assert response.json() == {"ok": True, "data": {"results": {}}, "error": None}
+
+
+def test_structure3d_visuals_register_artifact_url_and_serve_file(tmp_path: Path) -> None:
+    lab = _write_lab(tmp_path / "lab")
+    client, session = _client(lab)
+    artifact = tmp_path / "complex.cif"
+    artifact.write_text("data_complex\n", encoding="utf-8")
+    run = RunRecord(id="run-structure", lab_id="lab", parameters=None, simulation_config=None)
+    run.status = "completed"
+    run.results = {
+        "visuals": server._sanitize_visuals(
+            [
+                {
+                    "module": "visualisation",
+                    "visuals": [
+                        {
+                            "render": "structure3d",
+                            "data": {
+                                "title": "Predicted Complex Structure",
+                                "format": "mmcif",
+                                "source": {
+                                    "kind": "artifact",
+                                    "artifact_id": "complex-artifact",
+                                    "path": str(artifact),
+                                },
+                            },
+                        }
+                    ],
+                }
+            ],
+            run_id=run.id,
+            artifacts=run.artifacts,
+        )
+    }
+    session._runs[run.id] = run
+
+    results = client.get(f"/api/runs/{run.id}/results").json()
+
+    source = results["data"]["results"]["visuals"][0]["visuals"][0]["data"]["source"]
+    assert source["artifact_id"] == "complex-artifact"
+    assert source["path"] == str(artifact.resolve())
+    assert source["url"] == f"/api/runs/{run.id}/artifacts/complex-artifact"
+    response = client.get(source["url"])
+    assert response.status_code == 200
+    assert response.text == "data_complex\n"
+
+
+def test_run_artifact_route_rejects_unknown_run_and_artifact(tmp_path: Path) -> None:
+    lab = _write_lab(tmp_path / "lab")
+    client, session = _client(lab)
+    run = RunRecord(id="run-empty", lab_id="lab", parameters=None, simulation_config=None)
+    run.status = "completed"
+    session._runs[run.id] = run
+
+    missing_artifact = client.get(f"/api/runs/{run.id}/artifacts/missing")
+    missing_run = client.get("/api/runs/missing/artifacts/anything")
+
+    assert missing_artifact.status_code == 400
+    assert missing_artifact.json()["error"]["message"] == "Artifact not found for run run-empty: missing"
+    assert missing_run.status_code == 400
+    assert missing_run.json()["error"]["message"] == "Run not found: missing"
 
 
 def test_api_error_envelope_for_missing_run(tmp_path: Path) -> None:

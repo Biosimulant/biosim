@@ -1,4 +1,7 @@
 
+from biosim.visuals import classify_visual_capability
+
+
 def test_collect_visuals_empty(biosim):
     world = biosim.BioWorld(communication_step=0.1)
 
@@ -145,3 +148,15 @@ def test_visuals_description_is_preserved(biosim):
     collected = world.collect_visuals()
     assert collected[0]["module"] == "desc"
     assert collected[0]["visuals"][0]["description"] == "hello"
+
+
+def test_classify_visual_capability_for_renderer_audits():
+    assert (
+        classify_visual_capability(
+            {"render": "structure3d", "data": {"source": {"path": "/tmp/complex.cif"}}}
+        )
+        == "3d-capable"
+    )
+    assert classify_visual_capability({"render": "table", "data": {"rows": []}}) == "non-3d"
+    assert classify_visual_capability(None) == "no-visuals"
+    assert classify_visual_capability(None, conditional_when_empty=True) == "conditional"

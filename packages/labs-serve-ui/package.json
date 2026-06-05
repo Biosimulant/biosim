@@ -13,6 +13,7 @@
     "@xyflow/react": "^12.10.1",
     "dagre": "^0.8.5",
     "lucide-react": "^0.468.0",
+    "molstar": "^5.9.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-resizable-panels": "^4.7.3",

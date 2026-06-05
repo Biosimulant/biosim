@@ -72,6 +72,29 @@ def test_request_stop_emits_stopped(biosim):
     assert stopped_payloads[0]["progress_pct"] < 100.0
 
 
+def test_request_stop_notifies_modules(biosim):
+    class Stoppable(biosim.BioModule):
+        def __init__(self):
+            self.stopped = False
+
+        def advance_window(self, start: float, end: float) -> None:
+            return None
+
+        def get_outputs(self):
+            return {}
+
+        def request_stop(self) -> None:
+            self.stopped = True
+
+    module = Stoppable()
+    world = biosim.BioWorld(communication_step=0.1)
+    world.add_biomodule("stoppable", module)
+
+    world.request_stop()
+
+    assert module.stopped is True
+
+
 def test_request_pause_blocks_until_resume(biosim):
     about_to_tick = threading.Event()
     done = threading.Event()

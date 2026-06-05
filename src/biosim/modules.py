@@ -50,6 +50,10 @@ class BioModule(ABC):
         """Restore module state from a prior snapshot."""
         return
 
+    def request_stop(self) -> None:
+        """Request cooperative cancellation for blocking module work."""
+        return
+
     def visualize(self) -> Optional["VisualSpec" | List["VisualSpec"]]:
         return None
 

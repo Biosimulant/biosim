@@ -232,7 +232,7 @@ def test_internal_packages_dispatcher_covers_validate_build_run_and_errors(monke
         "package_type": "lab",
         "path": "/tmp/lab.bsilab",
     }])
-    monkeypatch.setattr(cli, "run_package", lambda _path, *, install_deps: {"outputs": []})
+    monkeypatch.setattr(cli, "_run_package_for_cli", lambda _path, *, install_deps: {"outputs": []})
 
     cli._main_packages(["validate", "package.bsilab"])
     assert "validation passed" in capsys.readouterr().out
@@ -246,7 +246,7 @@ def test_internal_packages_dispatcher_covers_validate_build_run_and_errors(monke
     cli._main_packages(["run", "package.bsilab", "--no-install-deps", "--json"])
     assert '"outputs": []' in capsys.readouterr().out
 
-    monkeypatch.setattr(cli, "run_package", lambda *_args, **_kwargs: (_ for _ in ()).throw(PackageError("nope")))
+    monkeypatch.setattr(cli, "_run_package_for_cli", lambda *_args, **_kwargs: (_ for _ in ()).throw(PackageError("nope")))
     with pytest.raises(SystemExit) as exc_info:
         cli._main_packages(["run", "package.bsilab"])
     assert exc_info.value.code == 1
@@ -257,7 +257,7 @@ def test_internal_pack_dispatcher_covers_legacy_helpers(monkeypatch, capsys) -> 
     monkeypatch.setattr(cli, "build_package", lambda *_args, **_kwargs: Path("built.bsilab"))
     monkeypatch.setattr(cli, "validate_package", lambda _path: _ValidationResult())
     monkeypatch.setattr(cli, "fetch_package", lambda package, version: Path(f"{package}-{version}.bsimodel"))
-    monkeypatch.setattr(cli, "run_package", lambda _path, *, install_deps: {"package": "demo/lab"})
+    monkeypatch.setattr(cli, "_run_package_for_cli", lambda _path, *, install_deps: {"package": "demo/lab"})
 
     cli._main_pack(["--json", "build", "source", "--package", "demo/lab"])
     assert '"command": "build"' in capsys.readouterr().out
@@ -370,7 +370,8 @@ def test_labs_dispatcher_covers_validate_run_serve_and_extension_paths(monkeypat
 
     monkeypatch.setattr(cli, "_resolve_runtime_lab_path", lambda *args, **kwargs: (tmp_path / "lab", {"reused": True}))
     monkeypatch.setattr(cli, "_package_file_for_lab", fake_package_file)
-    monkeypatch.setattr(cli, "run_package", lambda _path, *, install_deps: {"package": "demo/lab", "outputs": ["state"]})
+    monkeypatch.setattr(cli, "_run_package_for_cli", lambda _path, *, install_deps: {"package": "demo/lab", "outputs": ["state"]})
+    monkeypatch.setattr(cli, "run_labs_serve_with_managed_python", lambda *_args, **_kwargs: None)
     launched = {}
     def fake_serve_lab(_path, **kwargs):
         launched.update(kwargs)
@@ -403,3 +404,90 @@ def test_labs_dispatcher_covers_validate_run_serve_and_extension_paths(monkeypat
     monkeypatch.setattr(cli, "_run_extension_or_exit", lambda command, argv, *, prog: seen.update(command=command, argv=argv, prog=prog))
     cli._main_labs(["release", "publish"])
     assert seen["command"] == "labs release publish"
+
+
+def test_labs_serve_reinvokes_managed_python_before_serving(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    lab_path = tmp_path / "lab"
+    lab_path.mkdir()
+    package_path = tmp_path / "lab.bsilab"
+    package_path.write_text("placeholder", encoding="utf-8")
+    observed: dict[str, object] = {}
+
+    @contextmanager
+    def fake_package_file(path):
+        observed["package_source_path"] = path
+        yield package_path
+
+    def fake_handoff(package_file, argv):
+        observed["package_file"] = package_file
+        observed["argv"] = argv
+        return 0
+
+    monkeypatch.setattr(cli, "_resolve_runtime_lab_path", lambda *args, **kwargs: (lab_path, None))
+    monkeypatch.setattr(cli, "_package_file_for_lab", fake_package_file)
+    monkeypatch.setattr(cli, "run_labs_serve_with_managed_python", fake_handoff)
+    monkeypatch.setattr(
+        cli,
+        "serve_lab",
+        lambda *_args, **_kwargs: pytest.fail("serve_lab should not run in parent"),
+    )
+
+    cli._main_labs(
+        [
+            "serve",
+            "demo/lab",
+            "--host",
+            "0.0.0.0",
+            "--port",
+            "9999",
+            "--no-open",
+            "--no-install-deps",
+            "--json",
+        ]
+    )
+
+    assert observed["package_source_path"] == lab_path.resolve()
+    assert observed["package_file"] == package_path
+    assert observed["argv"] == [
+        "labs",
+        "serve",
+        str(lab_path.resolve()),
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "9999",
+        "--no-open",
+        "--no-install-deps",
+        "--json",
+    ]
+
+
+def test_labs_serve_exits_with_managed_child_failure(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    lab_path = tmp_path / "lab"
+    lab_path.mkdir()
+    package_path = tmp_path / "lab.bsilab"
+    package_path.write_text("placeholder", encoding="utf-8")
+
+    @contextmanager
+    def fake_package_file(_path):
+        yield package_path
+
+    monkeypatch.setattr(cli, "_resolve_runtime_lab_path", lambda *args, **kwargs: (lab_path, None))
+    monkeypatch.setattr(cli, "_package_file_for_lab", fake_package_file)
+    monkeypatch.setattr(cli, "run_labs_serve_with_managed_python", lambda *_args: 7)
+    monkeypatch.setattr(
+        cli,
+        "serve_lab",
+        lambda *_args, **_kwargs: pytest.fail("serve_lab should not run in parent"),
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        cli._main_labs(["serve", "demo/lab"])
+
+    assert exc_info.value.code == 7

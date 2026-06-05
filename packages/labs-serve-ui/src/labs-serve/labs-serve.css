@@ -596,7 +596,8 @@ button:disabled {
 
 .status-pill.running,
 .status-pill.pending,
-.status-pill.queued {
+.status-pill.queued,
+.status-pill.cancelling {
   background: rgba(161, 92, 7, 0.14);
   color: var(--warning);
 }
@@ -855,6 +856,100 @@ th {
   border-radius: 6px;
   color: var(--muted);
   font-size: 13px;
+}
+
+.text-visual {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-alt);
+  padding: 10px 12px;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.visual-fallback {
+  display: grid;
+  gap: 8px;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  background: var(--panel-alt);
+  padding: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.visual-fallback strong {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.structure-visual {
+  position: relative;
+  display: grid;
+  gap: 8px;
+}
+
+.structure-viewport {
+  position: relative;
+  width: 100%;
+  height: 300px;
+  min-height: 300px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #05070a;
+}
+
+.structure-visual.expanded .structure-viewport {
+  height: min(640px, 62vh);
+}
+
+.structure-viewport .msp-plugin {
+  position: absolute;
+  inset: 0;
+}
+
+.structure-overlay {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  z-index: 2;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  padding: 8px 10px;
+  color: var(--muted);
+  font-size: 12px;
+  box-shadow: var(--shadow);
+}
+
+.structure-overlay.error {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--border));
+}
+
+.structure-annotations {
+  display: grid;
+  grid-template-columns: minmax(110px, max-content) minmax(0, 1fr);
+  gap: 4px 10px;
+  margin: 0;
+  font-size: 11px;
+}
+
+.structure-annotations dt {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.structure-annotations dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text);
 }
 
 .modal-backdrop {
@@ -2585,7 +2680,8 @@ th {
 
 .status-pill.running,
 .status-pill.queued,
-.status-pill.pending {
+.status-pill.pending,
+.status-pill.cancelling {
   background: rgba(15, 118, 110, 0.12);
   color: var(--primary-strong);
   border-color: rgba(15, 118, 110, 0.4);

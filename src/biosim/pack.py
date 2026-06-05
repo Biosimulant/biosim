@@ -9,7 +9,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import warnings
+from contextlib import nullcontext
 from collections import deque
 from copy import deepcopy
 from dataclasses import dataclass, field
@@ -44,7 +44,9 @@ DEFAULT_REGISTRY_ENV = "BIOSIM_PACKAGE_REGISTRY_DIR"
 DEFAULT_CACHE_ENV = "BIOSIM_PACKAGE_CACHE_DIR"
 DEFAULT_CACHE_HOME = Path.home() / ".cache" / "biosim" / "packages"
 FIXED_ZIP_TIME = (2020, 1, 1, 0, 0, 0)
-SUPPORTED_LAB_PYTHON_VERSIONS = frozenset({"3.11", "3.12"})
+SUPPORTED_LAB_PYTHON_VERSIONS = frozenset(
+    {"3.10", "3.11", "3.12", "3.13", "3.14"}
+)
 _FORBIDDEN_LEGACY_SOURCE_KEYS = frozenset(
     {"repo", "manifest_path", "upstream_repo", "upstream_manifest_path"}
 )
@@ -56,10 +58,22 @@ _SEMVER_RE = re.compile(
 )
 _PACKAGE_SEGMENT_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$")
 DependencyLogger = Callable[[str], None]
+CancelChecker = Callable[[], None]
+ProcessTracker = Callable[[subprocess.Popen[str]], Any]
 
 
 class PackageError(ValueError):
     """Raised when a package is invalid or cannot be handled."""
+
+
+def _new_process_group_kwargs() -> dict[str, Any]:
+    if os.name == "posix":
+        return {"start_new_session": True}
+    if os.name == "nt":
+        return {
+            "creationflags": getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
+        }
+    return {}
 
 
 @dataclass
@@ -273,44 +287,28 @@ def _declared_lab_python_version(manifest: Mapping[str, Any]) -> str | None:
     version = str(raw).strip()
     if not version:
         raise PackageError("Lab manifest runtime.python_version must not be empty")
+    if version not in SUPPORTED_LAB_PYTHON_VERSIONS:
+        supported = ", ".join(sorted(SUPPORTED_LAB_PYTHON_VERSIONS))
+        raise PackageError(
+            f"Lab manifest runtime.python_version must be one of: {supported}"
+        )
     return version
-
-
-def _unsupported_lab_python_version_warning(version: str) -> str:
-    supported = ", ".join(sorted(SUPPORTED_LAB_PYTHON_VERSIONS))
-    return (
-        f"Lab manifest runtime.python_version '{version}' is not supported by this "
-        f"biosim version. Supported versions: {supported}. Local OSS commands will "
-        "continue with the active Python interpreter, but managed desktop or remote "
-        "runners may reject this lab."
-    )
-
-
-def _lab_python_version_warnings(manifest: Mapping[str, Any]) -> list[str]:
-    declared = _declared_lab_python_version(manifest)
-    if declared is None or declared in SUPPORTED_LAB_PYTHON_VERSIONS:
-        return []
-    return [_unsupported_lab_python_version_warning(declared)]
 
 
 def _current_python_minor() -> str:
     return f"{sys.version_info[0]}.{sys.version_info[1]}"
 
 
-def _warn_if_lab_python_version_mismatch(manifest: Mapping[str, Any]) -> None:
+def _ensure_lab_python_version_matches_current(manifest: Mapping[str, Any]) -> None:
     declared = _declared_lab_python_version(manifest)
     if declared is None:
         return
-    for message in _lab_python_version_warnings(manifest):
-        warnings.warn(message, RuntimeWarning, stacklevel=2)
     current = _current_python_minor()
     if declared != current:
-        warnings.warn(
-            "Lab manifest declares Python "
+        raise PackageError(
+            "Lab manifest requires Python "
             f"{declared}, but this process is running Python {current}. "
-            "Continuing with the active interpreter for local OSS execution.",
-            RuntimeWarning,
-            stacklevel=2,
+            "Run the lab with a matching Python interpreter."
         )
 
 
@@ -748,7 +746,6 @@ def validate_package(path: str | Path) -> PackageValidationResult:
                 _validate_dependencies(manifest)
             elif package_type == "lab":
                 _validate_lab_manifest(manifest)
-                result.warnings.extend(_lab_python_version_warnings(manifest))
                 _validate_embedded_lab_package(entries, manifest, entry_manifest)
             else:
                 raise PackageError(f"Unsupported package_type: {package_type}")
@@ -774,7 +771,6 @@ def validate_lab_source(path: str | Path) -> PackageValidationResult:
         manifest_path = _find_manifest_in_dir(source_path, ("lab.yaml", "lab.yml"))
         manifest = _safe_yaml_load(manifest_path.read_bytes())
         _validate_lab_manifest(manifest)
-        result.warnings.extend(_lab_python_version_warnings(manifest))
         _validate_lab_source_dir(
             source_root=source_path,
             current_lab_dir=source_path,
@@ -1194,10 +1190,15 @@ def _run_model_loaded_package(
     *,
     install_deps: bool = True,
     dependency_logger: DependencyLogger | None = None,
+    dependency_process_tracker: ProcessTracker | None = None,
+    cancel_checker: CancelChecker | None = None,
 ) -> dict[str, Any]:
     if install_deps:
         _install_declared_dependencies(
-            loaded.manifest, dependency_logger=dependency_logger
+            loaded.manifest,
+            dependency_logger=dependency_logger,
+            process_tracker=dependency_process_tracker,
+            cancel_checker=cancel_checker,
         )
     module, meta = _instantiate_model_from_package(loaded)
     module.setup(meta["setup"])
@@ -1362,11 +1363,13 @@ def _prepare_lab_loaded_package(
     *,
     install_deps: bool = True,
     dependency_logger: DependencyLogger | None = None,
+    dependency_process_tracker: ProcessTracker | None = None,
+    cancel_checker: CancelChecker | None = None,
 ) -> LabPackageRuntime:
     runtime = loaded.manifest.get("runtime")
     if not isinstance(runtime, Mapping):
         raise PackageError("Lab manifest must contain models, wiring, and runtime")
-    _warn_if_lab_python_version_mismatch(loaded.manifest)
+    _ensure_lab_python_version_matches_current(loaded.manifest)
     models, wiring, parsed_lab = _flatten_embedded_lab_dir(
         payload_root=loaded.payload_root,
         current_lab_dir=loaded.payload_root,
@@ -1394,7 +1397,10 @@ def _prepare_lab_loaded_package(
         manifest = _load_model_manifest_from_dir(model_path)
         if install_deps:
             _install_declared_dependencies(
-                manifest, dependency_logger=dependency_logger
+                manifest,
+                dependency_logger=dependency_logger,
+                process_tracker=dependency_process_tracker,
+                cancel_checker=cancel_checker,
             )
         parameters = (
             entry.get("parameters")
@@ -1485,11 +1491,15 @@ def _run_lab_loaded_package(
     *,
     install_deps: bool = True,
     dependency_logger: DependencyLogger | None = None,
+    dependency_process_tracker: ProcessTracker | None = None,
+    cancel_checker: CancelChecker | None = None,
 ) -> dict[str, Any]:
     prepared = _prepare_lab_loaded_package(
         loaded,
         install_deps=install_deps,
         dependency_logger=dependency_logger,
+        dependency_process_tracker=dependency_process_tracker,
+        cancel_checker=cancel_checker,
     )
     world = prepared.world
     duration = prepared.duration
@@ -1584,6 +1594,8 @@ def _install_declared_dependencies(
     manifest: Mapping[str, Any],
     *,
     dependency_logger: DependencyLogger | None = None,
+    process_tracker: ProcessTracker | None = None,
+    cancel_checker: CancelChecker | None = None,
 ) -> None:
     runtime = manifest.get("runtime")
     if not isinstance(runtime, Mapping):
@@ -1599,18 +1611,25 @@ def _install_declared_dependencies(
     ]
     if bad:
         raise PackageError(f"All dependencies must use exact pins: {bad}")
-    command = [sys.executable, "-m", "pip", "install", *packages]
-    if dependency_logger is None:
-        subprocess.run(
+    command = _dependency_install_command(packages)
+    if cancel_checker is not None:
+        cancel_checker()
+    if dependency_logger is None and process_tracker is None and cancel_checker is None:
+        completed = subprocess.run(
             command,
-            check=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
         )
+        if completed.returncode != 0:
+            raise PackageError(
+                f"Dependency installation failed with exit code {completed.returncode}.\n"
+                f"Recent pip output:\n{_dependency_output_tail(completed.stdout, completed.stderr)}"
+            )
         return
 
-    dependency_logger(f"Installing dependencies: {' '.join(packages)}")
+    if dependency_logger is not None:
+        dependency_logger(f"Installing dependencies: {' '.join(packages)}")
     recent: deque[str] = deque(maxlen=40)
     process = subprocess.Popen(
         command,
@@ -1618,18 +1637,25 @@ def _install_declared_dependencies(
         stderr=subprocess.STDOUT,
         text=True,
         bufsize=1,
+        **_new_process_group_kwargs(),
     )
-    assert process.stdout is not None
-    try:
-        for raw_line in process.stdout:
-            line = raw_line.rstrip()
-            if not line:
-                continue
-            recent.append(line)
-            dependency_logger(line)
-    finally:
-        process.stdout.close()
-    returncode = process.wait()
+    with process_tracker(process) if process_tracker is not None else nullcontext():
+        assert process.stdout is not None
+        try:
+            for raw_line in process.stdout:
+                if cancel_checker is not None:
+                    cancel_checker()
+                line = raw_line.rstrip()
+                if not line:
+                    continue
+                recent.append(line)
+                if dependency_logger is not None:
+                    dependency_logger(line)
+        finally:
+            process.stdout.close()
+        returncode = process.wait()
+    if cancel_checker is not None:
+        cancel_checker()
     if returncode != 0:
         tail = "\n".join(recent) if recent else "No pip output captured."
         raise PackageError(
@@ -1638,12 +1664,51 @@ def _install_declared_dependencies(
         )
 
 
+def _dependency_install_command(packages: list[str]) -> list[str]:
+    python = sys.executable
+    if _uv_module_available():
+        return [
+            python,
+            "-m",
+            "uv",
+            "pip",
+            "install",
+            "--python",
+            python,
+            *packages,
+        ]
+    return [python, "-m", "pip", "install", *packages]
+
+
+def _uv_module_available() -> bool:
+    try:
+        completed = subprocess.run(
+            [sys.executable, "-m", "uv", "--version"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except OSError:
+        return False
+    return completed.returncode == 0
+
+
+def _dependency_output_tail(stdout: str | None, stderr: str | None) -> str:
+    lines: list[str] = []
+    if stdout:
+        lines.extend(stdout.splitlines())
+    if stderr:
+        lines.extend(stderr.splitlines())
+    return "\n".join(lines[-40:]) if lines else "No pip output captured."
+
+
 def run_package(
     path: str | Path,
     *,
     install_deps: bool = True,
     unpack_root: str | Path | None = None,
     dependency_logger: DependencyLogger | None = None,
+    dependency_process_tracker: ProcessTracker | None = None,
+    cancel_checker: CancelChecker | None = None,
 ) -> dict[str, Any]:
     if unpack_root is None:
         with tempfile.TemporaryDirectory(prefix="biosim-pack-") as temp_dir:
@@ -1652,6 +1717,8 @@ def run_package(
                 install_deps=install_deps,
                 unpack_root=temp_dir,
                 dependency_logger=dependency_logger,
+                dependency_process_tracker=dependency_process_tracker,
+                cancel_checker=cancel_checker,
             )
     loaded = _loaded_package_from_path(
         Path(path).expanduser().resolve(),
@@ -1662,12 +1729,16 @@ def run_package(
             loaded,
             install_deps=install_deps,
             dependency_logger=dependency_logger,
+            dependency_process_tracker=dependency_process_tracker,
+            cancel_checker=cancel_checker,
         )
     if loaded.package_type == "lab":
         return _run_lab_loaded_package(
             loaded,
             install_deps=install_deps,
             dependency_logger=dependency_logger,
+            dependency_process_tracker=dependency_process_tracker,
+            cancel_checker=cancel_checker,
         )
     raise PackageError(f"Unsupported package type: {loaded.package_type}")
 
@@ -1678,6 +1749,8 @@ def prepare_lab_package(
     install_deps: bool = True,
     unpack_root: str | Path | None = None,
     dependency_logger: DependencyLogger | None = None,
+    dependency_process_tracker: ProcessTracker | None = None,
+    cancel_checker: CancelChecker | None = None,
 ) -> LabPackageRuntime:
     loaded = _loaded_package_from_path(
         Path(path).expanduser().resolve(),
@@ -1693,6 +1766,8 @@ def prepare_lab_package(
         loaded,
         install_deps=install_deps,
         dependency_logger=dependency_logger,
+        dependency_process_tracker=dependency_process_tracker,
+        cancel_checker=cancel_checker,
     )
 
 
