@@ -7,6 +7,22 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [0.0.18] - 2026-06-05
+
+### Added
+
+- Add managed runtime support for local lab execution and serving.
+- Add 3D Labs Serve visual support.
+- Add GPU accelerator warning detection.
+
+### Changed
+
+- Improve lab command progress messages during package resolution, dependency
+  installation, and runtime preparation.
+- Add Python version validation and warnings for lab manifests.
+- Improve PublicRegistryClient request headers and Cloudflare error handling.
+- Disable uvicorn access logs for the Labs Serve API.
+
 ## [0.0.17] - 2026-06-03
 
 ### Changed
@@ -123,7 +139,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Preserve the legacy `biosim` import path and `python -m biosim` compatibility
   command for existing model packages.
 
-[Unreleased]: https://github.com/Biosimulant/biosim/compare/v0.0.17...HEAD
+[Unreleased]: https://github.com/Biosimulant/biosim/compare/v0.0.18...HEAD
+[0.0.18]: https://github.com/Biosimulant/biosim/compare/v0.0.17...v0.0.18
 [0.0.17]: https://github.com/Biosimulant/biosim/compare/v0.0.16...v0.0.17
 [0.0.16]: https://github.com/Biosimulant/biosim/compare/v0.0.15...v0.0.16
 [0.0.15]: https://github.com/Biosimulant/biosim/compare/v0.0.14...v0.0.15
