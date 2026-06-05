@@ -77,6 +77,14 @@ export type LabRuntime = {
   [key: string]: unknown;
 };
 
+export type ComputeWarning = {
+  code: string;
+  message: string;
+  model_alias?: string;
+  parameter?: string;
+  value?: string;
+};
+
 export type LocalLab = {
   id: string;
   title: string;
@@ -85,6 +93,7 @@ export type LocalLab = {
   file_path?: string | null;
   runtime_metadata_status?: "pending" | "running" | "ready" | "failed";
   runtime_metadata_error?: string | null;
+  compute_warnings?: ComputeWarning[];
   manifest: {
     title?: string;
     description?: string;

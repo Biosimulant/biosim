@@ -75,6 +75,18 @@ class _PreparedRuntime:
     modules: list[dict[str, object]] = []
 
 
+def _set_model_parameters(lab: Path, alias: str, parameters: dict[str, object]) -> None:
+    manifest_path = lab / "lab.yaml"
+    manifest = _safe_yaml_load(manifest_path.read_bytes())
+    for entry in manifest["models"]:
+        if entry["alias"] == alias:
+            entry["parameters"] = parameters
+            break
+    else:  # pragma: no cover - defensive test helper
+        raise AssertionError(f"model alias not found: {alias}")
+    manifest_path.write_bytes(_safe_yaml_dump(manifest))
+
+
 def test_root_html_static_assets_and_legacy_ui_redirect(tmp_path: Path, monkeypatch) -> None:
     lab = _write_lab(tmp_path / "lab")
     static = tmp_path / "static"
@@ -132,6 +144,50 @@ def test_lab_api_enriches_payload_and_persists_edits(tmp_path: Path) -> None:
     assert world_saved["ok"] is True
     manifest = _safe_yaml_load((lab / "lab.yaml").read_bytes())
     assert manifest["wiring"] == [{"from": "source.count", "to": "accumulator.value"}]
+
+
+def test_compute_warning_detector_reports_gpu_accelerators() -> None:
+    manifest = {
+        "models": [
+            {
+                "alias": "boltz",
+                "parameters": {"accelerator": "gpu", "devices": 1},
+            }
+        ]
+    }
+
+    warnings = server._compute_warnings_for_manifest(manifest)
+
+    assert len(warnings) == 1
+    assert warnings[0]["code"] == "gpu-accelerator-requested"
+    assert warnings[0]["model_alias"] == "boltz"
+    assert warnings[0]["parameter"] == "accelerator"
+    assert warnings[0]["value"] == "gpu"
+    assert "will continue with the lab's configured accelerator" in warnings[0]["message"]
+
+
+def test_compute_warning_detector_ignores_cpu_and_missing_accelerators() -> None:
+    assert (
+        server._compute_warnings_for_manifest(
+            {"models": [{"alias": "cpu", "parameters": {"accelerator": "cpu"}}]}
+        )
+        == []
+    )
+    assert server._compute_warnings_for_manifest({"models": [{"alias": "plain"}]}) == []
+
+
+def test_lab_payload_includes_compute_warnings_for_gpu_accelerators(tmp_path: Path) -> None:
+    lab = _write_lab(tmp_path / "lab")
+    _set_model_parameters(lab, "counter", {"accelerator": "gpu"})
+    client, session = _client(lab)
+    _mark_runtime_metadata_ready(session)
+
+    payload = client.get("/api/lab").json()["data"]["lab"]
+
+    warnings = payload["compute_warnings"]
+    assert len(warnings) == 1
+    assert warnings[0]["code"] == "gpu-accelerator-requested"
+    assert warnings[0]["model_alias"] == "counter"
 
 
 def test_lab_api_returns_manifest_payload_before_runtime_metadata_is_ready(
@@ -321,6 +377,35 @@ def test_run_streams_structured_model_progress_to_run_logs(
     terminal = capsys.readouterr().out
     assert "raw model output" in terminal
     assert "BSIM_PROGRESS:" in terminal
+
+
+def test_run_logs_compute_warning_without_blocking_execution(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    lab = _write_lab(tmp_path / "lab")
+    _set_model_parameters(lab, "counter", {"accelerator": "gpu"})
+    client, session = _client(lab)
+    _mark_runtime_metadata_ready(session)
+
+    monkeypatch.setattr(server, "prepare_lab_package", lambda *_args, **_kwargs: _PreparedRuntime())
+
+    created = client.post("/api/runs", json={}).json()
+    assert created["ok"] is True
+    run = session.get_run(created["data"]["run"]["id"])
+    assert run.thread is not None
+    run.thread.join(timeout=2)
+
+    assert run.status == "completed"
+    warning_logs = [
+        entry
+        for entry in run.logs
+        if entry["level"] == "warning" and entry["source"] == "compute"
+    ]
+    assert len(warning_logs) == 1
+    assert "Model 'counter' requests GPU acceleration" in warning_logs[0]["message"]
+    messages = [entry["message"] for entry in run.logs]
+    assert messages.index(warning_logs[0]["message"]) < messages.index("Preparing runtime/dependencies...")
 
 
 def test_cancel_while_waiting_for_runtime_prepare_lock_does_not_prepare(

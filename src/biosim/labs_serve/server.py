@@ -4,6 +4,7 @@ import copy
 import hashlib
 import json
 import os
+import platform
 import signal
 import shutil
 import socket
@@ -40,6 +41,14 @@ from biosim.world import WorldEvent
 
 ACTIVE_STATUSES = {"queued", "pending", "running", "cancelling"}
 STATIC_DIR = Path(__file__).resolve().parent / "static"
+GPU_ACCELERATOR_VALUES = {"gpu", "cuda", "mps"}
+GPU_ACCELERATOR_PARAMETER_KEYS = {
+    "accelerator",
+    "backend",
+    "compute_backend",
+    "device",
+    "runtime_device",
+}
 
 
 def _now() -> str:
@@ -210,6 +219,85 @@ def _load_lab_manifest(path: Path) -> dict[str, Any]:
 
 def _write_lab_manifest(path: Path, manifest: Mapping[str, Any]) -> None:
     _lab_manifest_path(path).write_bytes(_safe_yaml_dump(dict(manifest)))
+
+
+def _has_obvious_cuda_runtime() -> bool:
+    disabled = os.environ.get("CUDA_VISIBLE_DEVICES", "").strip().lower()
+    if disabled in {"-1", "none", "no", "false"}:
+        return False
+    return shutil.which("nvidia-smi") is not None or shutil.which("nvcc") is not None
+
+
+def _is_accelerator_parameter(name: str) -> bool:
+    key = name.strip().lower().replace("-", "_")
+    return (
+        key in GPU_ACCELERATOR_PARAMETER_KEYS
+        or key.endswith("_accelerator")
+        or key.endswith("_device")
+    )
+
+
+def _gpu_warning_message(*, alias: str, parameter: str, value: str) -> str:
+    host = f"{platform.system() or sys.platform} {platform.machine() or 'unknown'}".strip()
+    if sys.platform == "darwin":
+        detail = (
+            "this host is macOS, where GPU requests may use Apple MPS or another backend "
+            "that some models do not support reliably"
+        )
+    elif value == "cuda" or value == "gpu":
+        if _has_obvious_cuda_runtime():
+            detail = (
+                "a CUDA-capable runtime appears to be present, but GPU support still depends "
+                "on the model and installed drivers"
+            )
+        else:
+            detail = "no obvious CUDA runtime was detected on this host"
+    elif value == "mps":
+        detail = "Apple MPS acceleration can be unsupported or unreliable for some models"
+    else:
+        detail = "the requested accelerator may not be available on this host"
+    return (
+        f"Model '{alias}' requests GPU acceleration via {parameter}={value!r}; {detail}. "
+        "The run will continue with the lab's configured accelerator."
+        f" Host: {host}."
+    )
+
+
+def _compute_warnings_for_manifest(manifest: Mapping[str, Any]) -> list[dict[str, str]]:
+    warnings: list[dict[str, str]] = []
+    models = manifest.get("models")
+    if not isinstance(models, list):
+        return warnings
+    for index, entry in enumerate(models):
+        if not isinstance(entry, Mapping):
+            continue
+        alias = entry.get("alias")
+        alias_text = alias.strip() if isinstance(alias, str) and alias.strip() else f"model_{index}"
+        parameters = entry.get("parameters")
+        if not isinstance(parameters, Mapping):
+            continue
+        for parameter, raw_value in parameters.items():
+            if not isinstance(parameter, str) or not _is_accelerator_parameter(parameter):
+                continue
+            if not isinstance(raw_value, str):
+                continue
+            value = raw_value.strip().lower()
+            if value not in GPU_ACCELERATOR_VALUES:
+                continue
+            warnings.append(
+                {
+                    "code": f"{value}-accelerator-requested",
+                    "message": _gpu_warning_message(
+                        alias=alias_text,
+                        parameter=parameter,
+                        value=value,
+                    ),
+                    "model_alias": alias_text,
+                    "parameter": parameter,
+                    "value": value,
+                }
+            )
+    return warnings
 
 
 @contextmanager
@@ -952,6 +1040,7 @@ class LabServeSession:
         record = workspace_get_lab(self.lab_path)
         manifest = _load_lab_manifest(self.lab_path)
         enriched_manifest = self._enriched_manifest(manifest)
+        compute_warnings = _compute_warnings_for_manifest(manifest)
         self._ensure_runtime_metadata()
         runtime_status = self._runtime_metadata_snapshot()
         metadata = record.metadata or {}
@@ -963,6 +1052,7 @@ class LabServeSession:
             "tags": enriched_manifest.get("tags") if isinstance(enriched_manifest.get("tags"), list) else [],
             "file_path": str(record.path),
             "manifest": enriched_manifest,
+            "compute_warnings": compute_warnings,
             "wiring_layout": _load_wiring_layout(self.lab_path),
             "runtime_metadata_status": runtime_status["status"],
             "runtime_metadata_error": runtime_status["error"],
@@ -1217,6 +1307,28 @@ class LabServeSession:
         thread.start()
         return run
 
+    def _compute_warnings_for_run(self, run: RunRecord) -> list[dict[str, str]]:
+        manifest = _load_lab_manifest(self.lab_path)
+        _apply_run_overrides(
+            manifest,
+            parameters=run.parameters,
+            simulation_config=run.simulation_config,
+        )
+        return _compute_warnings_for_manifest(manifest)
+
+    def _log_compute_warnings(self, run: RunRecord) -> None:
+        for warning in self._compute_warnings_for_run(run):
+            message = warning.get("message")
+            if not message:
+                continue
+            self._log_run(
+                run,
+                "warning",
+                message,
+                source="compute",
+                echo_terminal=True,
+            )
+
     def cancel_run(self, run_id: str) -> RunRecord:
         run = self.get_run(run_id)
         with self._lock:
@@ -1313,6 +1425,7 @@ class LabServeSession:
             run.started_at = _now()
             self._persist_run_locked(run)
         self._log_run(run, "info", "Run started", echo_terminal=True)
+        self._log_compute_warnings(run)
         try:
             result = self._execute_run(run)
             finished = time.time()

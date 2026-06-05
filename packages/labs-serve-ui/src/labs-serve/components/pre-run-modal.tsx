@@ -1,5 +1,5 @@
 import * as React from "react";
-import { ChevronDown, ChevronRight, Loader2, Play, X } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight, Loader2, Play, X } from "lucide-react";
 import type { LabModelEntry, LocalLab, WorldIoPort } from "../types";
 import { titleForModel } from "../lib/graph";
 import { getModelParameterDescriptors, type ParameterDescriptor } from "../lib/parameters";
@@ -110,6 +110,7 @@ export function PreRunModal({ lab, busy, onCancel, onSubmit }: PreRunModalProps)
   const initialInputs = (runtime.initial_inputs as Record<string, unknown> | undefined) ?? {};
   const worldInputs: WorldIoPort[] = lab.manifest.io?.inputs ?? [];
   const models: LabModelEntry[] = lab.manifest.models ?? [];
+  const computeWarnings = lab.compute_warnings ?? [];
 
   const [duration, setDuration] = React.useState<string>(() =>
     typeof runtime.duration === "number" ? String(runtime.duration) : "",
@@ -258,6 +259,17 @@ export function PreRunModal({ lab, busy, onCancel, onSubmit }: PreRunModalProps)
               </label>
             </div>
           </CollapsibleSection>
+
+          {computeWarnings.length > 0 ? (
+            <div className="modal-compute-warnings" role="alert">
+              {computeWarnings.map((warning, index) => (
+                <div className="modal-compute-warning" key={`${warning.code}-${warning.model_alias ?? index}`}>
+                  <AlertTriangle size={14} aria-hidden="true" />
+                  <span>{warning.message}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
 
           {worldInputs.length > 0 ? (
             <CollapsibleSection title="World Inputs" count={worldInputs.length}>

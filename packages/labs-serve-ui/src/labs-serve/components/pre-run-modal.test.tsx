@@ -50,6 +50,8 @@ it("submits settle steps from labs-serve pre-run runtime", () => {
     container.remove();
   };
 
+  expect(container.querySelector(".modal-compute-warnings")).toBeNull();
+
   const button = Array.from(container.querySelectorAll("button")).find((candidate) =>
     candidate.textContent?.includes("Start run"),
   );
@@ -136,5 +138,67 @@ it("submits world input values as ephemeral run overrides", () => {
   expect(onSubmit).toHaveBeenCalledWith({
     parameters: { initial_inputs: { seed: 4 }, per_model: {} },
     simulation_config: {},
+  });
+});
+
+it("shows compute warnings without blocking run submission", () => {
+  const onSubmit = vi.fn();
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  const root = createRoot(container);
+  const lab = {
+    compute_warnings: [
+      {
+        code: "gpu-accelerator-requested",
+        message:
+          "Model 'boltz' requests GPU acceleration via accelerator='gpu'; the run will continue.",
+        model_alias: "boltz",
+        parameter: "accelerator",
+        value: "gpu",
+      },
+    ],
+    manifest: {
+      runtime: {
+        duration: 10,
+      },
+      io: { inputs: [], outputs: [] },
+      models: [],
+    },
+  } as unknown as LocalLab;
+
+  act(() => {
+    root.render(
+      <PreRunModal
+        lab={lab}
+        busy={false}
+        onCancel={() => undefined}
+        onSubmit={onSubmit}
+      />,
+    );
+  });
+
+  cleanup = () => {
+    act(() => root.unmount());
+    container.remove();
+  };
+
+  const warning = container.querySelector(".modal-compute-warnings");
+  expect(warning).toBeInstanceOf(HTMLDivElement);
+  expect(warning?.textContent).toContain("requests GPU acceleration");
+
+  const submitButton = Array.from(container.querySelectorAll("button")).find((candidate) =>
+    candidate.textContent?.includes("Start run"),
+  );
+  expect(submitButton).toBeInstanceOf(HTMLButtonElement);
+
+  act(() => {
+    submitButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+
+  expect(onSubmit).toHaveBeenCalledWith({
+    parameters: { initial_inputs: {}, per_model: {} },
+    simulation_config: {
+      duration: 10,
+    },
   });
 });
