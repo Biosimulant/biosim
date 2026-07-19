@@ -20,7 +20,8 @@ Provide a small, stable composition layer for simulations: wire reusable compone
 ### Core Mission
 
 - Compose simulations from reusable, interoperable biomodules.
-- Make "run + visualize + share a config" the default workflow (local-first; hosted later).
+- Make "run + visualize + share a config" the default local workflow, with an
+  explicit client for durable hosted execution when requested.
 - Keep the runtime small and predictable while letting biomodules embed their own simulator/tooling.
 
 ### Primary Users
@@ -46,6 +47,28 @@ pip install biosimulant
 
 The default install includes the local web runtime used by
 `biosimulant labs serve`.
+
+## Managed Developer API
+
+`BioWorld.run()` remains local and free. Use `Client` or `AsyncClient` when you
+explicitly want to run an accessible, versioned Hub lab on managed compute:
+
+```python
+from biosimulant import Client
+
+with Client() as client:  # reads BIOSIMULANT_API_KEY
+    result = client.run(
+        "demi/microbiology-hello-world-growth@1.0.0",
+        inputs={"initial_cells": 10, "available_food": 80},
+        timeout=300,
+    )
+    print(result.outputs)
+```
+
+For a durable handle that returns immediately, use
+`client.runs.create(...).wait()`. See the
+[Developer API documentation](https://docs.biosimulant.com/developer-api) for
+async execution, cancellation, timeout recovery, webhooks, and billing.
 
 For the shared ONNX biomodule helpers:
 
@@ -78,8 +101,9 @@ python -m biosimulant --help
 `python -m biosim` remains available as a compatibility command. If a machine
 also has the Desktop/product CLI installed, `PATH` decides which `biosimulant`
 binary runs. Use `python -m biosimulant ...` to force the Python package CLI.
-The Python package owns local open-source workflows; Desktop/product extensions
-own Hub, auth, cloud, app state, and managed-service workflows.
+The Python package owns local open-source workflows and the explicit
+`Client`/`AsyncClient` interfaces for hosted runs. Desktop/product extensions
+continue to own interactive Hub, publishing, app-state, and workbench workflows.
 
 ### Shell completion
 

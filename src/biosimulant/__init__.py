@@ -29,6 +29,7 @@ def __dir__() -> list[str]:
 
 _ALIASED_SUBMODULES = (
     "contrib",
+    "cloud",
     "contrib.cellml",
     "contrib.sbml",
     "extensions",

@@ -42,6 +42,21 @@ from .pack import (
     unpack_package,
     validate_package,
 )
+from .cloud import (
+    ApiError,
+    Artifact,
+    AsyncClient,
+    AuthenticationError,
+    Client,
+    InsufficientCreditsError,
+    RateLimitError,
+    Run,
+    RunFailed,
+    RunResult,
+    RunTimeout,
+    ValidationError,
+    verify_webhook_signature,
+)
 
 __all__ = [
     "__version__",
@@ -80,6 +95,19 @@ __all__ = [
     "unpack_package",
     "validate_package",
     "OnnxClassifierModule",
+    "Client",
+    "AsyncClient",
+    "Run",
+    "RunResult",
+    "Artifact",
+    "ApiError",
+    "AuthenticationError",
+    "ValidationError",
+    "RateLimitError",
+    "InsufficientCreditsError",
+    "RunFailed",
+    "RunTimeout",
+    "verify_webhook_signature",
 ]
 
 

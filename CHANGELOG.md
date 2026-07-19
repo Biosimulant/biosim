@@ -7,6 +7,15 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [0.0.19] - 2026-07-19
+
+### Added
+
+- Add the open `Client` and `AsyncClient` interfaces for explicit managed,
+  durable execution through the private Biosimulant developer API.
+- Add typed run, result, artifact, error, timeout, and webhook verification
+  contracts while leaving `BioWorld.run()` local and unchanged.
+
 ## [0.0.18] - 2026-06-05
 
 ### Added
@@ -139,7 +148,8 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Preserve the legacy `biosim` import path and `python -m biosim` compatibility
   command for existing model packages.
 
-[Unreleased]: https://github.com/Biosimulant/biosim/compare/v0.0.18...HEAD
+[Unreleased]: https://github.com/Biosimulant/biosim/compare/v0.0.19...HEAD
+[0.0.19]: https://github.com/Biosimulant/biosim/compare/v0.0.18...v0.0.19
 [0.0.18]: https://github.com/Biosimulant/biosim/compare/v0.0.17...v0.0.18
 [0.0.17]: https://github.com/Biosimulant/biosim/compare/v0.0.16...v0.0.17
 [0.0.16]: https://github.com/Biosimulant/biosim/compare/v0.0.15...v0.0.16
