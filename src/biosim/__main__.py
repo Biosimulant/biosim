@@ -414,6 +414,12 @@ def _populate_labs_parser(parser: argparse.ArgumentParser) -> argparse.ArgumentP
     run_parser.add_argument("--force", action="store_true", help="Replace an existing auto-pull target")
     run_parser.add_argument("--registry-url", default=None)
     run_parser.add_argument("--no-install-deps", action="store_true")
+    run_parser.add_argument(
+        "--dependency-root",
+        type=Path,
+        default=None,
+        help="Writable Lab-local dependency state directory for a .bsilab archive",
+    )
     run_parser.add_argument("--no-open", action="store_true", help=argparse.SUPPRESS)
     run_parser.add_argument("--results-file", type=Path, default=None)
     run_parser.add_argument("--json", action="store_true", dest="json_output")
@@ -766,10 +772,12 @@ def _main_labs(argv: list[str], *, prog: str = "biosimulant labs") -> None:
                 emit_status=not args.json_output,
             )
             with _package_file_for_lab(lab_path) as package_file:
-                result = _run_package_for_cli(
-                    package_file,
-                    install_deps=not args.no_install_deps,
-                )
+                run_kwargs: dict[str, Any] = {
+                    "install_deps": not args.no_install_deps,
+                }
+                if args.dependency_root is not None:
+                    run_kwargs["dependency_root"] = args.dependency_root
+                result = _run_package_for_cli(package_file, **run_kwargs)
                 if args.results_file:
                     args.results_file.parent.mkdir(parents=True, exist_ok=True)
                     args.results_file.write_text(

@@ -141,6 +141,33 @@ want only a bare `lab.yaml` scaffold.
 Managed local lab identity lives in `.biosimulant/lab.json`; exported labs use
 the portable `lab.yaml` source manifest.
 
+## Compose Hub Labs Locally
+
+Use a local `BioModule` beside a version-pinned Hub Lab in one `BioWorld`.
+The parent Lab owns the dependency state and lockfile; resolving a Hub Lab is
+explicit and is never triggered by importing Python code.
+
+```python
+from biosimulant import BioWorld
+from biosimulant.hub import HubComposition
+
+world = BioWorld(communication_step=0.1)
+world.add_biomodule("controller", DoseController())
+
+# ./lab/biosimulant.lock pins the exact archive checksum for this reference.
+composition = HubComposition(world, lab_root="./lab")
+composition.add("medium", "your-namespace/nutrient-medium@1.1.0")
+composition.apply()
+composition.setup()
+world.run(duration=24.0)
+```
+
+`biosimulant.lock` must contain an exact SHA-256 for every package-backed child
+Lab. Dependencies resolve into `./lab/.biosimulant/dependencies/`; delete that
+directory to force a clean, lockfile-verified resolution. See
+[`docs/hub-composition.md`](docs/hub-composition.md) for the lockfile format,
+vendored archival packages, and read-only archive state overrides.
+
 ## Packaging Models And Labs
 
 `biosimulant` packages labs through the `labs` command group. Standalone model
@@ -170,8 +197,8 @@ Notes:
 - local `labs validate`, `labs run`, and `labs serve` can use source labs without `package:` or `version:`; the CLI assigns a transient `local/<lab-directory-slug>` identity for local execution.
 - standalone `labs package` builds require `package:` and `version:` in `lab.yaml`, or explicit `--package` and `--version` values. Release manifests can supply identity through `biosimulant-packages.yaml`.
 - model dependencies in manifests must use exact `==` pins.
-- lab builds are always self-contained and preserve the full runnable source tree inside the `.bsilab`.
-- nested lab dependencies must use relative `path` refs and must already exist inside the packaged lab directory.
+- ordinary lab builds preserve version-pinned Hub child references and their lockfile; use `--vendor-dependencies` when an archival `.bsilab` must embed every child Lab.
+- nested lab dependencies may use a relative `path`, or an exact `package` + `version` with a matching `biosimulant.lock` checksum.
 - `validate` prints human-readable success or failure output by default; add `--json` for machine-readable output.
 
 See [`docs/packaging.md`](docs/packaging.md) for the full package layout, recommended authoring flow, and CLI examples.

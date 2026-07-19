@@ -370,7 +370,13 @@ def test_labs_dispatcher_covers_validate_run_serve_and_extension_paths(monkeypat
 
     monkeypatch.setattr(cli, "_resolve_runtime_lab_path", lambda *args, **kwargs: (tmp_path / "lab", {"reused": True}))
     monkeypatch.setattr(cli, "_package_file_for_lab", fake_package_file)
-    monkeypatch.setattr(cli, "_run_package_for_cli", lambda _path, *, install_deps: {"package": "demo/lab", "outputs": ["state"]})
+    run_kwargs = {}
+
+    def fake_run(_path, **kwargs):
+        run_kwargs.update(kwargs)
+        return {"package": "demo/lab", "outputs": ["state"]}
+
+    monkeypatch.setattr(cli, "_run_package_for_cli", fake_run)
     monkeypatch.setattr(cli, "run_labs_serve_with_managed_python", lambda *_args, **_kwargs: None)
     launched = {}
     def fake_serve_lab(_path, **kwargs):
@@ -383,6 +389,9 @@ def test_labs_dispatcher_covers_validate_run_serve_and_extension_paths(monkeypat
     cli._main_labs(["run", "demo/lab", "--results-file", str(results_path)])
     assert "Outputs: state" in capsys.readouterr().out
     assert '"outputs": ["state"]' in results_path.read_text(encoding="utf-8")
+
+    cli._main_labs(["run", "demo/lab", "--dependency-root", str(tmp_path / "state")])
+    assert run_kwargs["dependency_root"] == tmp_path / "state"
 
     cli._main_labs(["serve", "demo/lab", "--json", "--host", "0.0.0.0", "--port", "9999", "--open"])
     assert '"command": "serve"' in capsys.readouterr().out

@@ -21,6 +21,7 @@ existing model packages.
 - [Neuro packs](neuro.md): computational neuroscience modules (Izhikevich, Hodgkin-Huxley, Poisson input, synapses, monitors) — lives in the companion [`models`](https://github.com/Biosimulant/models) repo
 - [Plugin Development](plugin-development.md): creating and distributing custom biomodules
 - [Packaging](packaging.md): building, validating, fetching, and exporting `.bsimodel` and `.bsilab` artifacts
+- [Hub composition](hub-composition.md): compose version-pinned Hub Labs into a Lab-local runtime graph
 - [CLI Extensions](extensions.md): OSS/product command ownership and extension integration contract
 - [Releasing](releasing.md): PyPI release/tag workflow and helper script
 

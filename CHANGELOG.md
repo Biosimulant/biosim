@@ -7,6 +7,25 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [0.0.20] - 2026-07-19
+
+### Added
+
+- Add explicit `biosimulant.hub.HubComposition` for resolving exact,
+  lockfile-pinned public Hub Labs into a caller-owned `BioWorld`.
+- Store composed Hub Lab payloads under the parent Lab's
+  `.biosimulant/dependencies/` state instead of a shared machine cache.
+- Add `biosimulant.lock` validation for package-backed child Labs and
+  `--vendor-dependencies` for fully self-contained archival `.bsilab` releases.
+- Add `--dependency-root` to `biosimulant labs run` for package-backed archives
+  in read-only locations.
+
+### Changed
+
+- Keep ordinary Lab package payloads compact by preserving locked Hub package
+  references; archive runtime state remains disposable and excluded from normal
+  package output.
+
 ## [0.0.19] - 2026-07-19
 
 ### Added

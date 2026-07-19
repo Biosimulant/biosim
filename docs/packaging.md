@@ -6,13 +6,13 @@ existing model code.
 
 Package unit:
 - one model package wraps one `model.yaml` into a `.bsimodel`
-- one lab package wraps one `lab.yaml` into a self-contained `.bsilab`
+- one lab package wraps one `lab.yaml` into a portable `.bsilab`
 
 Typical use cases:
 - move a runnable model or lab without shipping a whole repository
 - validate package structure before upload
 - cache and fetch package-backed models locally
-- export a self-contained lab whose full source tree is embedded in the archive
+- export a portable lab archive, with an optional fully self-contained archival mode
 
 ## CLI
 
@@ -62,11 +62,21 @@ Build a lab archive:
 biosimulant labs package path/to/lab --out dist
 ```
 
+Build a fully self-contained archival package with every lockfile-pinned Hub
+child embedded:
+
+```bash
+biosimulant labs package path/to/lab --out dist --vendor-dependencies
+```
+
 Validate or run a lab source tree or `.bsilab`:
 
 ```bash
 biosimulant labs validate path/to/lab
 biosimulant labs run path/to/lab.bsilab --no-install-deps
+
+# Use a writable Lab-local state directory when the archive's folder is read-only.
+biosimulant labs run path/to/lab.bsilab --dependency-root /tmp/my-lab-state
 ```
 
 Use `--json` with `biosimulant labs` commands when you need machine-readable output.
@@ -154,6 +164,7 @@ my-lab/
 ├── models/
 ├── labs/
 ├── lab.yaml
+├── biosimulant.lock  # required for package-backed child Labs
 ├── tests/
 └── README.md
 ```
@@ -212,9 +223,9 @@ biosimulant labs package path/to/lab --package biosimulant/example-lab --version
 - model manifests contain `biosim.entrypoint`
 - lab manifests contain valid `models`, `wiring`, and `runtime`
 - model dependencies use exact `==` pins only
-- lab manifests use `path`-based nested dependencies only
-- every nested model and child lab path stays inside the archive payload tree
-- every embedded model or child lab manifest is valid
+- package-backed child Labs use exact `package` + `version` values and have a matching `biosimulant.lock` entry with an artifact SHA-256
+- path-based nested models and child Labs stay inside the archive payload tree
+- every embedded model or path-based child Lab manifest is valid
 
 The command is meant to be operator-friendly:
 - success prints a concise summary with package name, version, and type
@@ -254,8 +265,10 @@ models:
     alias: counter
 ```
 
-`biosimulant labs package path/to/lab` always emits a self-contained `.bsilab`. The packaged
-payload preserves the runnable source tree exactly as it exists on disk under `payload/`.
+`biosimulant labs package path/to/lab` preserves the runnable source tree under
+`payload/`. Package-backed child Labs remain compact `package` + `version`
+references, with their checksum provenance in `biosimulant.lock`. Runtime state
+under `.biosimulant/` is excluded from normal package payloads.
 
 Lab-local visualisation modules should remain inside each lab when portability is
 the goal. If several labs intentionally carry byte-identical visualisation code,
@@ -268,9 +281,12 @@ the number of extra graph hops needed. One direct producer-to-visualisation edge
 usually needs `settle_steps: 1`; a producer-to-postprocessor-to-visualisation
 chain needs `settle_steps: 2`. Settling does not extend simulated time.
 
-Nested `models[]` and `children[]` must use relative `path` refs only. Nested executable
-`package`, `version`, `model_id`, `lab_id`, `hub_model_id`, and `hub_lab_id` are invalid.
+Nested `models[]` use relative `path` refs. A child Lab in `children[]` may use
+either a relative `path` or exact `package` + `version`; the latter must have a
+matching package/version/checksum entry in the sibling `biosimulant.lock`.
+Nested package references are resolved only into the parent Lab's local state.
 
 If a lab depends on another model or child lab, that dependency must already exist inside
-the lab directory before packaging. Packaging does not rewrite the manifest and does not bundle
-nested `.bsimodel` or `.bsilab` archives.
+the lab directory before packaging when it is path-based. Package-backed child
+Labs resolve from Hub at runtime. Use `--vendor-dependencies` for a fully
+self-contained archival package.

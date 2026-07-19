@@ -81,12 +81,15 @@ def test_completion_parser_exposes_nested_labs_commands() -> None:
 
     parser = cli._build_completion_parser(prog="biosimulant")
 
-    run_args = parser.parse_args(["labs", "run", "--no-install-deps", "--json"])
+    run_args = parser.parse_args([
+        "labs", "run", "--no-install-deps", "--dependency-root", "state", "--json"
+    ])
     package_args = parser.parse_args(["labs", "package", "--out", "dist"])
     release_args = parser.parse_args(["labs", "release", "validate", "manifest.yaml"])
 
     assert run_args.command == "run"
     assert run_args.no_install_deps is True
+    assert run_args.dependency_root == Path("state")
     assert run_args.json_output is True
     assert package_args.command == "package"
     assert package_args.out == Path("dist")
