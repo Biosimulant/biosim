@@ -96,11 +96,15 @@ def _run_package_for_cli(
     package_file: str | Path,
     *,
     install_deps: bool,
+    dependency_root: str | Path | None = None,
 ) -> dict[str, Any]:
     return run_package_with_managed_python(
         package_file,
         install_deps=install_deps,
-        in_process_runner=lambda path: run_package(path, install_deps=install_deps),
+        dependency_root=dependency_root,
+        in_process_runner=lambda path: run_package(
+            path, install_deps=install_deps, dependency_root=dependency_root
+        ),
     )
 
 
@@ -472,6 +476,8 @@ def _populate_labs_parser(parser: argparse.ArgumentParser) -> argparse.ArgumentP
     package_parser.add_argument("--package", dest="package_name", type=str, default=None)
     package_parser.add_argument("--version", type=str, default=None)
     package_parser.add_argument("--visibility", choices=("private", "public"), default="private")
+    package_parser.add_argument("--vendor-dependencies", action="store_true")
+    package_parser.add_argument("--registry-url", default=None)
     package_parser.add_argument("--json", action="store_true", dest="json_output")
 
     release_parser = subparsers.add_parser("release", help="Validate, build, and publish lab release manifests")
@@ -643,6 +649,8 @@ def _main_labs(argv: list[str], *, prog: str = "biosimulant labs") -> None:
                 package_name=args.package_name,
                 version=args.version,
                 visibility=args.visibility,
+                vendor_dependencies=args.vendor_dependencies,
+                registry_url=args.registry_url,
             )
             _print_lab_package_result(payload, json_output=args.json_output)
             return
@@ -833,6 +841,7 @@ def _main_packages(argv: list[str], *, prog: str = "biosimulant packages") -> No
     run_parser = subparsers.add_parser("run", help="Run a local .bsimodel or .bsilab package")
     run_parser.add_argument("package_file", type=Path)
     run_parser.add_argument("--no-install-deps", action="store_true")
+    run_parser.add_argument("--dependency-root", type=Path, default=None)
     run_parser.add_argument("--json", action="store_true", dest="json_output")
 
     for name in ("preview", "import", "export-model", "export-lab", "publish", "ci"):
@@ -860,10 +869,10 @@ def _main_packages(argv: list[str], *, prog: str = "biosimulant packages") -> No
             _print_package_repo_build_success(built, json_output=args.json_output)
             return
         if args.command == "run":
-            result = _run_package_for_cli(
-                args.package_file,
-                install_deps=not args.no_install_deps,
-            )
+            run_kwargs: dict[str, Any] = {"install_deps": not args.no_install_deps}
+            if args.dependency_root is not None:
+                run_kwargs["dependency_root"] = args.dependency_root
+            result = _run_package_for_cli(args.package_file, **run_kwargs)
             _print_run_result(args.package_file, result, json_output=args.json_output)
             return
     except PackageError as exc:
@@ -890,6 +899,8 @@ def _main_pack(argv: list[str], *, prog: str = "biosimulant pack") -> None:
     build_parser.add_argument("--package", dest="package_name", type=str, default=None)
     build_parser.add_argument("--version", type=str, default="0.1.0")
     build_parser.add_argument("--visibility", type=str, default="private")
+    build_parser.add_argument("--vendor-dependencies", action="store_true")
+    build_parser.add_argument("--registry-url", default=None)
 
     validate_parser = subparsers.add_parser("validate", help="Validate a model or lab package")
     validate_parser.add_argument("package_file", type=Path)
@@ -900,6 +911,7 @@ def _main_pack(argv: list[str], *, prog: str = "biosimulant pack") -> None:
     run_parser = subparsers.add_parser("run", help="Run a model or lab package")
     run_parser.add_argument("package_file", type=Path)
     run_parser.add_argument("--no-install-deps", action="store_true")
+    run_parser.add_argument("--dependency-root", type=Path, default=None)
 
     args = parser.parse_args(argv)
 
@@ -911,6 +923,8 @@ def _main_pack(argv: list[str], *, prog: str = "biosimulant pack") -> None:
                 package_name=args.package_name,
                 version=args.version,
                 visibility=args.visibility,
+                vendor_dependencies=args.vendor_dependencies,
+                registry_url=args.registry_url,
             )
             validation = validate_package(target)
             _print_pack_result(
@@ -947,10 +961,10 @@ def _main_pack(argv: list[str], *, prog: str = "biosimulant pack") -> None:
             )
             return
         if args.command == "run":
-            result = _run_package_for_cli(
-                args.package_file,
-                install_deps=not args.no_install_deps,
-            )
+            run_kwargs: dict[str, Any] = {"install_deps": not args.no_install_deps}
+            if args.dependency_root is not None:
+                run_kwargs["dependency_root"] = args.dependency_root
+            result = _run_package_for_cli(args.package_file, **run_kwargs)
             _print_run_result(args.package_file, result, json_output=args.json_output)
             return
     except PackageError as exc:
@@ -972,6 +986,8 @@ def _package_lab_source(
     package_name: str | None,
     version: str | None,
     visibility: str,
+    vendor_dependencies: bool = False,
+    registry_url: str | None = None,
 ) -> dict[str, Any]:
     target = _resolve_lab_package_target(
         lab,
@@ -979,6 +995,8 @@ def _package_lab_source(
         package_name=package_name,
         version=version,
         visibility=visibility,
+        vendor_dependencies=vendor_dependencies,
+        registry_url=registry_url,
     )
     validation = validate_package(target)
     if not validation.valid or not validation.metadata:
@@ -1004,6 +1022,8 @@ def _resolve_lab_package_target(
     package_name: str | None,
     version: str | None,
     visibility: str,
+    vendor_dependencies: bool = False,
+    registry_url: str | None = None,
 ) -> Path:
     if output is None or output.suffix == ".bsilab":
         return build_package(
@@ -1012,6 +1032,8 @@ def _resolve_lab_package_target(
             package_name=package_name,
             version=version,
             visibility=visibility,
+            vendor_dependencies=vendor_dependencies,
+            registry_url=registry_url,
         )
 
     output_dir = output.expanduser().resolve()
@@ -1024,6 +1046,8 @@ def _resolve_lab_package_target(
             package_name=package_name,
             version=version,
             visibility=visibility,
+            vendor_dependencies=vendor_dependencies,
+            registry_url=registry_url,
         )
         validation = validate_package(built)
         if not validation.valid or not validation.metadata:

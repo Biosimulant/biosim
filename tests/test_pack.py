@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import hashlib
 import os
 from pathlib import Path
 from types import SimpleNamespace
@@ -9,6 +10,7 @@ from zipfile import ZipFile
 import pytest
 
 from biosim import pack as pack_module
+from biosim import hub as hub_module
 from biosim.pack import (
     PackageError,
     build_package,
@@ -750,6 +752,179 @@ wiring: []
 
     with pytest.raises(PackageError, match="must use path references only"):
         build_package(path, package_name="local/legacy-lab", version="1.0.0")
+
+
+def test_lab_build_allows_locked_package_child_references(tmp_path: Path):
+    path = tmp_path / "package-child-lab"
+    path.mkdir()
+    (path / "lab.yaml").write_text(
+        """
+schema_version: "2.0"
+title: "Package child"
+package: local/package-child
+version: 1.0.0
+models: []
+children:
+  - package: acme/nutrient-medium
+    version: 1.1.0
+    alias: medium
+wiring: []
+runtime:
+  duration: 1
+  communication_step: 1
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+    (path / "biosimulant.lock").write_text(
+        """
+lock_version: 1
+dependencies:
+  - package: acme/nutrient-medium
+    version: 1.1.0
+    artifact_sha256: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    package_path = build_package(path)
+
+    assert validate_package(package_path).valid
+
+
+def test_package_child_resolves_into_parent_lab_local_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    child_source = _write_child_output_lab(tmp_path / "child")
+    child_package = build_package(child_source, package_name="acme/child", version="1.0.0")
+    child_bytes = child_package.read_bytes()
+    child_sha = hashlib.sha256(child_bytes).hexdigest()
+    parent = tmp_path / "parent"
+    parent.mkdir()
+    (parent / "lab.yaml").write_text(
+        "schema_version: \"2.0\"\n"
+        "title: Parent\npackage: local/parent\nversion: 1.0.0\nmodels: []\n"
+        "children:\n  - package: acme/child\n    version: 1.0.0\n    alias: child\n"
+        "runtime:\n  communication_step: 0.1\n  duration: 0.2\nwiring: []\n",
+        encoding="utf-8",
+    )
+    (parent / "biosimulant.lock").write_text(
+        f"lock_version: 1\ndependencies:\n  - package: acme/child\n"
+        f"    version: 1.0.0\n    artifact_sha256: {child_sha}\n",
+        encoding="utf-8",
+    )
+    parent_package = build_package(parent)
+
+    class FakeRegistry:
+        def __init__(self, _base_url=None):
+            pass
+
+        def resolve_package(self, package, version):
+            assert (package, version) == ("acme/child", "1.0.0")
+            return {"id": "child-artifact", "package_type": "lab", "sha256": child_sha}
+
+        def download_package(self, artifact_id):
+            assert artifact_id == "child-artifact"
+            return child_bytes
+
+    monkeypatch.setattr(hub_module, "PublicRegistryClient", FakeRegistry)
+    prepared = prepare_lab_package(parent_package, install_deps=False)
+
+    assert prepared.world.module_names == ["child.counter"]
+    state = parent_package.parent / ".biosimulant" / f"{parent_package.stem}.dependencies"
+    assert list(state.rglob("lab.yaml"))
+
+
+def test_vendor_dependencies_embeds_locked_hub_labs_without_network(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    child_source = _write_child_output_lab(tmp_path / "child")
+    child_package = build_package(child_source, package_name="acme/child", version="1.0.0")
+    child_bytes = child_package.read_bytes()
+    child_sha = hashlib.sha256(child_bytes).hexdigest()
+    parent = tmp_path / "parent"
+    parent.mkdir()
+    (parent / "lab.yaml").write_text(
+        "schema_version: \"2.0\"\n"
+        "title: Parent\npackage: local/parent\nversion: 1.0.0\nmodels: []\n"
+        "children:\n  - package: acme/child\n    version: 1.0.0\n    alias: child\n"
+        "runtime:\n  communication_step: 0.1\n  duration: 0.2\nwiring: []\n",
+        encoding="utf-8",
+    )
+    (parent / "biosimulant.lock").write_text(
+        f"lock_version: 1\ndependencies:\n  - package: acme/child\n"
+        f"    version: 1.0.0\n    artifact_sha256: {child_sha}\n",
+        encoding="utf-8",
+    )
+
+    class FakeRegistry:
+        def __init__(self, _base_url=None):
+            pass
+
+        def resolve_package(self, package, version):
+            assert (package, version) == ("acme/child", "1.0.0")
+            return {"id": "child-artifact", "package_type": "lab", "sha256": child_sha}
+
+        def download_package(self, artifact_id):
+            assert artifact_id == "child-artifact"
+            return child_bytes
+
+    monkeypatch.setattr(hub_module, "PublicRegistryClient", FakeRegistry)
+    archive = build_package(parent, vendor_dependencies=True)
+    unpacked = unpack_package(archive, dest=tmp_path / "unpacked")
+    manifest = pack_module._safe_yaml_load((unpacked / "payload" / "lab.yaml").read_bytes())
+    assert manifest["children"] == [{"alias": "child", "path": "labs/child"}]
+    assert (unpacked / "payload" / "labs" / "child" / "lab.yaml").is_file()
+
+    monkeypatch.setattr(
+        hub_module,
+        "PublicRegistryClient",
+        lambda *_args, **_kwargs: pytest.fail("vendored package must not resolve Hub dependencies"),
+    )
+    result = run_package(archive, install_deps=False)
+    assert result["modules"][0]["alias"] == "child.counter"
+
+
+def test_package_dependency_root_override_keeps_archive_parent_untouched(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    child_source = _write_child_output_lab(tmp_path / "child")
+    child_package = build_package(child_source, package_name="acme/child", version="1.0.0")
+    child_bytes = child_package.read_bytes()
+    child_sha = hashlib.sha256(child_bytes).hexdigest()
+    parent = tmp_path / "parent"
+    parent.mkdir()
+    (parent / "lab.yaml").write_text(
+        "schema_version: \"2.0\"\ntitle: Parent\npackage: local/parent\nversion: 1.0.0\nmodels: []\n"
+        "children:\n  - package: acme/child\n    version: 1.0.0\n    alias: child\n"
+        "runtime:\n  communication_step: 0.1\n  duration: 0.2\nwiring: []\n",
+        encoding="utf-8",
+    )
+    (parent / "biosimulant.lock").write_text(
+        f"lock_version: 1\ndependencies:\n  - package: acme/child\n"
+        f"    version: 1.0.0\n    artifact_sha256: {child_sha}\n",
+        encoding="utf-8",
+    )
+    parent_package = build_package(parent)
+
+    class FakeRegistry:
+        def __init__(self, _base_url=None):
+            pass
+
+        def resolve_package(self, *_args):
+            return {"id": "child-artifact", "package_type": "lab", "sha256": child_sha}
+
+        def download_package(self, *_args):
+            return child_bytes
+
+    monkeypatch.setattr(hub_module, "PublicRegistryClient", FakeRegistry)
+    dependency_root = tmp_path / "writable-state"
+    prepared = prepare_lab_package(
+        parent_package, install_deps=False, dependency_root=dependency_root
+    )
+
+    assert prepared.world.module_names == ["child.counter"]
+    assert list(dependency_root.rglob("lab.yaml"))
+    assert not (parent_package.parent / ".biosimulant").exists()
 
 
 def test_invalid_dependency_pin_fails(tmp_path: Path):

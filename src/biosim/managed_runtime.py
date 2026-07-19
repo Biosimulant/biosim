@@ -33,6 +33,7 @@ def run_package_with_managed_python(
     package_file: str | Path,
     *,
     install_deps: bool = True,
+    dependency_root: str | Path | None = None,
     in_process_runner: RunPackage | None = None,
 ) -> dict[str, Any]:
     runner = in_process_runner or (
@@ -47,7 +48,14 @@ def run_package_with_managed_python(
 
     python_path = ensure_executor_python(requested)
     _log_managed_python_handoff("package run", requested, python_path)
-    return run_child_package(python_path, package_file, install_deps=install_deps)
+    if dependency_root is None:
+        return run_child_package(python_path, package_file, install_deps=install_deps)
+    return run_child_package(
+        python_path,
+        package_file,
+        install_deps=install_deps,
+        dependency_root=dependency_root,
+    )
 
 
 def run_labs_serve_with_managed_python(
@@ -135,23 +143,28 @@ def run_child_package(
     package_file: str | Path,
     *,
     install_deps: bool,
+    dependency_root: str | Path | None = None,
 ) -> dict[str, Any]:
     code = (
         "import json, sys; "
         "from biosim.pack import run_package; "
-        "result = run_package(sys.argv[1], install_deps=(sys.argv[2] == '1')); "
+        "root = sys.argv[3] if len(sys.argv) > 3 else None; "
+        "result = run_package(sys.argv[1], install_deps=(sys.argv[2] == '1'), dependency_root=root); "
         "print(json.dumps(result, sort_keys=True))"
     )
     env = dict(os.environ)
     env[BIOSIM_MANAGED_RUNTIME_CHILD_ENV] = "1"
+    command = [
+        str(python_path),
+        "-c",
+        code,
+        str(package_file),
+        "1" if install_deps else "0",
+    ]
+    if dependency_root is not None:
+        command.append(str(dependency_root))
     completed = subprocess.run(
-        [
-            str(python_path),
-            "-c",
-            code,
-            str(package_file),
-            "1" if install_deps else "0",
-        ],
+        command,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,

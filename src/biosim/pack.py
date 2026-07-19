@@ -401,6 +401,7 @@ def _collect_lab_entries(source_dir: Path) -> tuple[dict[str, Any], dict[str, by
         raise PackageError(f"Lab package source is missing {manifest_path}")
     manifest, manifest_bytes = _normalized_manifest_bytes(manifest_path)
     _validate_lab_manifest(manifest)
+    _validate_lab_lock_for_dir(manifest, source_dir)
 
     entries: dict[str, bytes] = {"payload/lab.yaml": manifest_bytes}
     for path in sorted(source_dir.rglob("*")):
@@ -552,6 +553,8 @@ def build_package(
     version: str | None = None,
     visibility: str = "private",
     source: Mapping[str, Any] | None = None,
+    vendor_dependencies: bool = False,
+    registry_url: str | None = None,
 ) -> Path:
     source_path = Path(source_dir).expanduser().resolve()
     if not source_path.is_dir():
@@ -568,6 +571,8 @@ def build_package(
             version=version,
             visibility=visibility,
             source=source,
+            vendor_dependencies=vendor_dependencies,
+            registry_url=registry_url,
         )
     else:
         raise PackageError(f"Could not find model.yaml or lab.yaml in {source_path}")
@@ -614,8 +619,37 @@ def export_lab_package(
     version: str | None = None,
     visibility: str = "private",
     source: Mapping[str, Any] | None = None,
+    vendor_dependencies: bool = False,
+    registry_url: str | None = None,
 ) -> Path:
     source_path = Path(source_dir).expanduser().resolve()
+    if vendor_dependencies:
+        from .hub import materialize_vendored_lab
+
+        if output_path is None:
+            source_manifest = _safe_yaml_load((source_path / "lab.yaml").read_bytes())
+            source_package, source_version = _validate_lab_release_identity(
+                source_manifest,
+                package_name_override=package_name,
+                version_override=version,
+            )
+            output_path = source_path / "dist" / (
+                f"{_package_slug(source_package)}-{source_version}.bsilab"
+            )
+        with tempfile.TemporaryDirectory(prefix="biosim-vendor-lab-") as temp_dir:
+            vendored_source = materialize_vendored_lab(
+                source_path,
+                Path(temp_dir) / "lab",
+                registry_url=registry_url,
+            )
+            return export_lab_package(
+                vendored_source,
+                output_path=output_path,
+                package_name=package_name,
+                version=version,
+                visibility=visibility,
+                source=source,
+            )
     manifest, entries = _collect_lab_entries(source_path)
     package_name, version = _validate_lab_release_identity(
         manifest,
@@ -746,6 +780,7 @@ def validate_package(path: str | Path) -> PackageValidationResult:
                 _validate_dependencies(manifest)
             elif package_type == "lab":
                 _validate_lab_manifest(manifest)
+                _validate_lab_lock_for_archive(manifest, entries, entry_manifest)
                 _validate_embedded_lab_package(entries, manifest, entry_manifest)
             else:
                 raise PackageError(f"Unsupported package_type: {package_type}")
@@ -771,6 +806,7 @@ def validate_lab_source(path: str | Path) -> PackageValidationResult:
         manifest_path = _find_manifest_in_dir(source_path, ("lab.yaml", "lab.yml"))
         manifest = _safe_yaml_load(manifest_path.read_bytes())
         _validate_lab_manifest(manifest)
+        _validate_lab_lock_for_dir(manifest, source_path)
         _validate_lab_source_dir(
             source_root=source_path,
             current_lab_dir=source_path,
@@ -1365,20 +1401,88 @@ def _prepare_lab_loaded_package(
     dependency_logger: DependencyLogger | None = None,
     dependency_process_tracker: ProcessTracker | None = None,
     cancel_checker: CancelChecker | None = None,
+    dependency_root: Path | None = None,
 ) -> LabPackageRuntime:
     runtime = loaded.manifest.get("runtime")
     if not isinstance(runtime, Mapping):
         raise PackageError("Lab manifest must contain models, wiring, and runtime")
     _ensure_lab_python_version_matches_current(loaded.manifest)
-    models, wiring, parsed_lab = _flatten_embedded_lab_dir(
-        payload_root=loaded.payload_root,
-        current_lab_dir=loaded.payload_root,
-    )
+    has_package_children = bool(_package_children(loaded.manifest))
+    if has_package_children:
+        models: list[dict[str, Any]] = []
+        wiring: list[dict[str, Any]] = []
+        parsed_lab = dict(loaded.manifest)
+    else:
+        models, wiring, parsed_lab = _flatten_embedded_lab_dir(
+            payload_root=loaded.payload_root,
+            current_lab_dir=loaded.payload_root,
+        )
 
     communication_step = extract_communication_step(
         None, runtime, error_cls=PackageError
     )
     world = BioWorld(communication_step=communication_step)
+    if has_package_children:
+        # Package-backed children are intentionally resolved into a state
+        # directory owned by this parent archive, never a process-wide cache.
+        from .hub import _prepare_package_backed_lab
+
+        state_root = dependency_root or (
+            loaded.package_path.parent
+            / ".biosimulant"
+            / f"{loaded.package_path.stem}.dependencies"
+        )
+        parsed_lab, setup_config, resolved_models, modules_by_alias = _prepare_package_backed_lab(
+            world=world,
+            lab_root=loaded.payload_root,
+            dependency_root=state_root,
+            registry_url=None,
+            install_deps=install_deps,
+            dependency_logger=dependency_logger,
+            dependency_process_tracker=dependency_process_tracker,
+            cancel_checker=cancel_checker,
+        )
+        effective_runtime = (
+            parsed_lab.get("runtime")
+            if isinstance(parsed_lab.get("runtime"), Mapping)
+            else runtime
+        )
+        world.setup(setup_config)
+        initial_inputs = (
+            effective_runtime.get("initial_inputs")
+            if isinstance(effective_runtime.get("initial_inputs"), Mapping)
+            else {}
+        )
+        allow_global_inputs = len(modules_by_alias) == 1
+        for alias, module in modules_by_alias.items():
+            alias_inputs = _select_alias_override(
+                initial_inputs,
+                alias,
+                allow_global=allow_global_inputs,
+            )
+            if not alias_inputs:
+                continue
+            declared_inputs = module.inputs() if isinstance(module.inputs(), dict) else {}
+            module.set_inputs(
+                coerce_typed_inputs(
+                    alias_inputs,
+                    declared_inputs,
+                    source="run",
+                    time_value=0.0,
+                    error_cls=PackageError,
+                )
+            )
+        return LabPackageRuntime(
+            package=str(loaded.package_yaml["package"]),
+            version=str(loaded.package_yaml["version"]),
+            world=world,
+            manifest=parsed_lab,
+            lab_path=loaded.payload_root / "lab.yaml",
+            duration=float(effective_runtime.get("duration", 1.0)),
+            communication_step=communication_step,
+            settle_steps=extract_settle_steps(None, effective_runtime, error_cls=PackageError),
+            modules=resolved_models,
+        )
     builder = WiringBuilder(world)
     resolved_models: list[dict[str, Any]] = []
     setup_config: dict[str, dict[str, Any]] = {}
@@ -1493,6 +1597,7 @@ def _run_lab_loaded_package(
     dependency_logger: DependencyLogger | None = None,
     dependency_process_tracker: ProcessTracker | None = None,
     cancel_checker: CancelChecker | None = None,
+    dependency_root: Path | None = None,
 ) -> dict[str, Any]:
     prepared = _prepare_lab_loaded_package(
         loaded,
@@ -1500,6 +1605,7 @@ def _run_lab_loaded_package(
         dependency_logger=dependency_logger,
         dependency_process_tracker=dependency_process_tracker,
         cancel_checker=cancel_checker,
+        dependency_root=dependency_root,
     )
     world = prepared.world
     duration = prepared.duration
@@ -1709,6 +1815,7 @@ def run_package(
     dependency_logger: DependencyLogger | None = None,
     dependency_process_tracker: ProcessTracker | None = None,
     cancel_checker: CancelChecker | None = None,
+    dependency_root: str | Path | None = None,
 ) -> dict[str, Any]:
     if unpack_root is None:
         with tempfile.TemporaryDirectory(prefix="biosim-pack-") as temp_dir:
@@ -1719,6 +1826,7 @@ def run_package(
                 dependency_logger=dependency_logger,
                 dependency_process_tracker=dependency_process_tracker,
                 cancel_checker=cancel_checker,
+                dependency_root=dependency_root,
             )
     loaded = _loaded_package_from_path(
         Path(path).expanduser().resolve(),
@@ -1739,6 +1847,7 @@ def run_package(
             dependency_logger=dependency_logger,
             dependency_process_tracker=dependency_process_tracker,
             cancel_checker=cancel_checker,
+            dependency_root=(Path(dependency_root).expanduser().resolve() if dependency_root else None),
         )
     raise PackageError(f"Unsupported package type: {loaded.package_type}")
 
@@ -1751,6 +1860,7 @@ def prepare_lab_package(
     dependency_logger: DependencyLogger | None = None,
     dependency_process_tracker: ProcessTracker | None = None,
     cancel_checker: CancelChecker | None = None,
+    dependency_root: str | Path | None = None,
 ) -> LabPackageRuntime:
     loaded = _loaded_package_from_path(
         Path(path).expanduser().resolve(),
@@ -1768,6 +1878,7 @@ def prepare_lab_package(
         dependency_logger=dependency_logger,
         dependency_process_tracker=dependency_process_tracker,
         cancel_checker=cancel_checker,
+        dependency_root=(Path(dependency_root).expanduser().resolve() if dependency_root else None),
     )
 
 
@@ -1778,6 +1889,67 @@ def _validate_model_manifest(manifest: Mapping[str, Any]) -> None:
     entrypoint = bsim.get("entrypoint")
     if not isinstance(entrypoint, str) or not entrypoint.strip():
         raise PackageError("Model manifest must contain biosim.entrypoint")
+
+
+def _package_children(manifest: Mapping[str, Any]) -> list[tuple[str, str]]:
+    children = manifest.get("children")
+    if not isinstance(children, list):
+        return []
+    references: list[tuple[str, str]] = []
+    for entry in children:
+        if not isinstance(entry, Mapping):
+            continue
+        package = entry.get("package")
+        version = entry.get("version")
+        if package is None and version is None:
+            continue
+        if not isinstance(package, str) or not package.strip() or not isinstance(version, str) or not version.strip():
+            raise PackageError("Package-backed lab children require package and exact version")
+        references.append((package.strip(), version.strip()))
+    return references
+
+
+def _validate_lab_lock(manifest: Mapping[str, Any], value: Any, *, label: str) -> None:
+    references = _package_children(manifest)
+    if not references:
+        return
+    if not isinstance(value, Mapping) or value.get("lock_version") != 1:
+        raise PackageError(f"{label} must declare lock_version: 1 for package-backed children")
+    dependencies = value.get("dependencies")
+    if not isinstance(dependencies, list):
+        raise PackageError(f"{label} must contain a dependencies list")
+    locked: set[tuple[str, str]] = set()
+    for entry in dependencies:
+        if not isinstance(entry, Mapping):
+            raise PackageError(f"{label} contains an invalid dependency entry")
+        package, version, sha256 = entry.get("package"), entry.get("version"), entry.get("artifact_sha256")
+        if not all(isinstance(item, str) and item.strip() for item in (package, version, sha256)):
+            raise PackageError(f"{label} dependency entries require package, version, and artifact_sha256")
+        locked.add((package.strip(), version.strip()))
+    missing = sorted(set(references) - locked)
+    if missing:
+        joined = ", ".join(f"{package}@{version}" for package, version in missing)
+        raise PackageError(f"{label} is missing package locks for {joined}")
+
+
+def _validate_lab_lock_for_dir(manifest: Mapping[str, Any], lab_dir: Path) -> None:
+    if not _package_children(manifest):
+        return
+    lock_path = lab_dir / "biosimulant.lock"
+    if not lock_path.is_file():
+        raise PackageError(f"Package-backed lab children require {lock_path}")
+    _validate_lab_lock(manifest, _safe_yaml_load(lock_path.read_bytes()), label=str(lock_path))
+
+
+def _validate_lab_lock_for_archive(
+    manifest: Mapping[str, Any], entries: Mapping[str, bytes], entry_manifest: str
+) -> None:
+    if not _package_children(manifest):
+        return
+    lock_path = f"{posixpath.dirname(entry_manifest)}/biosimulant.lock"
+    if lock_path not in entries:
+        raise PackageError("Package-backed lab children require payload/biosimulant.lock")
+    _validate_lab_lock(manifest, _safe_yaml_load(entries[lock_path]), label=lock_path)
 
 
 def _validate_lab_manifest(manifest: Mapping[str, Any]) -> None:
@@ -1830,15 +2002,17 @@ def _validate_lab_manifest(manifest: Mapping[str, Any]) -> None:
                 raise PackageError(
                     f"Lab child '{alias}' must not use repo or manifest_path"
                 )
-            if (
-                entry.get("lab_id") is not None
-                or entry.get("package") is not None
-                or entry.get("version") is not None
-            ):
-                raise PackageError(f"Lab child '{alias}' must use path references only")
+            if entry.get("lab_id") is not None:
+                raise PackageError(f"Lab child '{alias}' must not use lab_id")
             has_path_ref = isinstance(entry.get("path"), str)
-            if not has_path_ref:
-                raise PackageError(f"Lab child '{alias}' must use a path reference")
+            has_package_key = entry.get("package") is not None or entry.get("version") is not None
+            has_package_ref = isinstance(entry.get("package"), str) and isinstance(entry.get("version"), str)
+            if has_package_key and not has_package_ref:
+                raise PackageError(f"Lab child '{alias}' must use path references only or package and version together")
+            if has_path_ref and has_package_ref:
+                raise PackageError(f"Lab child '{alias}' must use either path or package/version, not both")
+            if not has_path_ref and not has_package_ref:
+                raise PackageError(f"Lab child '{alias}' must use a path reference or package/version reference")
 
     wiring = manifest.get("wiring")
     if not isinstance(wiring, list):
