@@ -7,6 +7,13 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [0.0.22] - 2026-07-29
+
+### Added
+
+- Generate a standalone HTML report for `labs run --report-file`, completing
+  headless report parity for Studio, Desktop, local terminals, and CI.
+
 ## [0.0.21] - 2026-07-29
 
 ### Added

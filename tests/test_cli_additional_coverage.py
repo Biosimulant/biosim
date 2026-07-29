@@ -363,6 +363,7 @@ def test_labs_dispatcher_covers_validate_run_serve_and_compatibility_paths(monke
     package_path = tmp_path / "lab.bsilab"
     package_path.write_text("placeholder", encoding="utf-8")
     results_path = tmp_path / "results.json"
+    report_path = tmp_path / "report.html"
 
     @contextmanager
     def fake_package_file(_path):
@@ -386,9 +387,22 @@ def test_labs_dispatcher_covers_validate_run_serve_and_compatibility_paths(monke
 
     monkeypatch.setattr(cli, "serve_lab", fake_serve_lab)
 
-    cli._main_labs(["run", "demo/lab", "--results-file", str(results_path)])
+    cli._main_labs(
+        [
+            "run",
+            "demo/lab",
+            "--results-file",
+            str(results_path),
+            "--report-file",
+            str(report_path),
+        ]
+    )
     assert "Outputs: state" in capsys.readouterr().out
     assert '"outputs": ["state"]' in results_path.read_text(encoding="utf-8")
+    report = report_path.read_text(encoding="utf-8")
+    assert "Biosimulant run report" in report
+    assert "\\u003c/script\\u003e" not in report
+    assert '"outputs": ["state"]' in report
 
     cli._main_labs(["run", "demo/lab", "--dependency-root", str(tmp_path / "state")])
     assert run_kwargs["dependency_root"] == tmp_path / "state"

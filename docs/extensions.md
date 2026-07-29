@@ -32,7 +32,7 @@ Machine consumers should use the versioned JSON envelope:
   "meta": {
     "schemaVersion": "1",
     "command": "doctor",
-    "cliVersion": "0.0.21"
+    "cliVersion": "0.0.22"
   }
 }
 ```

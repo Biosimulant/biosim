@@ -39,6 +39,7 @@ import sys
 import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict
 
@@ -432,6 +433,12 @@ def _populate_labs_parser(parser: argparse.ArgumentParser) -> argparse.ArgumentP
     run_parser.add_argument("--no-open", action="store_true", help=argparse.SUPPRESS)
     run_parser.add_argument("--results-file", type=Path, default=None)
     run_parser.add_argument(
+        "--report-file",
+        type=Path,
+        default=None,
+        help="Write a standalone HTML run report",
+    )
+    run_parser.add_argument(
         "--run-input-file",
         type=Path,
         default=None,
@@ -802,6 +809,10 @@ def _main_labs(argv: list[str], *, prog: str = "biosimulant labs") -> None:
                     if args.dependency_root is not None:
                         run_kwargs["dependency_root"] = args.dependency_root
                     result = _run_package_for_cli(package_file, **run_kwargs)
+                    if args.report_file:
+                        report_path = args.report_file.expanduser().resolve()
+                        result = {**result, "report_file": str(report_path)}
+                        _write_run_report(report_path, package_file, result)
                     if args.results_file:
                         args.results_file.parent.mkdir(parents=True, exist_ok=True)
                         args.results_file.write_text(
@@ -1782,6 +1793,66 @@ def _print_run_result(package_file: Path, result: dict[str, Any], *, json_output
         print(f"Resolved models: {modules or '(none)'}")
     if "duration" in result:
         print(f"Duration: {result['duration']}")
+    if result.get("report_file"):
+        print(f"Report: {result['report_file']}")
+
+
+def _write_run_report(
+    report_file: Path,
+    package_file: Path,
+    result: dict[str, Any],
+) -> None:
+    payload = {
+        "package_file": str(package_file),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "result": result,
+    }
+    embedded = (
+        json.dumps(payload, ensure_ascii=False, sort_keys=True)
+        .replace("&", "\\u0026")
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+        .replace("\u2028", "\\u2028")
+        .replace("\u2029", "\\u2029")
+    )
+    document = f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Biosimulant Run Report</title>
+  <style>
+    body {{ margin: 0; background: #f7f4ed; color: #18201b;
+      font: 16px/1.5 ui-sans-serif, system-ui, sans-serif; }}
+    main {{ max-width: 960px; margin: 0 auto; padding: 40px 20px 64px; }}
+    h1 {{ letter-spacing: -0.04em; }}
+    .card {{ padding: 20px; border: 1px solid #ded6c8; border-radius: 16px;
+      background: #fffdf7; box-shadow: 0 16px 48px rgba(24, 32, 27, 0.08); }}
+    pre {{ overflow: auto; white-space: pre-wrap; word-break: break-word; }}
+  </style>
+</head>
+<body>
+  <main>
+    <p>Biosimulant</p>
+    <h1>Biosimulant run report</h1>
+    <section class="card">
+      <h2>Run result</h2>
+      <pre id="biosimulant-result"></pre>
+    </section>
+  </main>
+  <script type="application/json" id="biosimulant-report-data">{embedded}</script>
+  <script>
+    const payload = JSON.parse(
+      document.getElementById("biosimulant-report-data").textContent
+    );
+    document.getElementById("biosimulant-result").textContent =
+      JSON.stringify(payload, null, 2);
+  </script>
+</body>
+</html>
+"""
+    report_file.parent.mkdir(parents=True, exist_ok=True)
+    report_file.write_text(document, encoding="utf-8")
 
 
 def _print_pack_error(exc: Exception, *, json_output: bool) -> None:
