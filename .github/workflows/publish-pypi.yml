@@ -12,6 +12,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
+      attestations: write
     environment:
       name: pypi
     steps:
@@ -38,6 +39,23 @@ jobs:
 
       - name: Check package distributions
         run: twine check dist/biosimulant/*
+
+      - name: Create release checksum manifest
+        run: |
+          mkdir -p dist/release
+          cd dist/biosimulant
+          sha256sum ./* > ../release/SHA256SUMS
+
+      - name: Sign release checksum provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/release/SHA256SUMS
+
+      - name: Upload checksum manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: biosimulant-checksums
+          path: dist/release/SHA256SUMS
 
       - name: Publish biosimulant to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1

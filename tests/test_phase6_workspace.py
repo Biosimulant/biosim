@@ -301,13 +301,13 @@ def test_local_lab_save_can_create_first_manifest_snapshot(
     assert payload["lab"]["title"] == "First Save Lab"
 
 
-def test_hub_only_lab_commands_remain_extension_owned(capsys) -> None:
+def test_legacy_entrypoint_directs_publish_to_canonical_cli(capsys) -> None:
     with pytest.raises(SystemExit) as exc_info:
         main(["labs", "publish", "./lab", "--json"], prog="biosimulant")
 
-    assert exc_info.value.code == 1
+    assert exc_info.value.code == 7
     payload = json.loads(capsys.readouterr().err)
-    assert payload["error"] == "extension_unavailable"
+    assert payload["error"] == "canonical_cli_required"
     assert payload["command"] == "labs publish"
 
 

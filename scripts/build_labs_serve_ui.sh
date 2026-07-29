@@ -24,4 +24,9 @@ fi
 echo "Building labs-serve UI..."
 npm run build
 
+echo "Normalizing generated assets..."
+find "$ROOT_DIR/src/biosim/labs_serve/static/assets" -type f \
+  \( -name '*.js' -o -name '*.css' \) \
+  -exec perl -pi -e 's/[ \t]+$//' {} +
+
 echo "Done."

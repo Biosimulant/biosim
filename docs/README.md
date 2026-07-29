@@ -22,7 +22,7 @@ existing model packages.
 - [Plugin Development](plugin-development.md): creating and distributing custom biomodules
 - [Packaging](packaging.md): building, validating, fetching, and exporting `.bsimodel` and `.bsilab` artifacts
 - [Hub composition](hub-composition.md): compose version-pinned Hub Labs into a Lab-local runtime graph
-- [CLI Extensions](extensions.md): OSS/product command ownership and extension integration contract
+- [Unified CLI](extensions.md): headless CLI ownership and Desktop boundary
 - [Releasing](releasing.md): PyPI release/tag workflow and helper script
 
 See the files in this folder for a textbook-style walkthrough with code and concrete data examples.

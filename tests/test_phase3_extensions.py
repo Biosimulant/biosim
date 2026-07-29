@@ -1,203 +1,174 @@
+"""Unified headless CLI contract tests.
+
+The filename is retained so downstream test selectors continue to work during
+the migration from the former Desktop-extension CLI.
+"""
 from __future__ import annotations
 
+import importlib
+import io
 import json
+import os
+import stat
 from pathlib import Path
-from typing import Sequence
 
 import pytest
 
-from biosim.__main__ import main
-import biosim.extensions as extension_module
-from biosim.extensions import (
-    DEFAULT_PRODUCT_EXTENSION,
-    DESKTOP_CLI_ENV,
-    DISABLE_DESKTOP_DELEGATION_ENV,
-    clear_extensions,
-    extension_command_specs,
-    register_extension,
-    run_extension_command,
-)
+from biosim import credentials
+from biosimulant.__main__ import COMMANDS, main
 
 
-class RecordingExtension:
-    def __init__(self) -> None:
-        self.calls: list[tuple[str, list[str], str]] = []
+def test_doctor_uses_schema_v1_envelope_with_global_flag_anywhere(capsys) -> None:
+    main(["doctor", "--json"])
+    payload = json.loads(capsys.readouterr().out)
 
-    def run_cli_command(self, command: str, argv: Sequence[str], *, prog: str) -> int:
-        self.calls.append((command, list(argv), prog))
-        return 0
-
-
-@pytest.fixture(autouse=True)
-def _clear_extensions(monkeypatch: pytest.MonkeyPatch) -> None:
-    clear_extensions()
-    monkeypatch.setenv(DISABLE_DESKTOP_DELEGATION_ENV, "1")
-    yield
-    clear_extensions()
+    assert payload["ok"] is True
+    assert payload["error"] is None
+    assert payload["meta"]["schemaVersion"] == "1"
+    assert payload["meta"]["command"] == "doctor"
+    assert isinstance(payload["data"]["checks"], dict)
 
 
-def test_extension_command_metadata_marks_product_only_surface() -> None:
-    specs = {spec.command: spec for spec in extension_command_specs()}
-
-    for command in (
-        "auth",
-        "runs",
-        "runtime",
-        "jobs",
-        "self",
-        "labs publish",
-        "labs sync-status",
-        "labs release publish",
-        "labs release ci",
-    ):
-        assert specs[command].extension == DEFAULT_PRODUCT_EXTENSION
-
-    assert specs["runs"].category == "desktop/cloud"
-    assert specs["runtime"].category == "desktop"
-    assert "hub" not in specs
-    assert "packages publish" not in specs
+def test_doctor_has_concise_human_output(capsys) -> None:
+    main(["doctor"])
+    output = capsys.readouterr().out
+    assert "Biosimulant doctor succeeded" in output
+    assert "Healthy:" in output
 
 
-def test_biosimulant_namespace_exposes_extension_contracts() -> None:
-    import biosimulant.extensions as extensions
-
-    assert extensions.DEFAULT_PRODUCT_EXTENSION == DEFAULT_PRODUCT_EXTENSION
-    assert extensions.extension_command_specs()
-
-
-def test_removed_hub_surface_has_clean_removed_command_error(capsys) -> None:
-    with pytest.raises(SystemExit) as exc_info:
-        main(["hub", "labs", "list"], prog="biosimulant")
-
-    assert exc_info.value.code == 2
-    captured = capsys.readouterr()
-    assert "Command removed: biosimulant hub" in captured.err
-    assert "biosimulant labs search" in captured.err
-    assert "Config file not found" not in captured.err
-
-
-def test_removed_packages_surface_can_return_json_error(capsys) -> None:
-    with pytest.raises(SystemExit) as exc_info:
-        main(["packages", "validate", "biosimulant-packages.yaml", "--json"], prog="biosimulant")
-
-    assert exc_info.value.code == 2
-    payload = json.loads(capsys.readouterr().err)
-    assert payload["error"] == "command_removed"
-    assert payload["command"] == "packages"
-    assert "labs release" in payload["replacement"]
-
-
-def test_removed_labs_export_surface_can_return_json_error(capsys) -> None:
-    with pytest.raises(SystemExit) as exc_info:
-        main(["labs", "export", "./lab", "--json"], prog="biosimulant")
-
-    assert exc_info.value.code == 2
-    payload = json.loads(capsys.readouterr().err)
-    assert payload["error"] == "command_removed"
-    assert payload["command"] == "labs export"
-    assert "labs package" in payload["replacement"]
-
-
-def test_missing_lab_publish_extension_is_not_an_argparse_unknown_command(capsys) -> None:
-    with pytest.raises(SystemExit) as exc_info:
-        main(["labs", "publish", "./my-lab", "--visibility", "private"], prog="biosimulant")
-
-    assert exc_info.value.code == 1
-    captured = capsys.readouterr()
-    assert "Command: biosimulant labs publish ./my-lab --visibility private" in captured.err
-    assert "Reason: Hub lab publishing" in captured.err
-    assert "https://biosimulant.com" in captured.err
-    assert "invalid choice" not in captured.err
-
-
-def test_missing_lab_release_publish_extension_can_return_json_error(capsys) -> None:
-    with pytest.raises(SystemExit) as exc_info:
-        main(
-            [
-                "labs",
-                "release",
-                "publish",
-                "biosimulant-packages.yaml",
-                "--dry-run",
-                "--json",
-            ],
-            prog="biosimulant",
-        )
-
-    assert exc_info.value.code == 1
-    payload = json.loads(capsys.readouterr().err)
-    assert payload["error"] == "extension_unavailable"
-    assert payload["command"] == "labs release publish"
-    assert payload["category"] == "hub"
-    assert payload["extension"] == DEFAULT_PRODUCT_EXTENSION
-
-
-def test_registered_extension_handles_lab_release_command() -> None:
-    extension = RecordingExtension()
-    register_extension(DEFAULT_PRODUCT_EXTENSION, extension)
-
-    main(["labs", "release", "publish", "biosimulant-packages.yaml"], prog="biosimulant")
-
-    assert extension.calls == [
-        (
-            "labs release publish",
-            ["release", "publish", "biosimulant-packages.yaml"],
-            "biosimulant labs",
-        )
-    ]
-
-
-def test_registered_extension_handles_desktop_runtime_command() -> None:
-    extension = RecordingExtension()
-    register_extension(DEFAULT_PRODUCT_EXTENSION, extension)
-
-    main(["runtime", "status"], prog="biosimulant")
-
-    assert extension.calls == [("runtime", ["status"], "biosimulant runtime")]
-
-
-def test_missing_extension_delegates_to_desktop_cli_when_available(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    calls: list[tuple[list[str], dict[str, str] | None]] = []
-    candidate = extension_module.DesktopCliCandidate(Path("/tmp/desktop-biosimulant"))
-
-    monkeypatch.delenv(DISABLE_DESKTOP_DELEGATION_ENV, raising=False)
-    monkeypatch.setattr(extension_module, "_find_desktop_cli", lambda: candidate)
-    monkeypatch.setattr(
-        extension_module.subprocess,
-        "call",
-        lambda args, env=None: calls.append((list(args), env)) or 17,
-    )
-
-    exit_code = run_extension_command(
-        "labs open",
-        ["open", "."],
-        prog="biosimulant labs",
-    )
-
-    assert exit_code == 17
-    assert calls[0][0] == ["/tmp/desktop-biosimulant", "labs", "open", "."]
-    assert calls[0][1] is not None
-    assert calls[0][1][DISABLE_DESKTOP_DELEGATION_ENV] == "1"
-
-
-def test_desktop_cli_discovery_uses_explicit_env_path(
+def test_doctor_accepts_the_managed_uv_sidecar(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
-    desktop_cli = tmp_path / "biosimulant"
-    desktop_cli.write_text("#!/bin/sh\n", encoding="utf-8")
-    desktop_cli.chmod(0o755)
+    uv_path = tmp_path / ("uv.exe" if os.name == "nt" else "uv")
+    uv_path.write_bytes(b"sidecar")
+    monkeypatch.setenv("BIOSIM_UV_PATH", str(uv_path))
 
-    monkeypatch.delenv(DISABLE_DESKTOP_DELEGATION_ENV, raising=False)
-    monkeypatch.setenv(DESKTOP_CLI_ENV, str(desktop_cli))
-    monkeypatch.setattr(
-        extension_module,
-        "_is_desktop_cli",
-        lambda candidate: candidate.executable == desktop_cli.resolve(),
-    )
+    main(["doctor", "--json"])
+    payload = json.loads(capsys.readouterr().out)
 
-    found = extension_module._find_desktop_cli()
+    assert payload["data"]["checks"]["uv"] == {
+        "ok": True,
+        "path": str(uv_path.resolve()),
+    }
 
-    assert found == extension_module.DesktopCliCandidate(desktop_cli.resolve())
+
+def test_validate_alias_and_global_options_delegate_to_canonical_labs(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    cli = importlib.import_module("biosimulant.__main__")
+    calls: list[tuple[list[str], str]] = []
+
+    def fake_legacy(argv: list[str], *, prog: str) -> None:
+        calls.append((argv, prog))
+        print(json.dumps({"command": "labs.validate", "valid": True}))
+
+    monkeypatch.setattr(cli, "_legacy_main", fake_legacy)
+    main(["--no-open", "validate", ".", "--json"])
+    payload = json.loads(capsys.readouterr().out)
+
+    assert calls == [(["labs", "validate", ".", "--json"], "biosimulant")]
+    assert payload["ok"] is True
+    assert payload["data"]["command"] == "labs.validate"
+
+
+def test_json_stream_finishes_with_one_terminal_result(capsys) -> None:
+    main(["commands", "list", "--json-stream"])
+    lines = capsys.readouterr().out.splitlines()
+    assert len(lines) == 2
+    events = [json.loads(line) for line in lines]
+    assert [event["type"] for event in events] == ["progress", "result"]
+    assert [event["seq"] for event in events] == [1, 2]
+    assert events[0]["stage"] == "starting"
+    assert events[0]["percentage"] == 0
+    assert events[1]["stage"] == "complete"
+    assert events[1]["percentage"] == 100
+    assert events[1]["result"]["ok"] is True
+
+
+@pytest.mark.parametrize("command_path, _summary", COMMANDS)
+def test_every_public_command_has_headless_help(
+    command_path: str,
+    _summary: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        main([*command_path.split(), "--help"])
+    assert exc_info.value.code == 0
+    output = capsys.readouterr().out
+    assert output.startswith("usage: biosimulant")
+
+
+def test_migration_json_adapters_preserve_previous_shapes(capsys) -> None:
+    main(["--legacy-json=bare", "commands", "list"])
+    bare = json.loads(capsys.readouterr().out)
+    assert "commands" in bare
+    assert "ok" not in bare
+
+    main(["commands", "list", "--legacy-json", "desktop"])
+    desktop = json.loads(capsys.readouterr().out)
+    assert desktop["ok"] is True
+    assert "commands" in desktop["data"]
+    assert desktop["error"] is None
+    assert desktop["meta"]["format"] == "json"
+    assert desktop["meta"]["cwd"]
+    assert "schemaVersion" not in desktop["meta"]
+
+
+def test_invalid_migration_json_adapter_is_usage_error(capsys) -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        main(["doctor", "--legacy-json", "unknown"])
+    assert exc_info.value.code == 2
+    assert "--legacy-json" in capsys.readouterr().err
+
+
+def test_headless_auth_stores_registry_scoped_owner_only_file(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    credential_file = tmp_path / "credentials.json"
+    monkeypatch.setenv(credentials.CREDENTIALS_FILE_ENV, str(credential_file))
+    monkeypatch.setenv(credentials.DISABLE_KEYRING_ENV, "1")
+    monkeypatch.setattr("sys.stdin", io.StringIO("secret-token\n"))
+
+    main(["auth", "login", "registry.example.com", "--token-stdin", "--json"])
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["ok"] is True
+    assert payload["data"]["registry"] == "https://registry.example.com"
+    stored = json.loads(credential_file.read_text(encoding="utf-8"))
+    assert stored["registries"]["https://registry.example.com"] == "secret-token"
+    if stat.S_IMODE(credential_file.stat().st_mode) != 0:  # Windows ACLs differ.
+        assert stat.S_IMODE(credential_file.stat().st_mode) == 0o600
+
+
+def test_desktop_only_command_is_explicitly_unavailable(capsys) -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        main(["raw", "open-window", "--json"])
+
+    assert exc_info.value.code == 7
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["error"]["code"] == "deprecated_desktop_command"
+    assert "Desktop interface" in payload["error"]["message"]
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["runs", "start", "run-1", "--json"],
+        ["runs", "upload", "run-1", "result.json", "--json"],
+        ["jobs", "list", "--json"],
+    ],
+)
+def test_advertised_but_unsupported_api_capability_exits_seven(
+    argv: list[str],
+    capsys,
+) -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        main(argv)
+    assert exc_info.value.code == 7
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["error"]["code"] == "capability_unavailable"

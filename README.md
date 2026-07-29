@@ -101,12 +101,10 @@ biosimulant --help
 python -m biosimulant --help
 ```
 
-`python -m biosim` remains available as a compatibility command. If a machine
-also has the Desktop/product CLI installed, `PATH` decides which `biosimulant`
-binary runs. Use `python -m biosimulant ...` to force the Python package CLI.
-The Python package owns local open-source workflows and the explicit
-`Client`/`AsyncClient` interfaces for hosted runs. Desktop/product extensions
-continue to own interactive Hub, publishing, app-state, and workbench workflows.
+`python -m biosim` remains available as a compatibility command. The PyPI
+package is the canonical headless CLI used by Desktop, Studio, local terminals,
+CI, and servers. Desktop-specific windows and application state remain private
+application code; Biosimulant operations use this same CLI everywhere.
 
 ### Shell completion
 

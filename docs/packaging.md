@@ -95,9 +95,9 @@ Restart the shell, or run `source ~/.zshrc` / `source ~/.bashrc`.
 package helpers remain available as Python APIs for internal tooling and
 compatibility code.
 
-Publishing, private Hub download/sync, cloud runs, Desktop state, and
-self-update commands are routed through the product extension boundary described
-in [CLI Extensions](extensions.md).
+Publishing and private downloads use the registry and authentication support
+built into the headless Python CLI. Desktop state and interface actions are not
+public CLI commands.
 
 ## Public Registry
 
@@ -108,8 +108,8 @@ biosimulant labs versions namespace/name
 biosimulant labs pull namespace/name[@version] --target ./local-lab
 ```
 
-Anonymous public reads are supported first. Private assets should fail with a
-clean auth-required error until a product extension supplies credentials.
+Public reads are anonymous. Private pull and publishing use registry-scoped
+credentials configured with `biosimulant auth login`.
 
 ## Package Repository Manifest
 

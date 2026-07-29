@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import os
 import shutil
 import shlex
@@ -39,16 +40,12 @@ import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Dict
+from typing import TYPE_CHECKING, Any, Dict
+
+if TYPE_CHECKING:
+    from .world import BioWorld
 
 from .__about__ import __version__
-from .extensions import (
-    ExtensionUnavailableError,
-    extension_error_payload,
-    get_extension_command_spec,
-    is_extension_command_path,
-    run_extension_command,
-)
 from .labs_serve import serve_lab
 from .managed_runtime import (
     run_labs_serve_with_managed_python,
@@ -68,8 +65,10 @@ from .pack import (
     validate_lab_source,
     validate_package,
 )
+from .run_overrides import apply_run_overrides
 from .registry import (
     PublicRegistryClient,
+    PackageReference,
     cached_lab_destination_for_reference,
     lab_destination_for_reference,
     parse_package_reference,
@@ -319,9 +318,18 @@ def main(argv: list[str] | None = None, *, prog: str = "biosimulant") -> None:
     if args_list and args_list[0] == "labs":
         _main_labs(args_list[1:], prog=f"{prog} labs")
         return
-    if args_list and is_extension_command_path(args_list[0]):
-        _run_extension_or_exit(args_list[0], args_list[1:], prog=f"{prog} {args_list[0]}")
-        return
+    if args_list and args_list[0] in {
+        "auth",
+        "commands",
+        "doctor",
+        "runtime",
+        "runs",
+        "jobs",
+        "raw",
+        "settings",
+        "self",
+    }:
+        _canonical_cli_required_or_exit(args_list[0], prog=prog, json_output="--json" in args_list)
 
     parser = _build_main_parser(prog=prog)
     args = parser.parse_args(args_list)
@@ -422,6 +430,12 @@ def _populate_labs_parser(parser: argparse.ArgumentParser) -> argparse.ArgumentP
     )
     run_parser.add_argument("--no-open", action="store_true", help=argparse.SUPPRESS)
     run_parser.add_argument("--results-file", type=Path, default=None)
+    run_parser.add_argument(
+        "--run-input-file",
+        type=Path,
+        default=None,
+        help="JSON object containing parameters and simulation_config overlays",
+    )
     run_parser.add_argument("--json", action="store_true", dest="json_output")
 
     serve_parser = subparsers.add_parser("serve", help="Serve a local lab or registry ref through the local lab UI")
@@ -496,11 +510,11 @@ def _populate_labs_parser(parser: argparse.ArgumentParser) -> argparse.ArgumentP
     release_build_parser.add_argument("--out", type=Path, default=Path("dist/biosimulant-packages"))
     release_build_parser.add_argument("--json", action="store_true", dest="json_output")
     release_publish_parser = release_subparsers.add_parser("publish", help="Publish a lab release manifest")
-    release_publish_parser.add_argument("extension_args", nargs=argparse.REMAINDER)
-    release_publish_parser.set_defaults(extension_command_path="labs release publish")
+    release_publish_parser.add_argument("compatibility_args", nargs=argparse.REMAINDER)
+    release_publish_parser.set_defaults(canonical_command_path="labs release publish")
     release_ci_parser = release_subparsers.add_parser("ci", help="Run lab release CI")
-    release_ci_parser.add_argument("extension_args", nargs=argparse.REMAINDER)
-    release_ci_parser.set_defaults(extension_command_path="labs release ci")
+    release_ci_parser.add_argument("compatibility_args", nargs=argparse.REMAINDER)
+    release_ci_parser.set_defaults(canonical_command_path="labs release ci")
 
     search_parser = subparsers.add_parser("search", help="Search public registry labs")
     search_parser.add_argument("query", nargs="?")
@@ -558,7 +572,7 @@ def _populate_labs_parser(parser: argparse.ArgumentParser) -> argparse.ArgumentP
     inspect_owned_parser.add_argument("--json", action="store_true", dest="json_output")
 
     for name in ("import", "open", "publish", "sync-status"):
-        _add_extension_subcommand(subparsers, name, f"labs {name}")
+        _add_compatibility_subcommand(subparsers, name, f"labs {name}")
 
     _enable_path_completers(parser)
     return parser
@@ -571,8 +585,12 @@ def _main_labs(argv: list[str], *, prog: str = "biosimulant labs") -> None:
     parser = _build_labs_parser(prog=prog)
     _autocomplete(parser)
     args = parser.parse_args(argv)
-    if extension_command := getattr(args, "extension_command_path", None):
-        _run_extension_or_exit(extension_command, argv, prog=prog)
+    if canonical_command := getattr(args, "canonical_command_path", None):
+        _canonical_cli_required_or_exit(
+            canonical_command,
+            prog=prog,
+            json_output="--json" in argv,
+        )
         return
 
     try:
@@ -683,7 +701,7 @@ def _main_labs(argv: list[str], *, prog: str = "biosimulant labs") -> None:
             _print_registry_result(payload, json_output=args.json_output)
             return
         if args.command == "info":
-            client = PublicRegistryClient(args.registry_url)
+            client = _registry_client_for_reference(args.reference, args.registry_url)
             payload = {
                 "command": "labs.info",
                 "registry_url": client.base_url,
@@ -693,7 +711,7 @@ def _main_labs(argv: list[str], *, prog: str = "biosimulant labs") -> None:
             _print_registry_result(payload, json_output=args.json_output)
             return
         if args.command == "versions":
-            client = PublicRegistryClient(args.registry_url)
+            client = _registry_client_for_reference(args.reference, args.registry_url)
             payload = {
                 "command": "labs.versions",
                 "registry_url": client.base_url,
@@ -771,20 +789,28 @@ def _main_labs(argv: list[str], *, prog: str = "biosimulant labs") -> None:
                 registry_url=args.registry_url,
                 emit_status=not args.json_output,
             )
-            with _package_file_for_lab(lab_path) as package_file:
-                run_kwargs: dict[str, Any] = {
-                    "install_deps": not args.no_install_deps,
-                }
-                if args.dependency_root is not None:
-                    run_kwargs["dependency_root"] = args.dependency_root
-                result = _run_package_for_cli(package_file, **run_kwargs)
-                if args.results_file:
-                    args.results_file.parent.mkdir(parents=True, exist_ok=True)
-                    args.results_file.write_text(
-                        json_dumps(result) + "\n",
-                        encoding="utf-8",
+            with _lab_path_with_run_inputs(
+                lab_path,
+                args.run_input_file,
+            ) as runnable_lab_path:
+                with _package_file_for_lab(runnable_lab_path) as package_file:
+                    run_kwargs: dict[str, Any] = {
+                        "install_deps": not args.no_install_deps,
+                    }
+                    if args.dependency_root is not None:
+                        run_kwargs["dependency_root"] = args.dependency_root
+                    result = _run_package_for_cli(package_file, **run_kwargs)
+                    if args.results_file:
+                        args.results_file.parent.mkdir(parents=True, exist_ok=True)
+                        args.results_file.write_text(
+                            json_dumps(result) + "\n",
+                            encoding="utf-8",
+                        )
+                    _print_run_result(
+                        package_file,
+                        result,
+                        json_output=args.json_output,
                     )
-                _print_run_result(package_file, result, json_output=args.json_output)
             return
         if args.command == "serve":
             lab_path, _pull = _resolve_runtime_lab_path(
@@ -853,11 +879,15 @@ def _main_packages(argv: list[str], *, prog: str = "biosimulant packages") -> No
     run_parser.add_argument("--json", action="store_true", dest="json_output")
 
     for name in ("preview", "import", "export-model", "export-lab", "publish", "ci"):
-        _add_extension_subcommand(subparsers, name, f"packages {name}")
+        _add_compatibility_subcommand(subparsers, name, f"packages {name}")
 
     args = parser.parse_args(argv)
-    if extension_command := getattr(args, "extension_command_path", None):
-        _run_extension_or_exit(extension_command, argv, prog=prog)
+    if canonical_command := getattr(args, "canonical_command_path", None):
+        _canonical_cli_required_or_exit(
+            canonical_command,
+            prog=prog,
+            json_output="--json" in argv,
+        )
         return
 
     try:
@@ -1084,6 +1114,8 @@ def _pull_public_lab(
     if parsed is None:
         raise PackageError("labs pull requires a package reference: namespace/name[@version]")
     registry_client = client or PublicRegistryClient(registry_url)
+    if client is None:
+        registry_client = _new_registry_client(parsed, registry_url)
     if artifact is None:
         _print_registry_status(f"Resolving {reference}...", enabled=emit_status)
         artifact = registry_client.resolve_package(parsed.package_name, parsed.version)
@@ -1098,7 +1130,12 @@ def _pull_public_lab(
         )
 
     _print_registry_status("Downloading package...", enabled=emit_status)
-    archive_bytes = registry_client.download_package(str(artifact["id"]))
+    archive_bytes = _download_registry_artifact(
+        registry_client,
+        artifact,
+        package_name=parsed.package_name,
+        version=parsed.version or str(artifact.get("version") or ""),
+    )
     actual_sha = hashlib.sha256(archive_bytes).hexdigest()
     expected_sha = str(artifact.get("sha256") or "")
     if expected_sha and actual_sha != expected_sha:
@@ -1162,7 +1199,7 @@ def _resolve_runtime_lab_path(
     if parsed is None:
         return lab, None
 
-    client = PublicRegistryClient(registry_url)
+    client = _new_registry_client(parsed, registry_url)
     _print_registry_status(f"Resolving {reference}...", enabled=emit_status)
     artifact = client.resolve_package(parsed.package_name, parsed.version)
     if artifact.get("package_type") != "lab":
@@ -1200,6 +1237,42 @@ def _resolve_runtime_lab_path(
         artifact=artifact,
     )
     return destination, pull_result
+
+
+def _registry_client_for_reference(
+    reference: str,
+    registry_url: str | None,
+) -> PublicRegistryClient:
+    parsed = parse_package_reference(reference, allow_missing_version=True)
+    if parsed is None:
+        return PublicRegistryClient(registry_url)
+    return _new_registry_client(parsed, registry_url)
+
+
+def _new_registry_client(
+    reference: PackageReference,
+    registry_url: str | None,
+) -> PublicRegistryClient:
+    factory = getattr(PublicRegistryClient, "for_reference", None)
+    if callable(factory):
+        return factory(reference, base_url=registry_url)
+    return PublicRegistryClient(registry_url)
+
+
+def _download_registry_artifact(
+    client: PublicRegistryClient,
+    artifact: dict[str, Any],
+    *,
+    package_name: str,
+    version: str,
+) -> bytes:
+    if getattr(client, "_v1", False):
+        return client.download_package(
+            str(artifact.get("id") or ""),
+            package_name=package_name,
+            version=version,
+        )
+    return client.download_package(str(artifact["id"]))
 
 
 def _init_lab_project(
@@ -1334,6 +1407,67 @@ def _package_file_for_lab(path: Path) -> Iterator[Path]:
         )
 
 
+@contextmanager
+def _lab_path_with_run_inputs(
+    path: Path,
+    run_input_file: Path | None,
+) -> Iterator[Path]:
+    if run_input_file is None:
+        yield path
+        return
+    input_path = run_input_file.expanduser().resolve()
+    try:
+        run_inputs = json.loads(input_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise PackageError(f"Invalid run input file {input_path}: {exc}") from exc
+    if not isinstance(run_inputs, dict):
+        raise PackageError("Run input file must contain a JSON object")
+    unknown = sorted(set(run_inputs) - {"parameters", "simulation_config"})
+    if unknown:
+        raise PackageError(
+            f"Run input file contains unsupported keys: {', '.join(unknown)}"
+        )
+    for key in ("parameters", "simulation_config"):
+        value = run_inputs.get(key)
+        if value is not None and not isinstance(value, dict):
+            raise PackageError(f"Run input `{key}` must be a JSON object or null")
+
+    source = path.expanduser().resolve()
+    with tempfile.TemporaryDirectory(prefix="biosim-run-inputs-") as temp_dir:
+        temp_root = Path(temp_dir)
+        if source.is_file():
+            if source.suffix != ".bsilab":
+                raise PackageError(f"Expected a .bsilab package: {source}")
+            unpacked = unpack_package(source, dest=temp_root / "unpacked")
+            staged = unpacked / "payload"
+        elif source.is_dir():
+            staged = temp_root / "lab"
+            shutil.copytree(source, staged)
+        else:
+            raise PackageError(f"Lab path not found: {source}")
+
+        manifest_path = _lab_config_path(staged)
+        manifest = _load_structured_file(manifest_path)
+        if not isinstance(manifest, dict):
+            raise PackageError(f"{manifest_path} must contain a YAML mapping")
+        apply_run_overrides(
+            manifest,
+            parameters=run_inputs.get("parameters"),
+            simulation_config=run_inputs.get("simulation_config"),
+        )
+        try:
+            import yaml
+        except ImportError as exc:
+            raise PackageError(
+                "Run input overlays require PyYAML. Install with: pip install pyyaml"
+            ) from exc
+        manifest_path.write_text(
+            yaml.safe_dump(manifest, sort_keys=False),
+            encoding="utf-8",
+        )
+        yield staged
+
+
 def _lab_config_path(path: Path) -> Path:
     target = path.expanduser().resolve()
     if target.is_file():
@@ -1459,46 +1593,39 @@ def _print_registry_result(payload: dict[str, Any], *, json_output: bool) -> Non
         print(f"Path: {payload['path']}")
 
 
-def _add_extension_subcommand(
+def _add_compatibility_subcommand(
     subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
     name: str,
     command_path: str,
 ) -> None:
-    spec = get_extension_command_spec(command_path)
-    summary = spec.summary if spec else "Product extension command"
-    parser = subparsers.add_parser(name, help=f"{summary} (requires product extension)")
-    parser.add_argument("extension_args", nargs=argparse.REMAINDER)
-    parser.set_defaults(extension_command_path=command_path)
-
-
-def _run_extension_or_exit(command: str, argv: list[str], *, prog: str) -> None:
-    try:
-        exit_code = run_extension_command(command, argv, prog=prog)
-    except ExtensionUnavailableError as exc:
-        _print_extension_unavailable(exc, json_output="--json" in argv)
-        raise SystemExit(1) from exc
-    if exit_code:
-        raise SystemExit(exit_code)
-
-
-def _print_extension_unavailable(exc: ExtensionUnavailableError, *, json_output: bool) -> None:
-    if json_output:
-        print(json_dumps(extension_error_payload(exc)), file=sys.stderr)
-        return
-
-    payload = extension_error_payload(exc)
-    print("Biosimulant product extension required.", file=sys.stderr)
-    print(f"Command: {payload['invocation']}", file=sys.stderr)
-    print(f"Category: {payload['category']}", file=sys.stderr)
-    print(f"Extension: {payload['extension']}", file=sys.stderr)
-    print(f"Reason: {payload['summary']}", file=sys.stderr)
-    print(f"Next step: {payload['install_hint']}", file=sys.stderr)
-    print(
-        "Open-source local commands remain available: "
-        "biosimulant labs init|validate|run|serve|package; "
-        "biosimulant labs release validate|build.",
-        file=sys.stderr,
+    parser = subparsers.add_parser(
+        name,
+        help="Deprecated compatibility command; use the canonical biosimulant CLI",
     )
+    parser.add_argument("compatibility_args", nargs=argparse.REMAINDER)
+    parser.set_defaults(canonical_command_path=command_path)
+
+
+def _canonical_cli_required_or_exit(
+    command: str,
+    *,
+    prog: str,
+    json_output: bool,
+) -> None:
+    payload = {
+        "error": "canonical_cli_required",
+        "command": command,
+        "message": (
+            "This compatibility entrypoint does not implement this command. "
+            "Run it through the headless `biosimulant` CLI."
+        ),
+    }
+    if json_output:
+        print(json_dumps(payload), file=sys.stderr)
+    else:
+        print(f"Command unavailable in compatibility mode: {prog} {command}", file=sys.stderr)
+        print(payload["message"], file=sys.stderr)
+    raise SystemExit(7)
 
 
 def _print_lab_init_success(payload: dict[str, Any], *, json_output: bool) -> None:

@@ -359,7 +359,7 @@ def test_labs_dispatcher_covers_oss_commands_with_lightweight_fakes(monkeypatch,
     assert exc_info.value.code == 1
 
 
-def test_labs_dispatcher_covers_validate_run_serve_and_extension_paths(monkeypatch, tmp_path, capsys) -> None:
+def test_labs_dispatcher_covers_validate_run_serve_and_compatibility_paths(monkeypatch, tmp_path, capsys) -> None:
     package_path = tmp_path / "lab.bsilab"
     package_path.write_text("placeholder", encoding="utf-8")
     results_path = tmp_path / "results.json"
@@ -409,10 +409,10 @@ def test_labs_dispatcher_covers_validate_run_serve_and_extension_paths(monkeypat
     assert exc_info.value.code == 1
     assert "broken archive" in capsys.readouterr().err
 
-    seen = {}
-    monkeypatch.setattr(cli, "_run_extension_or_exit", lambda command, argv, *, prog: seen.update(command=command, argv=argv, prog=prog))
-    cli._main_labs(["release", "publish"])
-    assert seen["command"] == "labs release publish"
+    with pytest.raises(SystemExit) as exc_info:
+        cli._main_labs(["release", "publish", "manifest.yaml", "--json"])
+    assert exc_info.value.code == 7
+    assert '"command": "labs release publish"' in capsys.readouterr().err
 
 
 def test_labs_serve_reinvokes_managed_python_before_serving(

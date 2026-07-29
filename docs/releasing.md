@@ -14,7 +14,8 @@ new installs should use `pip install biosimulant`.
    release section.
 4. Commit and push the version/changelog bump to `main`.
 5. Create and push a matching tag (`v0.0.15`).
-6. Verify GitHub Actions `Publish to PyPI` finishes successfully.
+6. Verify GitHub Actions `Publish to PyPI` finishes successfully and produces
+   the `biosimulant-checksums` artifact plus its build-provenance attestation.
 7. Verify a fresh install from PyPI:
 
 ```bash
@@ -24,12 +25,12 @@ python -m venv /tmp/biosimulant-release-check
 /tmp/biosimulant-release-check/bin/python -m biosim --help
 ```
 
-## Command collision note
+## Forwarding-wrapper note
 
-The Python package installs a `biosimulant` console script. Machines that also
-install the Desktop/product CLI can have another `biosimulant` binary on `PATH`.
-Use `python -m biosimulant ...` to explicitly run the Python package CLI during
-release verification and debugging.
+The Python package installs the canonical `biosimulant` console script. During
+the one-release migration window, an older native installation may leave a
+forwarding wrapper earlier on `PATH`. Use `python -m biosimulant ...` to
+explicitly verify the installed Python package.
 
 ## Manual commands
 

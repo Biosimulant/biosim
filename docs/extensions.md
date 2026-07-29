@@ -1,102 +1,44 @@
-# Biosimulant CLI Extensions
+# Unified Biosimulant CLI
 
-The open-source `biosimulant` Python package owns the local developer workflow.
-Product, Desktop, Hub, cloud, auth, agent, and commercial behavior are extension
-surfaces over that core.
+The `biosimulant` Python package owns one headless CLI for Desktop, Studio,
+local terminals, CI, servers, and containers. There is no separate command
+extension package or Desktop CLI implementation.
 
-## Open-Source Core
+The public CLI owns simulation, lab, package, registry, authentication, and
+managed-runtime operations. Run `biosimulant commands list --json` for the
+machine-readable catalog.
 
-These commands work without Desktop, Hub credentials, cloud access, or a product
-binary:
+Desktop remains a graphical client. Window management, navigation,
+notifications, visual settings, and Desktop persistence are ordinary private
+application code rather than public commands. Desktop invokes the pinned PyPI
+CLI for operations such as validation, runs, pull, and publish.
 
-```bash
-biosimulant labs create ./my-lab --name "My Lab"
-biosimulant labs list .
-biosimulant labs get ./my-lab
-biosimulant labs save ./my-lab
-biosimulant labs package ./my-lab --out dist
-biosimulant labs add-model models/example --lab ./my-lab --alias example
-biosimulant labs vendor-model ../model-source --lab ./my-lab --alias vendored
-biosimulant labs inspect-owned ./my-lab
-biosimulant labs validate ./my-lab
-biosimulant labs run ./my-lab
-biosimulant labs serve ./my-lab
-
-biosimulant labs release validate biosimulant-packages.yaml
-biosimulant labs release build biosimulant-packages.yaml
-
-biosimulant labs search immune
-biosimulant labs info biosimulant/example-lab@1.0.0
-biosimulant labs pull biosimulant/example-lab@1.0.0 --target ./example-lab
-```
-
-The OSS package also exposes runtime APIs such as `BioWorld`, `BioModule`,
-signals, wiring, package validation, and local package execution.
-
-## Product Extension Boundary
-
-Commands in these areas require the `biosimulant-product` extension:
-
-- `auth`: Hub login, logout, token exchange, and secure credentials
-- `runs`: Desktop run index, cloud runs, upload, logs, and reports
-- `runtime`: Desktop-managed runtime bootstrap and inspection
-- `settings`: Desktop settings, logs, data directory, and dashboard integration
-- `jobs`: commercial hosted jobs and job inspection
-- `self`: product CLI self-update behavior
-- `agent`, `agents`, `chat`: authenticated product agent workflows
-- product-only `labs` commands such as `import`, `open`, `publish`, `sync-status`, and `release publish|ci`
-- product-only `runs remote ...` commands for Hub remote runs
-
-When the extension is not installed, the OSS CLI exits with a clear
-`extension_unavailable` error instead of trying to interpret the command as a
-local simulation config.
-
-Human-readable example:
-
-```text
-Biosimulant product extension required.
-Command: biosimulant labs publish ./my-lab
-Category: hub
-Extension: biosimulant-product
-Next step: Download the Biosimulant Desktop app from https://biosimulant.com, install its CLI tools, or set BIOSIMULANT_DESKTOP_CLI to the Desktop CLI binary, then retry this command.
-```
-
-JSON example:
+Registry credentials are stored independently by registry origin. The CLI
+checks an operation-scoped environment token, a configured credential helper,
+an OS keychain when available, and finally an owner-only credential file.
+Headless login accepts tokens through standard input:
 
 ```bash
-biosimulant labs release publish biosimulant-packages.yaml --json
+printf '%s\n' "$TOKEN" | biosimulant auth login registry.example.com --token-stdin
 ```
+
+Machine consumers should use the versioned JSON envelope:
 
 ```json
 {
-  "error": "extension_unavailable",
-  "command": "labs release publish",
-  "extension": "biosimulant-product"
+  "ok": true,
+  "data": {},
+  "error": null,
+  "meta": {
+    "schemaVersion": "1",
+    "command": "doctor",
+    "cliVersion": "0.0.21"
+  }
 }
 ```
 
-## Integration Contract
-
-Product code should register one extension implementation with:
-
-```python
-from biosimulant.extensions import register_extension
-
-register_extension("biosimulant-product", product_extension)
-```
-
-The registered object must implement:
-
-```python
-def run_cli_command(command: str, argv: Sequence[str], *, prog: str) -> int | None:
-    ...
-```
-
-The command path is a stable ownership key such as `runtime`,
-`labs publish`, or `labs release publish`. The `argv` sequence is the original
-remaining CLI argument list for that command surface.
-
-Local workflow implementations should remain in the OSS core. Product code may
-authenticate, persist, adapt, upload, download, or decorate shared behavior, but
-should not reimplement local lab source-tree management, package validation,
-build, run, or serve logic.
+For the first unified-CLI migration release only,
+`--legacy-json=bare` preserves the previous Python payload shape and
+`--legacy-json=desktop` preserves the former Desktop `{ok,data,error,meta}`
+envelope. New integrations must use `--json` or `--json-stream`; the legacy
+adapters are scheduled for removal after one complete release.

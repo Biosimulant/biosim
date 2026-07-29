@@ -160,6 +160,10 @@ def test_lab_versions_requires_package_to_link_to_lab(monkeypatch) -> None:
     [
         ("demo/immune@1.0.0", ("demo/immune", "1.0.0")),
         ("demo/immune", ("demo/immune", None)),
+        (
+            "registry.example.com/demo/immune@1.0.0",
+            ("demo/immune", "1.0.0"),
+        ),
         ("./demo/immune", None),
         ("/demo/immune", None),
         ("demo/immune/extra", None),
@@ -174,6 +178,130 @@ def test_parse_package_reference(value, expected) -> None:
     else:
         assert parsed is not None
         assert (parsed.package_name, parsed.version) == expected
+
+
+def test_qualified_reference_preserves_registry_origin() -> None:
+    parsed = parse_package_reference(
+        "registry.example.com/demo/immune@1.0.0",
+        allow_missing_version=True,
+    )
+    assert parsed is not None
+    assert parsed.registry == "registry.example.com"
+    assert parsed.qualified_name == "registry.example.com/demo/immune@1.0.0"
+
+
+def test_registry_v1_discovery_resolve_download_and_auth(monkeypatch) -> None:
+    requests = []
+
+    def fake_urlopen(request, timeout):
+        requests.append(request)
+        if request.full_url.endswith("/.well-known/biosimulant-registry"):
+            return _Response(
+                json.dumps(
+                    {
+                        "protocolVersion": "1",
+                        "apiBase": "/api/registry/v1",
+                        "auth": {"type": "bearer"},
+                        "capabilities": ["pull", "publish"],
+                    }
+                ).encode("utf-8")
+            )
+        if request.full_url.endswith("/download"):
+            return _Response(b"package")
+        return _Response(json.dumps({"artifactId": "artifact-1"}).encode("utf-8"))
+
+    monkeypatch.setattr(registry, "urlopen", fake_urlopen)
+    client = PublicRegistryClient(registry="registry.example.com", token="secret")
+    artifact = client.resolve_package("demo/immune", "1.0.0")
+    content = client.download_package(
+        "artifact-1",
+        package_name="demo/immune",
+        version="1.0.0",
+    )
+
+    assert artifact["artifactId"] == "artifact-1"
+    assert content == b"package"
+    assert requests[1].full_url.endswith(
+        "/api/registry/v1/packages/demo/immune/1.0.0"
+    )
+    assert requests[2].full_url.endswith(
+        "/api/registry/v1/packages/demo/immune/1.0.0/download"
+    )
+    assert requests[1].get_header("Authorization") == "Bearer secret"
+
+
+def test_registry_v1_normalizes_default_version_and_search_query(monkeypatch) -> None:
+    requests = []
+
+    def fake_urlopen(request, timeout):
+        requests.append(request)
+        if request.full_url.endswith("/.well-known/biosimulant-registry"):
+            return _Response(
+                json.dumps(
+                    {
+                        "protocolVersion": "1",
+                        "apiBase": "/api/registry/v1",
+                    }
+                ).encode("utf-8")
+            )
+        if "/packages?" in request.full_url:
+            return _Response(json.dumps({"items": [], "total": 0}).encode("utf-8"))
+        return _Response(
+            json.dumps(
+                {
+                    "latest": {
+                        "artifactId": "artifact-1",
+                        "labId": "lab-1",
+                        "packageType": "lab",
+                        "version": "1.0.0",
+                    }
+                }
+            ).encode("utf-8")
+        )
+
+    monkeypatch.setattr(registry, "urlopen", fake_urlopen)
+    client = PublicRegistryClient(registry="registry.example.com", token="")
+    artifact = client.resolve_package("demo/immune")
+    client.search_labs("immune", page_size=17)
+
+    assert artifact["id"] == "artifact-1"
+    assert artifact["lab_id"] == "lab-1"
+    assert artifact["package_type"] == "lab"
+    assert "q=immune" in requests[-1].full_url
+    assert "pageSize=17" in requests[-1].full_url
+
+
+def test_default_hub_discovery_safely_falls_back_to_legacy(monkeypatch) -> None:
+    requests = []
+
+    def fake_urlopen(request, timeout):
+        requests.append(request)
+        if ".well-known" in request.full_url:
+            raise URLError("not deployed")
+        return _Response(json.dumps({"id": "legacy-artifact"}).encode("utf-8"))
+
+    monkeypatch.setattr(registry, "urlopen", fake_urlopen)
+    client = PublicRegistryClient(token="")
+    payload = client.resolve_package("demo/immune", "1.0.0")
+
+    assert payload["id"] == "legacy-artifact"
+    assert requests[-1].full_url.startswith(registry.DEFAULT_REGISTRY_URL)
+
+
+def test_explicit_legacy_hub_url_uses_default_hub_credentials(monkeypatch) -> None:
+    requests = []
+    monkeypatch.delenv("BIOSIMULANT_TOKEN", raising=False)
+    monkeypatch.delenv("BIOSIMULANT_WORKSPACE_TOKEN", raising=False)
+    monkeypatch.setenv("BIOSIMULANT_ACCESS_TOKEN", "legacy-access")
+
+    def fake_urlopen(request, timeout):
+        requests.append(request)
+        return _Response(json.dumps({"id": "lab-1"}).encode("utf-8"))
+
+    monkeypatch.setattr(registry, "urlopen", fake_urlopen)
+    PublicRegistryClient(registry.DEFAULT_REGISTRY_URL).get_lab("lab-1")
+
+    assert requests[0].get_header("Authorization") == "Bearer legacy-access"
 
 
 def test_parse_package_reference_requires_version_when_configured() -> None:

@@ -7,6 +7,27 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [0.0.21] - 2026-07-29
+
+### Added
+
+- Add the canonical headless CLI contract, schema-v1 JSON/JSONL output,
+  standardized exit codes, portable doctor/runtime commands, and top-level
+  `validate` and `run` aliases.
+- Add registry-qualified references, Registry API v1 discovery and publishing,
+  registry-scoped credentials, and short-lived workspace token exchange.
+- Add headless runs, remote-runs, jobs capability reporting, lab publishing,
+  sync status, and release publishing workflows.
+
+### Changed
+
+- Make the MIT PyPI package the sole public CLI implementation used by local,
+  Desktop, Studio, CI, and server environments.
+
+### Removed
+
+- Remove the proprietary extension contract and Desktop-binary CLI delegation.
+
 ## [0.0.20] - 2026-07-19
 
 ### Added
