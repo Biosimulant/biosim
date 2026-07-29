@@ -129,6 +129,10 @@ def test_labs_option_completion(tmp_path: Path) -> None:
     assert "--out" in package_completions
 
 
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="argcomplete file completion targets POSIX shells, not PowerShell",
+)
 def test_path_completion_for_config_and_lab_paths(tmp_path: Path) -> None:
     (tmp_path / "config.yaml").write_text(
         "runtime:\n  communication_step: 0.1\n",
