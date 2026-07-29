@@ -69,7 +69,7 @@ def test_run_package_with_managed_python_spawns_managed_runtime_on_mismatch(
 
     assert result == {"managed": True}
     assert (
-        "Re-launching package run under managed Python 3.11: /runtime/python"
+        f"Re-launching package run under managed Python 3.11: {Path('/runtime/python')}"
         in capsys.readouterr().err
     )
     assert calls == {
@@ -163,7 +163,7 @@ def test_run_labs_serve_with_managed_python_spawns_on_mismatch(
     assert result == 7
     assert observed["version"] == "3.10"
     assert observed["args"] == [
-        "/runtime/python",
+        str(Path("/runtime/python")),
         "-m",
         "biosim",
         "labs",

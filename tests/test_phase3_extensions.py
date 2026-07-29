@@ -141,7 +141,7 @@ def test_headless_auth_stores_registry_scoped_owner_only_file(
     assert payload["data"]["registry"] == "https://registry.example.com"
     stored = json.loads(credential_file.read_text(encoding="utf-8"))
     assert stored["registries"]["https://registry.example.com"] == "secret-token"
-    if stat.S_IMODE(credential_file.stat().st_mode) != 0:  # Windows ACLs differ.
+    if os.name != "nt":
         assert stat.S_IMODE(credential_file.stat().st_mode) == 0o600
 
 

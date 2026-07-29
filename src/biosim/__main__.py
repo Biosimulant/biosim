@@ -417,7 +417,8 @@ def _populate_labs_parser(parser: argparse.ArgumentParser) -> argparse.ArgumentP
     validate_parser.add_argument("--json", action="store_true", dest="json_output")
 
     run_parser = subparsers.add_parser("run", help="Run a local lab source tree, .bsilab, or registry ref")
-    run_parser.add_argument("lab", type=Path, nargs="?", default=Path("."))
+    run_lab_action = run_parser.add_argument("lab", nargs="?", default=".")
+    run_lab_action.completer = _path_completer
     run_parser.add_argument("--target", type=Path, default=None, help="Destination for auto-pulled registry refs")
     run_parser.add_argument("--force", action="store_true", help="Replace an existing auto-pull target")
     run_parser.add_argument("--registry-url", default=None)
@@ -439,7 +440,8 @@ def _populate_labs_parser(parser: argparse.ArgumentParser) -> argparse.ArgumentP
     run_parser.add_argument("--json", action="store_true", dest="json_output")
 
     serve_parser = subparsers.add_parser("serve", help="Serve a local lab or registry ref through the local lab UI")
-    serve_parser.add_argument("lab", type=Path, nargs="?", default=Path("."))
+    serve_lab_action = serve_parser.add_argument("lab", nargs="?", default=".")
+    serve_lab_action.completer = _path_completer
     serve_parser.add_argument("--target", type=Path, default=None, help="Destination for auto-pulled registry refs")
     serve_parser.add_argument("--force", action="store_true", help="Replace an existing auto-pull target")
     serve_parser.add_argument("--registry-url", default=None)
@@ -1183,16 +1185,16 @@ def _print_registry_status(message: str, *, enabled: bool) -> None:
 
 
 def _resolve_runtime_lab_path(
-    lab: Path,
+    lab: str | Path,
     *,
     target: Path | None,
     force: bool,
     registry_url: str | None,
     emit_status: bool = False,
 ) -> tuple[Path, dict[str, Any] | None]:
-    local_candidate = lab.expanduser()
+    local_candidate = Path(lab).expanduser()
     if local_candidate.exists():
-        return lab, None
+        return local_candidate, None
 
     reference = str(lab)
     parsed = parse_package_reference(reference, allow_missing_version=True)

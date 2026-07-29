@@ -871,7 +871,7 @@ def test_structure3d_run_artifact_persists_across_session_restart(
 ) -> None:
     lab = _write_lab(tmp_path / "lab")
     source_artifact = tmp_path / "complex.cif"
-    source_artifact.write_text("data_complex\n", encoding="utf-8")
+    source_artifact.write_bytes(b"data_complex\n")
 
     class StructureWorld(_RuntimeWorld):
         def collect_visuals(self) -> list[dict[str, object]]:
@@ -921,7 +921,7 @@ def test_structure3d_run_artifact_persists_across_session_restart(
     source = results["data"]["results"]["visuals"][0]["visuals"][0]["data"]["source"]
     assert source["artifact_id"] == "complex-artifact"
     assert source["url"] == f"/api/runs/{run_id}/artifacts/complex-artifact"
-    assert ".biosimulant/runs" in source["path"]
+    assert ".biosimulant/runs" in source["path"].replace("\\", "/")
     response = restarted_client.get(source["url"])
     assert response.status_code == 200
     assert response.text == "data_complex\n"
@@ -944,7 +944,7 @@ def test_structure3d_visuals_register_artifact_url_and_serve_file(tmp_path: Path
     lab = _write_lab(tmp_path / "lab")
     client, session = _client(lab)
     artifact = tmp_path / "complex.cif"
-    artifact.write_text("data_complex\n", encoding="utf-8")
+    artifact.write_bytes(b"data_complex\n")
     run = RunRecord(id="run-structure", lab_id="lab", parameters=None, simulation_config=None)
     run.status = "completed"
     run.results = {

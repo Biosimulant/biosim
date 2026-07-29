@@ -139,5 +139,5 @@ def test_path_completion_for_config_and_lab_paths(tmp_path: Path) -> None:
     config_completions = _completion_values("biosimulant con", tmp_path)
     lab_completions = _completion_values("biosimulant labs run lab-", tmp_path)
 
-    assert any(value.startswith("config.yaml") for value in config_completions)
-    assert any(value.startswith("lab-one") for value in lab_completions)
+    assert any(Path(value).name.startswith("config.yaml") for value in config_completions)
+    assert any(Path(value).name.startswith("lab-one") for value in lab_completions)
