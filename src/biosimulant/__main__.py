@@ -805,6 +805,13 @@ def _normalize_exit_code(code: int, *, invalid: bool = False) -> int:
 
 def _failure_for_exception(exc: Exception) -> CliFailure:
     message = str(exc)
+    if isinstance(exc, CredentialError):
+        return CliFailure(
+            exc.code,
+            message,
+            exit_code=exc.exit_code,
+            details=exc.details,
+        )
     lower = message.lower()
     if "authentication" in lower or "unauthorized" in lower or "forbidden" in lower:
         return CliFailure("authentication", message, exit_code=EXIT_AUTH)

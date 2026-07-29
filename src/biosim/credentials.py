@@ -6,17 +6,18 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import stat
 import subprocess
 import time
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
-from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 
-DEFAULT_REGISTRY = "hub.biosimulant.ai"
+DEFAULT_REGISTRY = "hub.biosimulant.com"
 DEFAULT_HUB_API_BASE = "https://prod-api.biosimulant.com/api"
 TOKEN_ENV = "BIOSIMULANT_TOKEN"
 WORKSPACE_TOKEN_ENV = "BIOSIMULANT_WORKSPACE_TOKEN"
@@ -27,10 +28,30 @@ CREDENTIALS_FILE_ENV = "BIOSIMULANT_CREDENTIALS_FILE"
 DISABLE_KEYRING_ENV = "BIOSIMULANT_DISABLE_KEYRING"
 _KEYRING_SERVICE = "biosimulant-registry"
 _WORKSPACE_TOKEN_CACHE: dict[str, tuple[str, float]] = {}
+_EXCHANGE_MAX_ATTEMPTS = 3
+_EXCHANGE_RETRY_DELAYS_SECONDS = (0.25, 0.75)
+_TRANSIENT_EXCHANGE_STATUSES = frozenset({404, 408, 429})
+_JWT_PATTERN = re.compile(
+    r"\b[A-Za-z0-9_-]{12,}\.[A-Za-z0-9_-]{12,}\.[A-Za-z0-9_-]{12,}\b"
+)
+_BEARER_PATTERN = re.compile(r"(?i)\bbearer\s+[^\s,;\"']+")
 
 
 class CredentialError(RuntimeError):
     """Raised when registry credentials cannot be read or persisted safely."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str = "credential_error",
+        details: dict[str, Any] | None = None,
+        exit_code: int = 1,
+    ) -> None:
+        self.code = code
+        self.details = details
+        self.exit_code = exit_code
+        super().__init__(message)
 
 
 def normalize_registry_origin(value: str | None) -> str:
@@ -277,21 +298,146 @@ def _exchange_workspace_token(origin: str, identity_token: str) -> str:
     request.add_header("Authorization", f"Bearer {identity_token}")
     request.add_header("Content-Type", "application/json")
     request.add_header("Accept", "application/json")
-    try:
-        with urlopen(request, timeout=15) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-    except (HTTPError, URLError, OSError, json.JSONDecodeError) as exc:
-        raise CredentialError("Workspace registry token exchange failed") from exc
+    payload: Any = None
+    for attempt in range(1, _EXCHANGE_MAX_ATTEMPTS + 1):
+        try:
+            with urlopen(request, timeout=15) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+            break
+        except HTTPError as exc:
+            status = int(exc.code)
+            backend_message = _safe_http_error_message(exc)
+            if _is_transient_exchange_status(status):
+                if attempt < _EXCHANGE_MAX_ATTEMPTS:
+                    time.sleep(_EXCHANGE_RETRY_DELAYS_SECONDS[attempt - 1])
+                    continue
+                raise CredentialError(
+                    "Workspace Registry exchange endpoint is temporarily unavailable",
+                    code="workspace_registry_exchange_endpoint_unavailable",
+                    details=_exchange_failure_details(
+                        category="endpoint_unavailable",
+                        status=status,
+                        attempts=attempt,
+                        backend_message=backend_message,
+                    ),
+                    exit_code=7,
+                ) from exc
+            if status in {401, 403}:
+                raise CredentialError(
+                    "Workspace credentials expired — reconnect to continue",
+                    code="workspace_registry_exchange_unauthorized",
+                    details=_exchange_failure_details(
+                        category="unauthorized",
+                        status=status,
+                        attempts=attempt,
+                        backend_message=backend_message,
+                    ),
+                    exit_code=3,
+                ) from exc
+            raise CredentialError(
+                "Workspace Registry exchange is misconfigured",
+                code="workspace_registry_exchange_configuration_error",
+                details=_exchange_failure_details(
+                    category="configuration",
+                    status=status,
+                    attempts=attempt,
+                    backend_message=backend_message,
+                ),
+            ) from exc
+        except (URLError, OSError) as exc:
+            if attempt < _EXCHANGE_MAX_ATTEMPTS:
+                time.sleep(_EXCHANGE_RETRY_DELAYS_SECONDS[attempt - 1])
+                continue
+            raise CredentialError(
+                "Workspace Registry exchange endpoint is temporarily unavailable",
+                code="workspace_registry_exchange_endpoint_unavailable",
+                details=_exchange_failure_details(
+                    category="network",
+                    status=None,
+                    attempts=attempt,
+                ),
+                exit_code=7,
+            ) from exc
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            raise CredentialError(
+                "Workspace Registry returned an invalid exchange response",
+                code="workspace_registry_exchange_invalid_response",
+                details=_exchange_failure_details(
+                    category="invalid_response",
+                    status=200,
+                    attempts=attempt,
+                ),
+            ) from exc
     access_token = payload.get("accessToken") if isinstance(payload, dict) else None
     expires_in = payload.get("expiresIn", 300) if isinstance(payload, dict) else 300
     if not isinstance(access_token, str) or not access_token:
-        raise CredentialError("Workspace registry token exchange returned no access token")
+        raise CredentialError(
+            "Workspace Registry returned an invalid exchange response",
+            code="workspace_registry_exchange_invalid_response",
+            details=_exchange_failure_details(
+                category="invalid_response",
+                status=200,
+                attempts=attempt,
+            ),
+        )
     try:
         ttl = max(1, min(300, int(expires_in)))
     except (TypeError, ValueError):
         ttl = 300
     _WORKSPACE_TOKEN_CACHE[origin] = (access_token, now + max(1, ttl - 30))
     return access_token
+
+
+def _is_transient_exchange_status(status: int) -> bool:
+    return status in _TRANSIENT_EXCHANGE_STATUSES or status >= 500
+
+
+def _sanitize_backend_message(value: str) -> str | None:
+    text = " ".join(value.split()).strip()
+    if not text:
+        return None
+    text = _BEARER_PATTERN.sub("Bearer [redacted]", text)
+    text = _JWT_PATTERN.sub("[redacted-jwt]", text)
+    text = re.sub(
+        r"(?i)\b(authorization|access[_-]?token|refresh[_-]?token|workspace[_-]?token|token)"
+        r"\s*[:=]\s*[^\s,;]+",
+        r"\1=[redacted]",
+        text,
+    )
+    return text[:240]
+
+
+def _safe_http_error_message(exc: HTTPError) -> str | None:
+    try:
+        raw = exc.read().decode("utf-8", errors="replace")
+        parsed = json.loads(raw)
+    except (OSError, ValueError, AttributeError):
+        return None
+    candidate: Any = None
+    if isinstance(parsed, dict):
+        candidate = parsed.get("detail")
+        if isinstance(candidate, dict):
+            candidate = candidate.get("message") or candidate.get("code")
+        if candidate is None and isinstance(parsed.get("error"), dict):
+            candidate = parsed["error"].get("message")
+    return _sanitize_backend_message(candidate) if isinstance(candidate, str) else None
+
+
+def _exchange_failure_details(
+    *,
+    category: str,
+    status: int | None,
+    attempts: int,
+    backend_message: str | None = None,
+) -> dict[str, Any]:
+    details: dict[str, Any] = {
+        "failureCategory": category,
+        "httpStatus": status,
+        "attemptCount": attempts,
+    }
+    if backend_message:
+        details["backendMessage"] = backend_message
+    return details
 
 
 def _exchange_legacy_refresh_token(origin: str, refresh_token: str) -> str:
