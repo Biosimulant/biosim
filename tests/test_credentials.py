@@ -45,6 +45,7 @@ def test_workspace_identity_is_exchanged_not_used_as_registry_bearer(
     monkeypatch.setattr(credentials, "urlopen", fake_urlopen)
     assert credentials.resolve_token("hub.biosimulant.com") == "operation-token"
     assert requests[0][0].get_header("Authorization") == "Bearer workspace-identity"
+    assert requests[0][0].get_header("User-agent") == credentials.CLI_USER_AGENT
     assert requests[0][0].full_url == (
         f"{credentials.DEFAULT_HUB_API_BASE}/registry/v1/auth/exchange"
     )
@@ -83,6 +84,7 @@ def test_legacy_refresh_token_is_exchanged_without_becoming_bearer(
     monkeypatch.setattr(credentials, "urlopen", fake_urlopen)
     assert credentials.resolve_token("hub.biosimulant.com") == "refreshed-access"
     assert requests[0].get_header("Authorization") is None
+    assert requests[0].get_header("User-agent") == credentials.CLI_USER_AGENT
     assert requests[0].full_url == f"{credentials.DEFAULT_HUB_API_BASE}/users/refresh"
     assert json.loads(requests[0].data) == {"token": "refresh-secret"}
 
@@ -95,6 +97,61 @@ def _http_error(status: int, payload: dict[str, object]) -> HTTPError:
         hdrs=None,
         fp=io.BytesIO(json.dumps(payload).encode("utf-8")),
     )
+
+
+def _raw_http_error(status: int, payload: str) -> HTTPError:
+    return HTTPError(
+        "https://api.example/auth/exchange",
+        status,
+        "failure",
+        hdrs=None,
+        fp=io.BytesIO(payload.encode("utf-8")),
+    )
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        "error code: 1010",
+        json.dumps(
+            {
+                "detail": (
+                    "The site owner has blocked access based on your browser's signature."
+                )
+            }
+        ),
+    ],
+)
+def test_workspace_exchange_gateway_client_block_is_not_reported_as_expired(
+    monkeypatch,
+    payload: str,
+) -> None:
+    monkeypatch.setattr(
+        credentials,
+        "urlopen",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            _raw_http_error(403, payload)
+        ),
+    )
+
+    with pytest.raises(credentials.CredentialError) as exc_info:
+        credentials._exchange_workspace_token(
+            "https://hub.biosimulant.com",
+            "workspace-secret",
+        )
+
+    assert exc_info.value.code == "workspace_registry_exchange_client_blocked"
+    assert exc_info.value.exit_code == 7
+    assert exc_info.value.details == {
+        "failureCategory": "client_blocked",
+        "httpStatus": 403,
+        "attemptCount": 1,
+        "backendMessage": (
+            "error code: 1010"
+            if payload == "error code: 1010"
+            else "The site owner has blocked access based on your browser's signature."
+        ),
+    }
 
 
 def test_workspace_exchange_unauthorized_is_structured_and_secret_safe(

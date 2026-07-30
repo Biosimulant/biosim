@@ -16,9 +16,11 @@ from urllib.parse import urlparse
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from .__about__ import __version__
 
 DEFAULT_REGISTRY = "hub.biosimulant.com"
 DEFAULT_HUB_API_BASE = "https://prod-api.biosimulant.com/api"
+CLI_USER_AGENT = f"biosimulant-cli/{__version__}"
 TOKEN_ENV = "BIOSIMULANT_TOKEN"
 WORKSPACE_TOKEN_ENV = "BIOSIMULANT_WORKSPACE_TOKEN"
 LEGACY_ACCESS_TOKEN_ENV = "BIOSIMULANT_ACCESS_TOKEN"
@@ -298,6 +300,7 @@ def _exchange_workspace_token(origin: str, identity_token: str) -> str:
     request.add_header("Authorization", f"Bearer {identity_token}")
     request.add_header("Content-Type", "application/json")
     request.add_header("Accept", "application/json")
+    request.add_header("User-Agent", CLI_USER_AGENT)
     payload: Any = None
     for attempt in range(1, _EXCHANGE_MAX_ATTEMPTS + 1):
         try:
@@ -323,6 +326,18 @@ def _exchange_workspace_token(origin: str, identity_token: str) -> str:
                     exit_code=7,
                 ) from exc
             if status in {401, 403}:
+                if status == 403 and _is_gateway_client_block(backend_message):
+                    raise CredentialError(
+                        "Workspace Registry rejected this CLI client — upgrade and reconnect",
+                        code="workspace_registry_exchange_client_blocked",
+                        details=_exchange_failure_details(
+                            category="client_blocked",
+                            status=status,
+                            attempts=attempt,
+                            backend_message=backend_message,
+                        ),
+                        exit_code=7,
+                    ) from exc
                 raise CredentialError(
                     "Workspace credentials expired — reconnect to continue",
                     code="workspace_registry_exchange_unauthorized",
@@ -410,9 +425,12 @@ def _sanitize_backend_message(value: str) -> str | None:
 def _safe_http_error_message(exc: HTTPError) -> str | None:
     try:
         raw = exc.read().decode("utf-8", errors="replace")
-        parsed = json.loads(raw)
-    except (OSError, ValueError, AttributeError):
+    except (OSError, AttributeError):
         return None
+    try:
+        parsed = json.loads(raw)
+    except ValueError:
+        return _sanitize_backend_message(raw)
     candidate: Any = None
     if isinstance(parsed, dict):
         candidate = parsed.get("detail")
@@ -421,6 +439,19 @@ def _safe_http_error_message(exc: HTTPError) -> str | None:
         if candidate is None and isinstance(parsed.get("error"), dict):
             candidate = parsed["error"].get("message")
     return _sanitize_backend_message(candidate) if isinstance(candidate, str) else None
+
+
+def _is_gateway_client_block(message: str | None) -> bool:
+    normalized = (message or "").lower()
+    return any(
+        marker in normalized
+        for marker in (
+            "error code: 1010",
+            "browser's signature",
+            "browser signature",
+            "blocked access based on",
+        )
+    )
 
 
 def _exchange_failure_details(
@@ -457,6 +488,7 @@ def _exchange_legacy_refresh_token(origin: str, refresh_token: str) -> str:
     request = Request(endpoint, data=body, method="POST")
     request.add_header("Content-Type", "application/json")
     request.add_header("Accept", "application/json")
+    request.add_header("User-Agent", CLI_USER_AGENT)
     try:
         with urlopen(request, timeout=15) as response:
             payload = json.loads(response.read().decode("utf-8"))

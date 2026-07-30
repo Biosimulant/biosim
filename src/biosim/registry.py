@@ -11,8 +11,8 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, quote, urljoin, urlparse
 from urllib.request import Request, urlopen
 
-from .__about__ import __version__
 from .credentials import (
+    CLI_USER_AGENT,
     DEFAULT_REGISTRY,
     normalize_registry_origin,
     resolve_token,
@@ -25,7 +25,7 @@ DEFAULT_REGISTRY_ORIGIN = f"https://{DEFAULT_REGISTRY}"
 REGISTRY_URL_ENV = "BIOSIMULANT_REGISTRY_URL"
 LEGACY_API_BASE_ENV = "BIOSIMULANT_API_BASE_URL"
 LAB_CACHE_DIR_ENV = "BIOSIMULANT_LAB_CACHE_DIR"
-REGISTRY_USER_AGENT = f"biosimulant-cli/{__version__}"
+REGISTRY_USER_AGENT = CLI_USER_AGENT
 REGISTRY_JSON_ACCEPT = "application/json"
 REGISTRY_PACKAGE_ACCEPT = "application/zip, application/octet-stream, */*"
 _PACKAGE_NAME_RE = re.compile(
