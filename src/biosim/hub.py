@@ -172,7 +172,14 @@ class _LabDependencyResolver:
             return destination
 
         self.dependency_root.mkdir(parents=True, exist_ok=True)
-        archive = self.client.download_package(str(artifact["id"]))
+        if getattr(self.client, "_v1", False):
+            archive = self.client.download_package(
+                str(artifact.get("id") or ""),
+                package_name=package,
+                version=version,
+            )
+        else:
+            archive = self.client.download_package(str(artifact["id"]))
         if hashlib.sha256(archive).hexdigest().lower() != expected_sha:
             raise PackageError(f"Downloaded checksum does not match lockfile for {reference}")
         with tempfile.TemporaryDirectory(prefix="hub-dependency-", dir=self.dependency_root) as temp_dir:

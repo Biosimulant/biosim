@@ -815,6 +815,8 @@ def test_package_child_resolves_into_parent_lab_local_state(tmp_path: Path, monk
     parent_package = build_package(parent)
 
     class FakeRegistry:
+        _v1 = True
+
         def __init__(self, _base_url=None):
             pass
 
@@ -822,8 +824,10 @@ def test_package_child_resolves_into_parent_lab_local_state(tmp_path: Path, monk
             assert (package, version) == ("acme/child", "1.0.0")
             return {"id": "child-artifact", "package_type": "lab", "sha256": child_sha}
 
-        def download_package(self, artifact_id):
+        def download_package(self, artifact_id, *, package_name=None, version=None):
             assert artifact_id == "child-artifact"
+            assert package_name == "acme/child"
+            assert version == "1.0.0"
             return child_bytes
 
     monkeypatch.setattr(hub_module, "PublicRegistryClient", FakeRegistry)
