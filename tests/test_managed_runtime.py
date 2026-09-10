@@ -10,6 +10,36 @@ from biosim import managed_runtime
 from biosim.pack import PackageError
 
 
+def test_configured_managed_source_accepts_a_local_wheel(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    wheel = tmp_path / "biosimulant-0.0.26-py3-none-any.whl"
+    wheel.write_bytes(b"wheel")
+    monkeypatch.setenv("BIOSIMULANT_MANAGED_SOURCE_SPEC", str(wheel))
+
+    assert managed_runtime._local_source_spec() == str(wheel.resolve())
+
+
+def test_install_biosimulant_uses_wheel_without_editable_flag(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    wheel = tmp_path / "biosimulant-0.0.26-py3-none-any.whl"
+    wheel.write_bytes(b"wheel")
+    observed: list[str] = []
+    monkeypatch.setattr(managed_runtime, "_local_source_spec", lambda: str(wheel))
+    monkeypatch.setattr(
+        managed_runtime,
+        "_run_uv",
+        lambda _command, args, _message: observed.extend(args),
+    )
+
+    managed_runtime._install_biosimulant(["uv"], tmp_path / "python")
+
+    assert observed == ["pip", "install", str(wheel), "--python", str(tmp_path / "python")]
+
+
 def test_run_package_with_managed_python_uses_in_process_runner_when_version_matches(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

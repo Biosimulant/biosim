@@ -240,7 +240,7 @@ def _install_biosimulant(uv_command: list[str], python_path: Path) -> None:
     spec = source_spec or f"biosimulant=={__version__}"
     _log_runtime_status(f"Installing Biosimulant into managed runtime: {python_path}")
     args = ["pip", "install"]
-    if source_spec is not None:
+    if source_spec is not None and Path(source_spec).is_dir():
         args.extend(["-e", spec])
     else:
         args.append(spec)
@@ -253,6 +253,16 @@ def _install_biosimulant(uv_command: list[str], python_path: Path) -> None:
 
 
 def _local_source_spec() -> str | None:
+    configured = os.environ.get("BIOSIMULANT_MANAGED_SOURCE_SPEC", "").strip()
+    if configured:
+        source = Path(configured).expanduser().resolve()
+        if source.is_file() and source.suffix == ".whl":
+            return str(source)
+        if source.is_dir() and (source / "pyproject.toml").is_file():
+            return str(source)
+        raise PackageError(
+            "BIOSIMULANT_MANAGED_SOURCE_SPEC must reference a wheel or project directory"
+        )
     repo_root = Path(__file__).resolve().parents[2]
     if (
         (repo_root / "pyproject.toml").is_file()
