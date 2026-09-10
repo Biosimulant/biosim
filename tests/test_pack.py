@@ -302,6 +302,120 @@ def test_model_package_run_smoke(tmp_path: Path):
     assert "count" in result["outputs"]
 
 
+def test_execute_only_model_package_uses_bioworld_policy(tmp_path: Path):
+    model_dir = tmp_path / "execute-model"
+    model_dir.mkdir()
+    (model_dir / "model.yaml").write_text(
+        """
+schema_version: "2.0"
+title: "Execute Model"
+description: "Execute-only package"
+standard: other
+tags: [test]
+authors: ["Tests"]
+biosim:
+  entrypoint: "src.execute_model:ExecuteModel"
+  communication_step: 0.1
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+    src_dir = model_dir / "src"
+    src_dir.mkdir()
+    (src_dir / "execute_model.py").write_text(
+        """
+from biosim import BioModule, ExecutionPolicy, SignalSpec
+
+
+class ExecuteModel(BioModule):
+    execution_policy = ExecutionPolicy.ONCE_AFTER_RUN
+
+    def __init__(self):
+        self.calls = 0
+
+    def outputs(self):
+        return {"value": SignalSpec.scalar(dtype="float64")}
+
+    def execute(self, inputs, *, context):
+        self.calls += 1
+        return {"value": 7.0}
+
+    def snapshot(self):
+        return {"calls": self.calls}
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    package_path = build_package(
+        model_dir, package_name="local/execute-model", version="1.0.0"
+    )
+    result = run_package(package_path, install_deps=False)
+
+    assert result["outputs"] == ["value"]
+    assert result["state"] == {"calls": 1}
+
+
+def test_execute_only_model_package_receives_runtime_initial_inputs(tmp_path: Path):
+    model_dir = tmp_path / "execute-input-model"
+    model_dir.mkdir()
+    (model_dir / "model.yaml").write_text(
+        """
+schema_version: "2.0"
+title: "Execute Input Model"
+description: "Canonical package input"
+standard: other
+tags: [test]
+authors: ["Tests"]
+biosim:
+  entrypoint: "src.execute_input_model:ExecuteInputModel"
+  communication_step: 0.1
+runtime:
+  initial_inputs:
+    value: 4.0
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+    src_dir = model_dir / "src"
+    src_dir.mkdir()
+    (src_dir / "execute_input_model.py").write_text(
+        """
+from biosim import BioModule, ExecutionPolicy, SignalSpec
+
+
+class ExecuteInputModel(BioModule):
+    execution_policy = ExecutionPolicy.ONCE_BEFORE_RUN
+
+    def __init__(self):
+        self.latest = None
+
+    def inputs(self):
+        return {"value": SignalSpec.scalar(dtype="float64")}
+
+    def outputs(self):
+        return {"value": SignalSpec.scalar(dtype="float64")}
+
+    def execute(self, inputs, *, context):
+        self.latest = inputs["value"].value * 2
+        return {"value": self.latest}
+
+    def snapshot(self):
+        return {"latest": self.latest}
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    package_path = build_package(
+        model_dir, package_name="local/execute-input-model", version="1.0.0"
+    )
+    result = run_package(package_path, install_deps=False)
+
+    assert result["outputs"] == ["value"]
+    assert result["state"] == {"latest": 8.0}
+
+
 def test_model_package_run_coerces_runtime_initial_inputs(tmp_path: Path):
     model_dir = tmp_path / "input-model"
     model_dir.mkdir()

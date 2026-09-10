@@ -8,7 +8,13 @@ from types import ModuleType
 
 from .__about__ import __version__
 from .world import BioWorld, WorldEvent
-from .modules import BioModule, SignalEmitterBioModule, StatefulBioModule
+from .modules import (
+    BioModule,
+    ExecutionContext,
+    ExecutionPolicy,
+    SignalEmitterBioModule,
+    StatefulBioModule,
+)
 from .signals import (
     AcceptedSignalProfile,
     ArraySignal,
@@ -66,6 +72,8 @@ __all__ = [
     "validate_visual_spec",
     "normalize_visuals",
     "BioModule",
+    "ExecutionContext",
+    "ExecutionPolicy",
     "SignalEmitterBioModule",
     "StatefulBioModule",
     "BioSignal",

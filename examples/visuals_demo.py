@@ -24,13 +24,14 @@ except ModuleNotFoundError:
 
 
 class StepSeries(biosim.BioModule):
+    execution_policy = biosim.ExecutionPolicy.EACH_WINDOW
+
     def __init__(self) -> None:
         self._points: list[list[float]] = []
 
-    def advance_window(self, start: float, end: float) -> None:
-        self._points.append([end, len(self._points)])
-
-    def get_outputs(self):
+    def execute(self, inputs, *, context: biosim.ExecutionContext):
+        assert context.window_end is not None
+        self._points.append([context.window_end, len(self._points)])
         return {}
 
     def visualize(self):

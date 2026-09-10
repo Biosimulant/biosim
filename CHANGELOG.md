@@ -7,6 +7,25 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [0.0.26] - 2026-09-10
+
+### Added
+
+- Add `ExecutionPolicy`, immutable `ExecutionContext`, and the canonical
+  `execute(inputs, *, context)` BioModule authoring contract for finite or
+  temporal computation before, during, or after communication windows.
+- Add deterministic dependency draining for once-before and once-after modules.
+
+### Changed
+
+- Route standalone model-package execution through BioWorld so invocation policy,
+  signal timestamps, and output validation match Lab execution.
+- Preserve existing temporal `advance_window()` behavior as the default while
+  excluding canonical modules from zero-duration settle calls.
+- Validate canonical signatures at registration, warn when `EACH_WINDOW` is only
+  inherited, and commit normalized canonical output caches atomically with world
+  signals.
+
 ## [0.0.22] - 2026-07-29
 
 ### Added

@@ -96,6 +96,29 @@ builder.connect("eye.visual_stream", ["lgn.retina"]).apply()
 world.run(duration=0.3)
 ```
 
+## Finite models and AI inference
+
+A finite input-to-output model remains a `BioModule` and uses the canonical
+execution method:
+
+```python
+class Predictor(biosim.BioModule):
+    execution_policy = biosim.ExecutionPolicy.ONCE_BEFORE_RUN
+
+    def outputs(self):
+        return {"score": biosim.SignalSpec.scalar(dtype="float64")}
+
+    def execute(self, inputs, *, context: biosim.ExecutionContext):
+        return {"score": 0.95}
+```
+
+Use `ONCE_AFTER_RUN` for final analysis of simulation outputs. Explicitly declare
+`EACH_WINDOW` when a temporal or AI model must run against evolving state at every
+positive communication window; temporal code reads the window bounds from
+`context`. Existing `advance_window()` packages remain supported. Canonical
+modules do not run during zero-time settle. Manifests and Lab runtime fields do
+not change.
+
 ## Run the built-in examples
 
 - `python examples/world_simulation.py`

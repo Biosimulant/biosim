@@ -3,22 +3,26 @@
 `biosimulant` is a modular biological simulation library. It centers around four ideas:
 
 - **BioWorld**: the runtime container that orchestrates multi-rate biomodules, routes signals, and publishes lifecycle events. Supports cooperative pause/resume/stop.
-- **BioModule**: a unit of behavior with local state that implements the runnable contract (`setup/reset/advance_window/get_outputs/snapshot/restore/...`).
+- **BioModule**: a unit of behavior. New modules implement canonical
+  `execute(inputs, *, context)`; existing temporal modules may retain the
+  supported `advance_window()` contract.
 - **BioSignal**: typed data exchanged between modules over named ports. Each signal carries `source`, `name`, `value`, `emitted_at`, and a bound `SignalSpec`.
 - **Local Lab UI**: a bundled browser UI for running, visualizing, and editing labs through `biosimulant labs serve`.
 
-`BioModule` is the minimal full-control interface. Authors who want less adapter
-boilerplate can opt into `SignalEmitterBioModule` for output wrapping or
-`StatefulBioModule` for fixed-step state/history handling. Those subclasses are
-helpers, not required architecture.
+`BioModule` is the minimal full-control interface. New modules explicitly select
+`ONCE_BEFORE_RUN`, `EACH_WINDOW`, or `ONCE_AFTER_RUN`; the inherited compatibility
+default remains `EACH_WINDOW`. Authors who want existing temporal helpers can use
+`SignalEmitterBioModule` or `StatefulBioModule`.
 
 ## Event flow (typical)
 - STARTED -> STEP x N -> FINISHED
 - PAUSED, RESUMED, STOPPED, and ERROR may be emitted depending on runtime control flow.
 
 ## Directed biosignals
-- Modules emit outputs via `get_outputs()` (returning `dict[str, BioSignal]`).
-- Modules receive inputs via `set_inputs(signals)` when connected.
+- Canonical modules return raw values or typed signals from `execute()`; BioWorld
+  normalizes, timestamps, commits, and stores them at the applicable boundary.
+- Temporal compatibility modules receive inputs through `set_inputs(signals)` and
+  emit outputs through `get_outputs()`.
 - Connections are explicit: `world.connect("src.port", "dst.port")` (single target) or via `WiringBuilder.connect("src.port", ["dst1.port", "dst2.port"])` (fan-out).
 
 ## Wiring and configuration

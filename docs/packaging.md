@@ -275,11 +275,12 @@ the goal. If several labs intentionally carry byte-identical visualisation code,
 keep those copies local and use a drift check in repository maintenance rather
 than introducing a shared runtime import path.
 
-If a lab has downstream report, export, or visualisation modules that consume
-outputs produced at the final simulation boundary, set `runtime.settle_steps` to
-the number of extra graph hops needed. One direct producer-to-visualisation edge
-usually needs `settle_steps: 1`; a producer-to-postprocessor-to-visualisation
-chain needs `settle_steps: 2`. Settling does not extend simulated time.
+Finite downstream report, export, or visualisation modules should implement
+`execute(inputs, *, context)` with `ExecutionPolicy.ONCE_AFTER_RUN`. BioWorld drains chains of
+those modules automatically after the final atomic window commit, so authors do
+not calculate a settle depth. `runtime.settle_steps` remains unchanged for
+legacy temporal modules that deliberately use zero-time propagation. Settling
+does not extend simulated time, and canonical modules are not invoked by it.
 
 Nested `models[]` use relative `path` refs. A child Lab in `children[]` may use
 either a relative `path` or exact `package` + `version`; the latter must have a

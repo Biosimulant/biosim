@@ -21,10 +21,11 @@ def print_listener(event: biosim.WorldEvent, payload: dict) -> None:
 class StepLoggerModule(biosim.BioModule):
     """Example module that advances on its schedule."""
 
-    def advance_window(self, start: float, end: float) -> None:
-        print(f"[Module] window [{start:.1f}, {end:.1f}]")
+    execution_policy = biosim.ExecutionPolicy.EACH_WINDOW
 
-    def get_outputs(self):
+    def execute(self, inputs, *, context: biosim.ExecutionContext):
+        assert context.window_start is not None and context.window_end is not None
+        print(f"[Module] window [{context.window_start:.1f}, {context.window_end:.1f}]")
         return {}
 
 

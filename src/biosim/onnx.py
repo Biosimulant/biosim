@@ -9,8 +9,8 @@ import importlib
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence
 
-from .modules import BioModule
-from .signals import ArraySignal, RecordSignal, ScalarSignal, SignalSpec
+from .modules import BioModule, ExecutionContext, ExecutionPolicy
+from .signals import BioSignal, SignalSpec
 
 
 def _flatten_numeric_items(value: Any) -> List[float]:
@@ -29,6 +29,8 @@ def _flatten_numeric_items(value: Any) -> List[float]:
 
 class OnnxClassifierModule(BioModule):
     """Run an ONNX classifier behind the standard BioModule contract."""
+
+    execution_policy = ExecutionPolicy.EACH_WINDOW
 
     def __init__(
         self,
@@ -66,7 +68,7 @@ class OnnxClassifierModule(BioModule):
         self._latest_vector: List[float] = self._initial_vector()
         self._latest_probs: List[float] = [1.0] + [0.0] * (len(self.class_labels) - 1)
         self._latest_label: str = self.class_labels[0]
-        self._outputs: Dict[str, Any] = {}
+        self._has_result = False
 
     def inputs(self) -> Mapping[str, SignalSpec]:
         vector_length = self.input_vector_length or len(self.class_labels)
@@ -94,10 +96,11 @@ class OnnxClassifierModule(BioModule):
         }
 
     def reset(self) -> None:
+        super().reset()
         self._latest_vector = self._initial_vector()
         self._latest_probs = [1.0] + [0.0] * (len(self.class_labels) - 1)
         self._latest_label = self.class_labels[0]
-        self._outputs = {}
+        self._has_result = False
 
     def _initial_vector(self) -> List[float]:
         if self.input_vector_length is None:
@@ -120,8 +123,8 @@ class OnnxClassifierModule(BioModule):
         if self._session is None:
             factory = self._session_factory or self._default_session_factory()
             self._session = factory(self._resolved_model_path())
-            inputs = getattr(self._session, "get_inputs", lambda: [])()
-            outputs = getattr(self._session, "get_outputs", lambda: [])()
+            inputs: list[Any] = getattr(self._session, "get_inputs", lambda: [])()
+            outputs: list[Any] = getattr(self._session, "get_outputs", lambda: [])()
             if inputs:
                 self._input_name = str(inputs[0].name)
             if outputs:
@@ -139,6 +142,7 @@ class OnnxClassifierModule(BioModule):
         return vector
 
     def set_inputs(self, signals: Dict[str, Any]) -> None:
+        super().set_inputs(signals)
         signal = signals.get(self.input_port)
         if signal is None:
             return
@@ -153,38 +157,29 @@ class OnnxClassifierModule(BioModule):
         probs = _flatten_numeric_items(result[0])
         return probs or ([1.0] + [0.0] * (len(self.class_labels) - 1))
 
-    def advance_window(self, start: float, end: float) -> None:
+    def execute(
+        self,
+        inputs: Mapping[str, BioSignal],
+        *,
+        context: ExecutionContext,
+    ) -> Mapping[str, Any]:
+        signal = inputs.get(self.input_port)
+        if signal is not None:
+            self._latest_vector = self._normalize_input_value(signal.value)
         probs = self._run_inference()
         if len(probs) < len(self.class_labels):
             probs = probs + [0.0] * (len(self.class_labels) - len(probs))
         self._latest_probs = probs[: len(self.class_labels)]
         max_idx = max(range(len(self._latest_probs)), key=self._latest_probs.__getitem__)
         self._latest_label = self.class_labels[max_idx]
-        specs = self.outputs()
-
-        source = getattr(self, "_world_name", self.__class__.__name__)
-        self._outputs = {
-            self.probabilities_port: ArraySignal(
-                source=source,
-                name=self.probabilities_port,
-                value=self._latest_probs,
-                emitted_at=end,
-                spec=specs[self.probabilities_port],
-            ),
-            self.predicted_port: RecordSignal(
-                source=source,
-                name=self.predicted_port,
-                value={
-                    "label": self._latest_label,
-                    "probabilities": dict(zip(self.class_labels, self._latest_probs)),
-                },
-                emitted_at=end,
-                spec=specs[self.predicted_port],
-            ),
+        self._has_result = True
+        return {
+            self.probabilities_port: self._latest_probs,
+            self.predicted_port: {
+                "label": self._latest_label,
+                "probabilities": dict(zip(self.class_labels, self._latest_probs)),
+            },
         }
-
-    def get_outputs(self) -> Dict[str, Any]:
-        return dict(self._outputs)
 
     def snapshot(self) -> Dict[str, Any]:
         return {
@@ -206,7 +201,7 @@ class OnnxClassifierModule(BioModule):
         self._latest_label = str(snapshot.get("latest_label", self._latest_label))
 
     def visualize(self) -> Optional[Dict[str, Any]]:
-        if not self._outputs:
+        if not self._has_result:
             return None
         return {
             "render": "bar",

@@ -8,6 +8,16 @@ import pytest
 from biosim.onnx import _flatten_numeric_items
 
 
+def _window_context(biosim, *, end: float = 0.1):
+    return biosim.ExecutionContext(
+        policy=biosim.ExecutionPolicy.EACH_WINDOW,
+        run_start=0.0,
+        run_end=end,
+        window_start=0.0,
+        window_end=end,
+    )
+
+
 class _FakeSession:
     def __init__(self) -> None:
         self.seen = []
@@ -32,24 +42,19 @@ def test_onnx_classifier_emits_probabilities_and_label(biosim):
         input_vector_length=4,
     )
 
-    module.set_inputs(
-        {
-            "state_vector": biosim.ArraySignal(
-                source="adapter",
-                name="state_vector",
-                value=[-64.0, 0.1, 0.6, 0.3],
-                emitted_at=0.0,
-                spec=biosim.SignalSpec.array(dtype="float32", shape=(4,)),
-            )
-        }
-    )
-    module.advance_window(0.0, 0.001)
+    inputs = {
+        "state_vector": biosim.ArraySignal(
+            source="adapter",
+            name="state_vector",
+            value=[-64.0, 0.1, 0.6, 0.3],
+            emitted_at=0.0,
+            spec=biosim.SignalSpec.array(dtype="float32", shape=(4,)),
+        )
+    }
+    outputs = module.execute(inputs, context=_window_context(biosim, end=0.001))
 
-    outputs = module.get_outputs()
-    assert outputs["state_probabilities"].value == pytest.approx([0.1, 0.2, 0.7])
-    assert outputs["state_probabilities"].spec is not None
-    assert outputs["state_probabilities"].spec.shape == (3,)
-    assert outputs["predicted_state"].value["label"] == "spiking"
+    assert outputs["state_probabilities"] == pytest.approx([0.1, 0.2, 0.7])
+    assert outputs["predicted_state"]["label"] == "spiking"
     assert session.seen[0][0] == ("state_probabilities",)
     assert session.seen[0][1]["state_vector"][0] == pytest.approx([-64.0, 0.1, 0.6, 0.3])
 
@@ -66,22 +71,19 @@ def test_onnx_classifier_normalizes_feature_dict_input(biosim):
         input_vector_length=4,
     )
 
-    module.set_inputs(
-        {
-            "features": biosim.RecordSignal(
-                source="adapter",
-                name="features",
-                value={"features": [1, 2]},
-                emitted_at=0.0,
-                spec=biosim.SignalSpec.record(schema={"features": "list"}),
-            )
-        }
-    )
-    module.advance_window(0.0, 0.1)
+    inputs = {
+        "features": biosim.RecordSignal(
+            source="adapter",
+            name="features",
+            value={"features": [1, 2]},
+            emitted_at=0.0,
+            spec=biosim.SignalSpec.record(schema={"features": "list"}),
+        )
+    }
+    outputs = module.execute(inputs, context=_window_context(biosim))
 
-    outputs = module.get_outputs()
-    assert outputs["scores"].value == pytest.approx([0.1, 0.2, 0.7])
-    assert outputs["label"].value["label"] == "burst"
+    assert outputs["scores"] == pytest.approx([0.1, 0.2, 0.7])
+    assert outputs["label"]["label"] == "burst"
     assert session.seen[0][1]["state_vector"][0] == pytest.approx([1.0, 2.0, 0.0, 0.0])
 
 
@@ -94,11 +96,10 @@ def test_onnx_classifier_uses_zero_vector_before_first_input(biosim):
         input_vector_length=4,
     )
 
-    module.advance_window(0.0, 0.001)
+    outputs = module.execute({}, context=_window_context(biosim, end=0.001))
 
-    outputs = module.get_outputs()
-    assert outputs["state_probabilities"].value == pytest.approx([0.1, 0.2, 0.7])
-    assert outputs["predicted_state"].value["label"] == "spiking"
+    assert outputs["state_probabilities"] == pytest.approx([0.1, 0.2, 0.7])
+    assert outputs["predicted_state"]["label"] == "spiking"
     assert session.seen[0][1]["state_vector"][0] == pytest.approx([0.0, 0.0, 0.0, 0.0])
 
 
@@ -142,13 +143,11 @@ def test_onnx_classifier_handles_missing_input_and_empty_session_result(biosim, 
     )
 
     assert module.visualize() is None
-    module.set_inputs({})
-    module.advance_window(0.0, 0.1)
+    outputs = module.execute({}, context=_window_context(biosim))
 
     assert seen_paths == [str(tmp_path / "model.onnx")]
-    outputs = module.get_outputs()
-    assert outputs["scores"].value == pytest.approx([1.0, 0.0])
-    assert outputs["label"].value["label"] == "baseline"
+    assert outputs["scores"] == pytest.approx([1.0, 0.0])
+    assert outputs["label"]["label"] == "baseline"
     assert module.visualize()["data"]["items"][0] == {"label": "baseline", "value": 1.0}
 
 
@@ -163,20 +162,18 @@ def test_onnx_classifier_pads_short_probabilities_and_round_trips_state(biosim):
         session_factory=lambda _path: ShortSession(),
         input_vector_length=3,
     )
-    module.set_inputs(
-        {
-            "state_vector": biosim.RecordSignal(
-                source="adapter",
-                name="state_vector",
-                value={"features": [9, 8, 7, 6]},
-                emitted_at=0.0,
-                spec=biosim.SignalSpec.record(schema={"features": "list"}),
-            )
-        }
-    )
-    module.advance_window(0.0, 0.2)
+    inputs = {
+        "state_vector": biosim.RecordSignal(
+            source="adapter",
+            name="state_vector",
+            value={"features": [9, 8, 7, 6]},
+            emitted_at=0.0,
+            spec=biosim.SignalSpec.record(schema={"features": "list"}),
+        )
+    }
+    outputs = module.execute(inputs, context=_window_context(biosim, end=0.2))
 
-    assert module.get_outputs()["state_probabilities"].value == pytest.approx([0.25, 0.0, 0.0])
+    assert outputs["state_probabilities"] == pytest.approx([0.25, 0.0, 0.0])
     snapshot = module.snapshot()
 
     restored = biosim.OnnxClassifierModule(

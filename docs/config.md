@@ -15,8 +15,10 @@ runtime:
 
 `communication_step` controls how often modules exchange committed signals. A
 separate lab/package runtime may also declare `duration` and optional
-`settle_steps`; `settle_steps` gives downstream report/export/visualisation
-modules zero-time turns after the requested simulation duration.
+`settle_steps`. Prefer `ExecutionPolicy.ONCE_AFTER_RUN` for finite downstream
+report, export, or analysis modules; BioWorld drains those automatically.
+`settle_steps` remains available for legacy temporal modules that deliberately
+need zero-time propagation after the requested simulation duration.
 
 ## Module declarations
 

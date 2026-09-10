@@ -13,17 +13,23 @@ class BioWorld:
 
 ## Execution model
 
+- Before the first positive window, BioWorld drains ready canonical
+  `ONCE_BEFORE_RUN` modules in deterministic dependency layers.
 - Every run advances in windows `[t, t + communication_step]`.
 - Inputs for a window are collected from the committed signal store at the start boundary.
-- Every module advances independently across the same window via `advance_window(start, end)`.
+- Every `EACH_WINDOW` module advances independently across the same window via
+  canonical execute or the supported temporal compatibility hook.
 - Outputs are committed atomically at the end boundary.
+- After the final window commit, BioWorld drains ready canonical
+  `ONCE_AFTER_RUN` modules.
 - Tied-time behavior is order-independent by design; the kernel has no execution-order scheduling contract.
 
 Outputs produced during a window become visible to downstream modules at the next
 communication boundary. For workflow-style graphs that end immediately after a
 producer emits final outputs, call `settle(steps)` after `run(duration)` to give
-downstream modules explicit zero-time communication turns. Settling is opt-in and
-does not advance simulation time.
+downstream temporal modules explicit zero-time communication turns. Settling is
+opt-in and does not advance simulation time. Canonical modules are excluded
+from settling; once-policy dependency chains are drained automatically.
 
 ## Key methods
 
@@ -60,6 +66,8 @@ A world snapshot captures:
 - committed signal store
 - per-connection event/staleness delivery state
 - per-module snapshot payloads
+- per-run once-policy completion state
+- latest committed canonical module outputs
 - setup config
 
 `branch()` deep-copies modules, restores the captured snapshot into a new `BioWorld`, and allows both worlds to diverge independently from the same boundary.

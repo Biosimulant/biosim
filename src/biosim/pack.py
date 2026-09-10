@@ -1237,7 +1237,6 @@ def _run_model_loaded_package(
             cancel_checker=cancel_checker,
         )
     module, meta = _instantiate_model_from_package(loaded)
-    module.setup(meta["setup"])
     runtime = (
         loaded.manifest.get("runtime")
         if isinstance(loaded.manifest.get("runtime"), Mapping)
@@ -1246,6 +1245,9 @@ def _run_model_loaded_package(
     communication_step = extract_communication_step(
         None, runtime, fallback=meta["communication_step"], error_cls=PackageError
     )
+    world = BioWorld(communication_step=communication_step)
+    world.add_biomodule("model", module)
+    world.setup({"model": meta["setup"]})
     initial_inputs = (
         runtime.get("initial_inputs")
         if isinstance(runtime.get("initial_inputs"), Mapping)
@@ -1262,8 +1264,8 @@ def _run_model_loaded_package(
                 error_cls=PackageError,
             )
         )
-    module.advance_window(0.0, communication_step)
-    outputs = module.get_outputs()
+    world.run(communication_step)
+    outputs = world.get_outputs("model")
     return {
         "package": loaded.package_yaml["package"],
         "version": loaded.package_yaml["version"],

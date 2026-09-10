@@ -6,7 +6,9 @@ The communication-step kernel moves Biosimulant from a per-module due-time sched
 
 - typed port contracts via `SignalSpec`
 - typed runtime signals instead of schema-less `value: Any`
-- `advance_window(start, end)` is the world-facing simulation hook
+- `execute(inputs, *, context)` is the canonical new computation hook
+- `advance_window(start, end)` remains the supported temporal compatibility hook
+- explicit before-run, each-window, and after-run invocation policies
 - atomic output commit at communication boundaries
 - explicit staleness handling on consuming ports
 - world snapshots and in-memory branching
@@ -16,8 +18,8 @@ The communication-step kernel moves Biosimulant from a per-module due-time sched
 For each window `[t, t + communication_step]`:
 
 1. the world reads the committed signal store at `t`
-2. the world delivers those inputs to every module
-3. every module advances across the same window
+2. the world delivers those inputs to each ready `EACH_WINDOW` module
+3. each such module advances or executes across the same positive window
 4. the world commits all module outputs atomically at `t + communication_step`
 
 This means closed loops are modeled as sampled-data coupling at communication boundaries. Rollback, algebraic-loop solving, and FMI negotiation are explicit non-goals for this version.
@@ -35,9 +37,10 @@ advancing simulation time:
 4. call `advance_window(current_time, current_time)`
 5. commit any new outputs as the next propagation frontier
 
-Use this for report, export, or visualisation modules that should consume final
-producer outputs after the scientific duration has completed. The default runtime
-behavior is unchanged unless a runner explicitly calls `settle()`.
+Use this for temporal compatibility modules that require zero-time propagation.
+Canonical modules use `ONCE_AFTER_RUN` for finite postprocessing and are excluded
+from zero-time settling under every policy. The default runtime behavior remains
+unchanged for existing temporal modules.
 
 ## Typed signals
 
