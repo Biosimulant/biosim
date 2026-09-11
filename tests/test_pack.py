@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import io
 import hashlib
-import os
 from pathlib import Path
 from types import SimpleNamespace
 from zipfile import ZipFile
@@ -582,6 +581,24 @@ def test_export_lab_alias_embeds_models(tmp_path: Path):
     assert validation.valid
     result = run_package(exported, install_deps=False)
     assert result["package"] == "local/source-lab"
+
+
+def test_lab_package_run_preserves_typed_terminal_outputs(tmp_path: Path):
+    lab_dir = _write_lab(tmp_path / "lab")
+    package_path = build_package(
+        lab_dir,
+        package_name="local/source-lab",
+        version="1.0.0",
+    )
+
+    result = run_package(package_path, install_deps=False)
+
+    assert set(result["outputs"]) == {"counter", "accumulator"}
+    assert result["outputs"]["counter"]["count"]["type"] == "scalar"
+    assert result["outputs"]["counter"]["count"]["spec"]["dtype"] == "float64"
+    assert result["outputs"]["counter"]["count"]["value"] == pytest.approx(2.0)
+    assert result["outputs"]["accumulator"]["total"]["type"] == "scalar"
+    assert result["outputs"]["accumulator"]["total"]["value"] == pytest.approx(1.0)
 
 
 def test_export_lab_package_ignores_project_metadata_in_logical_hash(tmp_path: Path):

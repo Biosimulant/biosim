@@ -237,8 +237,9 @@ The open-source CLI and Biosimulant platform share package interpretation semant
 
 - `biosimulant labs run` installs exact-pinned manifest dependencies into the current Python environment when dependency installation is enabled
 - platform and desktop executors install payload dependencies into isolated per-lock-hash environments with allow/deny policy
-- `biosimulant labs run` returns a compact CLI-oriented summary
-- platform and desktop runs return full per-module outputs, state, visuals, and run metadata for UI consumers
+- `biosimulant labs run` preserves typed terminal signals under
+  `outputs.<module-alias>.<port>` in JSON result and report files
+- platform and desktop runs add durable artifact and run metadata for UI consumers
 
 ## Registries And Cache
 

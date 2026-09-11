@@ -1615,6 +1615,14 @@ def _run_lab_loaded_package(
     world.run(duration=duration)
     if settle_steps:
         world.settle(settle_steps)
+    outputs = {
+        module_name: {
+            port_name: signal.to_dict()
+            for port_name, signal in world.get_outputs(module_name).items()
+        }
+        for module_name in world.module_names
+        if world.get_outputs(module_name)
+    }
     return {
         "package": prepared.package,
         "version": prepared.version,
@@ -1622,6 +1630,7 @@ def _run_lab_loaded_package(
         "communication_step": prepared.communication_step,
         "settle_steps": settle_steps,
         "modules": prepared.modules,
+        "outputs": outputs,
         "visuals": world.collect_visuals(),
     }
 

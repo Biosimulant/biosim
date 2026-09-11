@@ -7,6 +7,13 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [0.0.27] - 2026-09-12
+
+### Changed
+
+- Preserve every module's typed terminal output signals in Lab run JSON and
+  report results so managed and local runs retain inspectable scientific data.
+
 ## [0.0.26] - 2026-09-10
 
 ### Added
