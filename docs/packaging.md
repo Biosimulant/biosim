@@ -21,9 +21,16 @@ Initialize, validate, run, and serve a local lab without Desktop:
 ```bash
 biosimulant labs create ./my-lab --name "My Lab"
 biosimulant labs validate ./my-lab
-biosimulant labs run ./my-lab --no-install-deps
+biosimulant labs capabilities ./my-lab --json
+biosimulant labs run ./my-lab --require-local-capability --no-install-deps
 biosimulant labs serve ./my-lab
 ```
+
+`labs capabilities` checks explicit CPU-core, memory, and accelerator
+requirements against the current host. `--require-local-capability` makes a
+local-first run fail before execution when those declared requirements are not
+met. The probe does not replace model tests or establish framework-specific GPU
+compatibility, and local runs do not create managed-run or Passport records.
 
 Manage a local lab source tree without Desktop:
 

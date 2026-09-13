@@ -17,7 +17,7 @@ from .signals import (
     validate_connection_specs,
     validate_port_spec_direction,
 )
-from .visuals import normalize_visuals
+from .visuals import derive_timeseries_visuals, normalize_visuals
 
 logger = logging.getLogger(__name__)
 
@@ -937,7 +937,9 @@ class BioWorld:
                 logger.exception("BioModule.visualize raised for %s", module.__class__.__name__)
                 continue
             if not visuals:
-                continue
+                visuals = derive_timeseries_visuals(
+                    self._signal_store.get(entry.name, {})
+                )
             normalized = normalize_visuals(visuals)
             if normalized:
                 out.append({"module": entry.name, "visuals": normalized})

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { X } from "lucide-react";
+import { XIcon } from "@phosphor-icons/react";
 import { serveApi } from "../api";
 import type { LocalRun, RunModuleVisuals, ServeResults } from "../types";
 import { getSeries } from "./visuals";
@@ -66,7 +66,7 @@ export function CompareOverlay({ runIds, onClose }: CompareOverlayProps) {
         <div className="modal-header">
           <h2>Compare {runIds.length} runs</h2>
           <button className="icon-button" onClick={onClose} aria-label="Close">
-            <X size={14} />
+            <XIcon size={14} />
           </button>
         </div>
         <div className="modal-body">

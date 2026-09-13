@@ -48,6 +48,7 @@ if TYPE_CHECKING:
 
 from .__about__ import __version__
 from .labs_serve import serve_lab
+from .execution_capabilities import inspect_local_execution_capability
 from .managed_runtime import (
     run_labs_serve_with_managed_python,
     run_package_with_managed_python,
@@ -417,6 +418,18 @@ def _populate_labs_parser(parser: argparse.ArgumentParser) -> argparse.ArgumentP
     validate_parser.add_argument("lab", type=Path, nargs="?", default=Path("."))
     validate_parser.add_argument("--json", action="store_true", dest="json_output")
 
+    capabilities_parser = subparsers.add_parser(
+        "capabilities", help="Check whether this host can run a lab locally"
+    )
+    capabilities_lab_action = capabilities_parser.add_argument("lab", nargs="?", default=".")
+    capabilities_lab_action.completer = _path_completer
+    capabilities_parser.add_argument(
+        "--target", type=Path, default=None, help="Destination for auto-pulled registry refs"
+    )
+    capabilities_parser.add_argument("--force", action="store_true")
+    capabilities_parser.add_argument("--registry-url", default=None)
+    capabilities_parser.add_argument("--json", action="store_true", dest="json_output")
+
     run_parser = subparsers.add_parser("run", help="Run a local lab source tree, .bsilab, or registry ref")
     run_lab_action = run_parser.add_argument("lab", nargs="?", default=".")
     run_lab_action.completer = _path_completer
@@ -431,6 +444,11 @@ def _populate_labs_parser(parser: argparse.ArgumentParser) -> argparse.ArgumentP
         help="Writable Lab-local dependency state directory for a .bsilab archive",
     )
     run_parser.add_argument("--no-open", action="store_true", help=argparse.SUPPRESS)
+    run_parser.add_argument(
+        "--require-local-capability",
+        action="store_true",
+        help="Fail before execution unless declared CPU, memory, and GPU needs fit this host",
+    )
     run_parser.add_argument("--results-file", type=Path, default=None)
     run_parser.add_argument(
         "--report-file",
@@ -790,6 +808,21 @@ def _main_labs(argv: list[str], *, prog: str = "biosimulant labs") -> None:
                 raise SystemExit(1)
             _print_lab_validation_success(args.lab, result, json_output=args.json_output)
             return
+        if args.command == "capabilities":
+            lab_path, _pull = _resolve_runtime_lab_path(
+                args.lab,
+                target=args.target,
+                force=args.force,
+                registry_url=args.registry_url,
+                emit_status=not args.json_output,
+            )
+            result = _validate_local_lab(lab_path)
+            if not result.valid:
+                _print_validation_failure(lab_path, result, json_output=args.json_output)
+                raise SystemExit(1)
+            capability = inspect_local_execution_capability(lab_path)
+            _print_local_execution_capability(capability, json_output=args.json_output)
+            return
         if args.command == "run":
             lab_path, _pull = _resolve_runtime_lab_path(
                 args.lab,
@@ -802,6 +835,15 @@ def _main_labs(argv: list[str], *, prog: str = "biosimulant labs") -> None:
                 lab_path,
                 args.run_input_file,
             ) as runnable_lab_path:
+                local_capability = None
+                if args.require_local_capability:
+                    local_capability = inspect_local_execution_capability(runnable_lab_path)
+                    if not local_capability["local_supported"]:
+                        reasons = "; ".join(
+                            str(item.get("message") or item.get("code"))
+                            for item in local_capability["blockers"]
+                        )
+                        raise PackageError(f"Local execution capability check failed: {reasons}")
                 with _package_file_for_lab(runnable_lab_path) as package_file:
                     run_kwargs: dict[str, Any] = {
                         "install_deps": not args.no_install_deps,
@@ -809,6 +851,8 @@ def _main_labs(argv: list[str], *, prog: str = "biosimulant labs") -> None:
                     if args.dependency_root is not None:
                         run_kwargs["dependency_root"] = args.dependency_root
                     result = _run_package_for_cli(package_file, **run_kwargs)
+                    if local_capability is not None:
+                        result = {**result, "local_execution": local_capability}
                     if args.report_file:
                         report_path = args.report_file.expanduser().resolve()
                         result = {**result, "report_file": str(report_path)}
@@ -1557,6 +1601,19 @@ def _print_workspace_result(payload: dict[str, Any], *, json_output: bool) -> No
         print(f"Path: {payload['path']}")
     if payload.get("alias"):
         print(f"Alias: {payload['alias']}")
+
+
+def _print_local_execution_capability(
+    payload: dict[str, Any], *, json_output: bool
+) -> None:
+    if json_output:
+        print(json_dumps(payload))
+        return
+    print("Biosimulant local execution capability check completed.")
+    print(f"Local execution supported: {'yes' if payload['local_supported'] else 'no'}")
+    print(f"Selected backend: {payload.get('selected_backend') or 'none'}")
+    for blocker in payload.get("blockers") or []:
+        print(f"- {blocker.get('message') or blocker.get('code')}")
 
 
 def _print_lab_package_result(payload: dict[str, Any], *, json_output: bool) -> None:

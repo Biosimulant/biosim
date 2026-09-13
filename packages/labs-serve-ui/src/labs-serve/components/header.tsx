@@ -1,14 +1,13 @@
 import {
-  CircleStop,
-  FlaskConical,
-  Loader2,
-  Moon,
-  PanelLeft,
-  PanelRight,
-  Play,
-  RefreshCcw,
-  Sun,
-} from "lucide-react";
+  ArrowsCounterClockwiseIcon,
+  CircleNotchIcon,
+  FlaskIcon,
+  MoonIcon,
+  PlayIcon,
+  SidebarSimpleIcon,
+  StopCircleIcon,
+  SunIcon,
+} from "@phosphor-icons/react";
 import type { LocalLab, LocalRun } from "../types";
 import { isActive } from "../hooks/use-runs";
 import type { ThemeMode } from "../hooks/use-theme";
@@ -59,10 +58,10 @@ export function Header(props: HeaderProps) {
         onClick={onToggleLeft}
         aria-label="Toggle contents sidebar"
       >
-        <PanelLeft size={16} />
+        <SidebarSimpleIcon size={16} />
       </button>
       <div className="command-title">
-        <FlaskConical size={18} />
+        <FlaskIcon size={18} />
         <div>
           <h1>{lab?.title || "Biosimulant Lab"}</h1>
           <p>{lab?.file_path || lab?.id || "Loading lab..."}</p>
@@ -72,24 +71,24 @@ export function Header(props: HeaderProps) {
         <span className={`saved-indicator ${saved ? "ok" : "dirty"}`}>{saved ? "Saved" : "Unsaved"}</span>
         {running ? (
           <button className="button danger" disabled={busy || cancelling} onClick={onCancel}>
-            {cancelling ? <Loader2 size={14} className="spin" /> : <CircleStop size={14} />}
+            {cancelling ? <CircleNotchIcon size={14} className="spin" /> : <StopCircleIcon size={14} />}
             {cancelling ? "Cancelling" : "Cancel"}
           </button>
         ) : (
           <button className="button primary" disabled={busy} onClick={onRunClick}>
-            {busy ? <Loader2 size={14} className="spin" /> : <Play size={14} />}
+            {busy ? <CircleNotchIcon size={14} className="spin" /> : <PlayIcon size={14} />}
             Run
           </button>
         )}
         <button className="icon-button" title="Refresh" onClick={onRefresh}>
-          <RefreshCcw size={15} />
+          <ArrowsCounterClockwiseIcon size={15} />
         </button>
         <button
           className="icon-button"
           title={`Theme: ${theme}`}
           onClick={() => onThemeChange(nextTheme(theme))}
         >
-          {theme === "dark" ? <Moon size={15} /> : <Sun size={15} />}
+          {theme === "dark" ? <MoonIcon size={15} /> : <SunIcon size={15} />}
         </button>
         <button
           className="icon-button"
@@ -97,7 +96,7 @@ export function Header(props: HeaderProps) {
           onClick={onToggleRight}
           aria-label="Toggle run sidebar"
         >
-          <PanelRight size={16} />
+          <SidebarSimpleIcon size={16} />
         </button>
       </div>
     </header>

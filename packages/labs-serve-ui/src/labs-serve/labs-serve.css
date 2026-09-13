@@ -129,7 +129,7 @@ button {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 16px;
-  font-weight: 680;
+  font-weight: 500;
   letter-spacing: 0;
 }
 
@@ -439,7 +439,7 @@ button:disabled {
   align-items: center;
   gap: 7px;
   padding: 10px 11px 4px;
-  font-weight: 680;
+  font-weight: 500;
   font-size: 13px;
 }
 
@@ -942,7 +942,7 @@ th {
 
 .structure-annotations dt {
   color: var(--muted);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .structure-annotations dd {
@@ -1019,7 +1019,7 @@ th {
   align-items: center;
   gap: 6px;
   color: var(--primary-strong);
-  font-weight: 650;
+  font-weight: 500;
   text-decoration: none;
 }
 
@@ -1152,7 +1152,7 @@ th {
   padding: 0 9px;
   border-radius: 999px;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.03em;
 }
 
@@ -1495,7 +1495,7 @@ th {
   background: var(--primary);
   color: white;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   box-shadow: var(--shadow);
   cursor: pointer;
 }
@@ -1537,7 +1537,7 @@ th {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .flow-node-title {
@@ -1747,7 +1747,7 @@ th {
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .property-field textarea {
@@ -2023,7 +2023,7 @@ th {
 
 .tree-item-title {
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.25;
   white-space: nowrap;
   overflow: hidden;
@@ -2268,7 +2268,7 @@ th {
   text-align: left;
   cursor: pointer;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--muted);
@@ -2316,7 +2316,7 @@ th {
 .property-static-title {
   margin: 0;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--muted);
@@ -2656,7 +2656,7 @@ th {
 
 .upgrade-banner-text a {
   color: var(--primary-strong);
-  font-weight: 600;
+  font-weight: 500;
   text-decoration: underline;
   text-underline-offset: 2px;
 }

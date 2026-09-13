@@ -1,5 +1,5 @@
 import * as React from "react";
-import { BarChart3, Braces, History, ListTree } from "lucide-react";
+import { BracketsCurlyIcon, ChartBarIcon, ClockCounterClockwiseIcon, TreeViewIcon } from "@phosphor-icons/react";
 import type { LocalRun, RunLogEntry, ServeResults } from "../types";
 import { RunHistoryPanel } from "./run-sidebar";
 import { LogsPanel, VisualsPanel } from "./visuals";
@@ -88,16 +88,16 @@ export function RunStatus({
       </div>
       <div className="tabs">
         <button className={tab === "visuals" ? "active" : ""} onClick={() => setTab("visuals")}>
-          <BarChart3 size={13} /> Visuals
+          <ChartBarIcon size={13} /> Visuals
         </button>
         <button className={tab === "logs" ? "active" : ""} onClick={() => setTab("logs")}>
-          <ListTree size={13} /> Logs
+          <TreeViewIcon size={13} /> Logs
         </button>
         <button className={tab === "json" ? "active" : ""} onClick={() => setTab("json")}>
-          <Braces size={13} /> JSON
+          <BracketsCurlyIcon size={13} /> JSON
         </button>
         <button className={tab === "history" ? "active" : ""} onClick={() => setTab("history")}>
-          <History size={13} /> History
+          <ClockCounterClockwiseIcon size={13} /> History
         </button>
       </div>
       <div className="tab-body">

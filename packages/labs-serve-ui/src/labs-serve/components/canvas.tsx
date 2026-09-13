@@ -13,7 +13,7 @@ import {
   type Node,
   type NodeProps,
 } from "@xyflow/react";
-import { FlaskConical, GitBranch, Globe2, Loader2, Plus, WandSparkles } from "lucide-react";
+import { CircleNotchIcon, FlaskIcon, GitBranchIcon, GlobeIcon, MagicWandIcon, PlusIcon } from "@phosphor-icons/react";
 import "@xyflow/react/dist/style.css";
 import { WORLD_INPUT_RAIL_ID, WORLD_OUTPUT_RAIL_ID, type LocalLab, type Selection } from "../types";
 import {
@@ -56,7 +56,7 @@ function PortLabel({ kind, text }: { kind: "Input" | "Output"; text: string }) {
 }
 
 function ModuleNode({ data, id, selected }: NodeProps<Node<ModelNodeData>>) {
-  const Icon = data.kind === "lab" ? GitBranch : FlaskConical;
+  const Icon = data.kind === "lab" ? GitBranchIcon : FlaskIcon;
   return (
     <div className={`flow-node ${selected ? "selected" : ""}`} data-node-id={id}>
       <div className="flow-node-top">
@@ -128,7 +128,7 @@ function WorldRailNode({
         className="world-rail-header"
         style={{ height: RAIL_HEADER_HEIGHT }}
       >
-        <Globe2 size={13} />
+        <GlobeIcon size={13} />
         <span>{isInputs ? "WORLD INPUTS" : "WORLD OUTPUTS"}</span>
       </div>
       <div
@@ -287,7 +287,7 @@ function CanvasInner({ lab, selection, onSelect, onAddClick, onLayoutChange, rea
     <div className="serve-canvas">
       <div className="canvas-toolbar">
         <button className="toolbar-button" onClick={handleTidy} title="Auto-arrange nodes">
-          <WandSparkles size={14} />
+          <MagicWandIcon size={14} />
           <span>Tidy Layout</span>
         </button>
         <div className="canvas-toolbar-spacer" />
@@ -299,20 +299,20 @@ function CanvasInner({ lab, selection, onSelect, onAddClick, onLayoutChange, rea
             className={`canvas-toolbar-stat runtime-metadata ${runtimeMetadataStatus}`}
             title={lab?.runtime_metadata_error || runtimeMetadataLabel}
           >
-            {runtimeMetadataStatus === "failed" ? null : <Loader2 size={11} className="spin" />}
+            {runtimeMetadataStatus === "failed" ? null : <CircleNotchIcon size={11} className="spin" />}
             {runtimeMetadataLabel}
           </span>
         ) : null}
       </div>
       {loading ? (
         <div className="empty-state loading-state">
-          <Loader2 size={28} className="spin" />
+          <CircleNotchIcon size={28} className="spin" />
           <h2>Loading lab...</h2>
           <p>Reading the local lab manifest and canvas layout.</p>
         </div>
       ) : decoratedNodes.length === 0 ? (
         <div className="empty-state">
-          <FlaskConical size={28} />
+          <FlaskIcon size={28} />
           <h2>No modules in this lab</h2>
           <p>This local lab has no model or nested lab entries to draw.</p>
         </div>
@@ -342,7 +342,7 @@ function CanvasInner({ lab, selection, onSelect, onAddClick, onLayoutChange, rea
                 onClick={onAddClick}
                 title="Add model or nested lab"
               >
-                <Plus size={16} />
+                <PlusIcon size={16} />
                 <span>Add</span>
               </button>
             </Panel>
@@ -356,7 +356,7 @@ function CanvasInner({ lab, selection, onSelect, onAddClick, onLayoutChange, rea
           onClick={onAddClick}
           title="Add model or nested lab"
         >
-          <Plus size={16} />
+          <PlusIcon size={16} />
           <span>Add</span>
         </button>
       ) : null}

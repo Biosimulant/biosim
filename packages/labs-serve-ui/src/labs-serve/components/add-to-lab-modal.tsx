@@ -1,4 +1,4 @@
-import { Download, X } from "lucide-react";
+import { DownloadSimpleIcon, XIcon } from "@phosphor-icons/react";
 
 export type AddToLabModalProps = {
   onCancel: () => void;
@@ -17,7 +17,7 @@ export function AddToLabModal({ onCancel }: AddToLabModalProps) {
         <div className="modal-header">
           <h2>Add to lab</h2>
           <button type="button" className="icon-button small" onClick={onCancel} title="Close">
-            <X size={14} />
+            <XIcon size={14} />
           </button>
         </div>
         <div className="modal-body">
@@ -32,7 +32,7 @@ export function AddToLabModal({ onCancel }: AddToLabModalProps) {
             </p>
             <p>
               <a href={DESKTOP_DOWNLOAD_URL} target="_blank" rel="noreferrer">
-                <Download size={12} aria-hidden /> Get the Biosimulant Desktop app →
+                <DownloadSimpleIcon size={12} aria-hidden /> Get the Biosimulant Desktop app →
               </a>
             </p>
           </div>

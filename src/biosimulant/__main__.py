@@ -81,6 +81,7 @@ COMMANDS: tuple[tuple[str, str], ...] = (
     ("labs vendor-model", "Vendor a model into a lab"),
     ("labs inspect-owned", "Inspect lab-owned model sources"),
     ("labs validate", "Validate a lab"),
+    ("labs capabilities", "Check local CPU, memory, and GPU support"),
     ("labs run", "Run a lab"),
     ("labs serve", "Serve a lab locally"),
     ("labs package", "Build a lab package"),

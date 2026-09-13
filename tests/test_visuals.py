@@ -150,6 +150,69 @@ def test_visuals_description_is_preserved(biosim):
     assert collected[0]["visuals"][0]["description"] == "hello"
 
 
+def test_collect_visuals_derives_timeseries_from_typed_trajectory_output(biosim):
+    class Trajectory(biosim.BioModule):
+        execution_policy = biosim.ExecutionPolicy.EACH_WINDOW
+
+        def outputs(self):
+            return {
+                "trajectory": biosim.SignalSpec.record(
+                    schema={
+                        "quantity": "str",
+                        "time_unit": "str",
+                        "value_unit": "str",
+                        "rows": "list",
+                    },
+                    emitted_unit="mg/L",
+                )
+            }
+
+        def execute(self, inputs, *, context):
+            del inputs
+            return {
+                "trajectory": {
+                    "quantity": "concentration",
+                    "time_unit": "h",
+                    "value_unit": "mg/L",
+                    "rows": [
+                        {"time_h": 0.0, "value": 5.0},
+                        {"time_h": context.window_end, "value": 4.0},
+                    ],
+                }
+            }
+
+    world = biosim.BioWorld(communication_step=1.0)
+    world.add_biomodule("trajectory", Trajectory())
+    world.run(duration=1.0)
+
+    collected = world.collect_visuals()
+
+    assert collected == [
+        {
+            "module": "trajectory",
+            "visuals": [
+                {
+                    "render": "timeseries",
+                    "description": "Derived from typed trajectory output trajectory.",
+                    "data": {
+                        "title": "Concentration",
+                        "x_label": "Time",
+                        "y_label": "Concentration",
+                        "x_unit": "h",
+                        "y_unit": "mg/L",
+                        "series": [
+                            {
+                                "name": "Concentration",
+                                "points": [[0.0, 5.0], [1.0, 4.0]],
+                            }
+                        ],
+                    },
+                }
+            ],
+        }
+    ]
+
+
 def test_classify_visual_capability_for_renderer_audits():
     assert (
         classify_visual_capability(

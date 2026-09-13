@@ -25,6 +25,11 @@ def test_labs_init_validate_and_run_without_desktop(tmp_path: Path, capsys) -> N
     assert validate_payload["valid"] is True
     assert validate_payload["package"] == "local/starter-lab"
 
+    main(["labs", "capabilities", str(lab_dir), "--json"], prog="biosimulant")
+    capability_payload = json.loads(capsys.readouterr().out)
+    assert capability_payload["local_supported"] is True
+    assert capability_payload["selected_backend"] == "cpu"
+
     main(
         ["labs", "run", str(lab_dir), "--no-install-deps", "--json"],
         prog="biosimulant",
@@ -35,11 +40,20 @@ def test_labs_init_validate_and_run_without_desktop(tmp_path: Path, capsys) -> N
     assert run_payload["modules"][0]["alias"] == "hello"
 
     main(
-        ["labs", "run", str(lab_dir), "--no-install-deps", "--json", "--no-open"],
+        [
+            "labs",
+            "run",
+            str(lab_dir),
+            "--no-install-deps",
+            "--require-local-capability",
+            "--json",
+            "--no-open",
+        ],
         prog="biosimulant",
     )
     run_no_open_payload = json.loads(capsys.readouterr().out)
     assert run_no_open_payload["package"] == "local/starter-lab"
+    assert run_no_open_payload["local_execution"]["local_supported"] is True
 
 
 def test_root_version_flag(capsys) -> None:

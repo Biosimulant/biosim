@@ -1,5 +1,5 @@
 import * as React from "react";
-import { GitBranch, Maximize2 } from "lucide-react";
+import { ArrowsOutIcon, GitBranchIcon } from "@phosphor-icons/react";
 import "molstar/build/viewer/molstar.css";
 import type { Viewer as MolstarViewerInstance } from "molstar/lib/apps/viewer/app";
 import type { RunModuleVisuals, RunVisualSpec } from "../types";
@@ -39,7 +39,7 @@ export function VisualsPanel({ visuals }: { visuals: RunModuleVisuals[] }) {
                     <span className="renderer-badge">{visual.render}</span>
                   </div>
                   <button className="icon-button small" onClick={() => setExpanded({ title: module.module, visual })}>
-                    <Maximize2 size={12} />
+                    <ArrowsOutIcon size={12} />
                   </button>
                 </div>
                 {visual.description ? <p>{visual.description}</p> : null}
@@ -316,7 +316,7 @@ function GraphVisual({ data }: { data: Record<string, unknown> }) {
   const edges = Array.isArray(data.edges) ? data.edges : [];
   return (
     <div className="graph-summary">
-      <GitBranch size={14} /> {nodes.length} nodes / {edges.length} edges
+      <GitBranchIcon size={14} /> {nodes.length} nodes / {edges.length} edges
     </div>
   );
 }

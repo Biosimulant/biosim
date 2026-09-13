@@ -16,7 +16,7 @@ export default defineConfig({
         assetFileNames: "assets/[name][extname]",
         manualChunks: {
           canvas: ["@xyflow/react", "dagre"],
-          icons: ["lucide-react"]
+          icons: ["@phosphor-icons/react"]
         }
       }
     }

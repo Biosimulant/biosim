@@ -117,7 +117,7 @@ def test_top_level_completion_includes_labs(tmp_path: Path) -> None:
 def test_nested_labs_completion_includes_core_commands(tmp_path: Path) -> None:
     completions = _completion_values("biosimulant labs ", tmp_path)
 
-    assert {"run", "validate", "package"}.issubset(set(completions))
+    assert {"run", "validate", "capabilities", "package"}.issubset(set(completions))
 
 
 def test_labs_option_completion(tmp_path: Path) -> None:
@@ -126,6 +126,7 @@ def test_labs_option_completion(tmp_path: Path) -> None:
 
     assert "--json" in run_completions
     assert "--no-install-deps" in run_completions
+    assert "--require-local-capability" in run_completions
     assert "--out" in package_completions
 
 

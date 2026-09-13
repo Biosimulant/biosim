@@ -1,4 +1,4 @@
-import { BarChart3 } from "lucide-react";
+import { ChartBarIcon } from "@phosphor-icons/react";
 import type { LocalRun } from "../types";
 
 export type RunSidebarProps = {
@@ -42,7 +42,7 @@ export function RunHistoryPanel(props: RunSidebarProps) {
           onClick={onOpenCompare}
           title={compareCount < 2 ? "Pick at least two runs to compare" : "Open comparison"}
         >
-          <BarChart3 size={12} />
+          <ChartBarIcon size={12} />
           Compare {compareCount > 0 ? `(${compareCount})` : ""}
         </button>
       </div>

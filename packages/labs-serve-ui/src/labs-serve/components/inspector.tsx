@@ -1,5 +1,5 @@
 import * as React from "react";
-import { ArrowRight, Cable, ChevronRight, Plus, Save, Trash2, X } from "lucide-react";
+import { ArrowRightIcon, CaretRightIcon, FloppyDiskIcon, PlugsConnectedIcon, PlusIcon, TrashIcon, XIcon } from "@phosphor-icons/react";
 import type {
   LabChildEntry,
   LabModelEntry,
@@ -47,7 +47,7 @@ function PropertySection({
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
-        <ChevronRight size={12} className={`property-chevron ${open ? "open" : ""}`} />
+        <CaretRightIcon size={12} className={`property-chevron ${open ? "open" : ""}`} />
         <span>{title}</span>
         {typeof count === "number" ? <span className="muted">{count}</span> : null}
       </button>
@@ -117,7 +117,7 @@ function ParameterField({
         <span title={name}>{name}</span>
         {onRemove ? (
           <button type="button" className="icon-button tiny" title="Remove" onClick={onRemove}>
-            <Trash2 size={11} />
+            <TrashIcon size={11} />
           </button>
         ) : null}
       </div>
@@ -437,7 +437,7 @@ function ModelInspector({
       {onSave ? (
         <div className="property-actions">
           <button className="button primary small" disabled={!dirty || busy} onClick={handleSave}>
-            <Save size={12} />
+            <FloppyDiskIcon size={12} />
             {busy ? "Saving..." : "Save"}
           </button>
         </div>
@@ -621,9 +621,9 @@ function WorldConnectionsSection({
                 className="connection-row"
               >
                 <div className="connection-row-body">
-                  <Cable size={12} className="connection-icon" aria-hidden="true" />
+                  <PlugsConnectedIcon size={12} className="connection-icon" aria-hidden="true" />
                   <code className="connection-ref">{connection.from}</code>
-                  <ArrowRight size={12} className="connection-arrow" aria-label="to" />
+                  <ArrowRightIcon size={12} className="connection-arrow" aria-label="to" />
                   <code className="connection-ref">{connection.to}</code>
                 </div>
                 {onSave ? (
@@ -635,7 +635,7 @@ function WorldConnectionsSection({
                     disabled={saving}
                     onClick={() => removeConnection(connection.from, connection.to)}
                   >
-                    <Trash2 size={11} />
+                    <TrashIcon size={11} />
                   </button>
                 ) : null}
               </div>
@@ -695,7 +695,7 @@ function WorldConnectionsSection({
                     disabled={saving}
                     onClick={() => removeDraft(index)}
                   >
-                    <Trash2 size={11} />
+                    <TrashIcon size={11} />
                   </button>
                 </div>
               );
@@ -713,7 +713,7 @@ function WorldConnectionsSection({
             disabled={saving}
             onClick={appendDraft}
           >
-            <Plus size={11} /> Add connection
+            <PlusIcon size={11} /> Add connection
           </button>
         ) : null}
 
@@ -849,7 +849,7 @@ function WorldInspector({
         ))}
         {onSave ? (
           <button type="button" className="link-button" onClick={() => addPort("inputs")}>
-            <Plus size={11} /> Add input
+            <PlusIcon size={11} /> Add input
           </button>
         ) : null}
       </PropertySection>
@@ -867,7 +867,7 @@ function WorldInspector({
         ))}
         {onSave ? (
           <button type="button" className="link-button" onClick={() => addPort("outputs")}>
-            <Plus size={11} /> Add output
+            <PlusIcon size={11} /> Add output
           </button>
         ) : null}
       </PropertySection>
@@ -877,7 +877,7 @@ function WorldInspector({
       {onSave ? (
         <div className="property-actions">
           <button className="button primary small" disabled={!dirty || busy} onClick={handleSave}>
-            <Save size={12} />
+            <FloppyDiskIcon size={12} />
             {busy ? "Saving..." : "Save"}
           </button>
         </div>
@@ -933,7 +933,7 @@ function PortRow({
       </div>
       {onRemove ? (
         <button type="button" className="icon-button tiny" title="Remove" onClick={onRemove}>
-          <Trash2 size={11} />
+          <TrashIcon size={11} />
         </button>
       ) : null}
     </div>
@@ -949,7 +949,7 @@ export function Inspector(props: InspectorProps) {
       <div className="panel-header">
         <span>Properties</span>
         <button className="icon-button small" onClick={onClose} title="Clear selection">
-          <X size={13} />
+          <XIcon size={13} />
         </button>
       </div>
       {selection.kind === "world" ? <WorldInspector lab={lab} onSave={onSaveWorld} /> : null}

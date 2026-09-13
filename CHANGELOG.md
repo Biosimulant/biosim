@@ -7,6 +7,12 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Added
+
+- Add `biosimulant labs capabilities` and
+  `labs run --require-local-capability` for conservative, hardware-aware
+  local-first execution on declared CPU, memory, CUDA, or Apple MPS resources.
+
 ## [0.0.27] - 2026-09-12
 
 ### Changed

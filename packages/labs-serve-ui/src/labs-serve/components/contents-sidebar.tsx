@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Activity, FlaskConical, GitBranch, Search } from "lucide-react";
+import { FlaskIcon, GitBranchIcon, MagnifyingGlassIcon, PulseIcon } from "@phosphor-icons/react";
 import type { LocalLab, Selection } from "../types";
 import { titleForLab, titleForModel } from "../lib/graph";
 
@@ -28,7 +28,7 @@ export function ContentsSidebar({ lab, selection, onSelect }: ContentsSidebarPro
   return (
     <aside className="left-panel">
       <label className="search-box">
-        <Search size={13} />
+        <MagnifyingGlassIcon size={13} />
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
@@ -40,7 +40,7 @@ export function ContentsSidebar({ lab, selection, onSelect }: ContentsSidebarPro
           className={`tree-item ${selection.kind === "world" ? "active" : ""}`}
           onClick={() => onSelect({ kind: "world" })}
         >
-          <Activity size={13} className="tree-item-icon" />
+          <PulseIcon size={13} className="tree-item-icon" />
           <div className="tree-item-text">
             <div className="tree-item-title">World</div>
             <div className="tree-item-subtitle">{lab?.manifest.runtime ? "runtime" : "local"}</div>
@@ -53,7 +53,7 @@ export function ContentsSidebar({ lab, selection, onSelect }: ContentsSidebarPro
             onClick={() => onSelect({ kind: "model", id: entry.alias })}
             title={titleForModel(entry)}
           >
-            <FlaskConical size={13} className="tree-item-icon" />
+            <FlaskIcon size={13} className="tree-item-icon" />
             <div className="tree-item-text">
               <div className="tree-item-title">{titleForModel(entry)}</div>
               <div className="tree-item-subtitle">{entry.alias}</div>
@@ -67,7 +67,7 @@ export function ContentsSidebar({ lab, selection, onSelect }: ContentsSidebarPro
             onClick={() => onSelect({ kind: "lab", id: entry.alias })}
             title={titleForLab(entry)}
           >
-            <GitBranch size={13} className="tree-item-icon" />
+            <GitBranchIcon size={13} className="tree-item-icon" />
             <div className="tree-item-text">
               <div className="tree-item-title">{titleForLab(entry)}</div>
               <div className="tree-item-subtitle">{entry.alias}</div>

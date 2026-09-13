@@ -1,5 +1,5 @@
 import * as React from "react";
-import { AlertTriangle, ChevronDown, ChevronRight, Loader2, Play, X } from "lucide-react";
+import { CaretDownIcon, CaretRightIcon, CircleNotchIcon, PlayIcon, WarningIcon, XIcon } from "@phosphor-icons/react";
 import type { LabModelEntry, LocalLab, WorldIoPort } from "../types";
 import { titleForModel } from "../lib/graph";
 import { getModelParameterDescriptors, type ParameterDescriptor } from "../lib/parameters";
@@ -64,7 +64,7 @@ function CollapsibleSection({
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
       >
-        {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+        {open ? <CaretDownIcon size={13} /> : <CaretRightIcon size={13} />}
         <h3>{title}</h3>
         {typeof count === "number" ? <span className="muted">{count}</span> : null}
       </button>
@@ -231,7 +231,7 @@ export function PreRunModal({ lab, busy, onCancel, onSubmit }: PreRunModalProps)
         <div className="modal-header">
           <h2>Configure Run</h2>
           <button type="button" className="icon-button" onClick={onCancel} aria-label="Close">
-            <X size={14} />
+            <XIcon size={14} />
           </button>
         </div>
         <div className="modal-body">
@@ -264,7 +264,7 @@ export function PreRunModal({ lab, busy, onCancel, onSubmit }: PreRunModalProps)
             <div className="modal-compute-warnings" role="alert">
               {computeWarnings.map((warning, index) => (
                 <div className="modal-compute-warning" key={`${warning.code}-${warning.model_alias ?? index}`}>
-                  <AlertTriangle size={14} aria-hidden="true" />
+                  <WarningIcon size={14} aria-hidden="true" />
                   <span>{warning.message}</span>
                 </div>
               ))}
@@ -347,7 +347,7 @@ export function PreRunModal({ lab, busy, onCancel, onSubmit }: PreRunModalProps)
             Cancel
           </button>
           <button type="submit" className="button primary" disabled={busy}>
-            {busy ? <Loader2 size={13} className="spin" /> : <Play size={13} />}
+            {busy ? <CircleNotchIcon size={13} className="spin" /> : <PlayIcon size={13} />}
             Start run
           </button>
         </div>
@@ -380,7 +380,7 @@ function ModelParametersBlock({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
       >
-        {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+        {open ? <CaretDownIcon size={12} /> : <CaretRightIcon size={12} />}
         <strong>{title}</strong>
         <span className="muted">{alias}</span>
         <span className="muted">{descriptors.length} params</span>
