@@ -98,14 +98,17 @@ These are dynamic scientific trajectories, not structural metadata summaries.
 For a PhysioMe model already checked into a model repository:
 
 ```python
+import biosimulant as biosim
 from src.huang_ferrell_1996_huangferrell1996_model import HuangFerrell1996Huangferrell1996Model
 
 model = HuangFerrell1996Huangferrell1996Model(
     model_path="data/huang_ferrell_1996.cellml",
     integration_step=0.01,
 )
-model.advance_window(0.0, 1.0)
-print(model.get_outputs()["state"].value)
+world = biosim.BioWorld(communication_step=0.01)
+world.add_biomodule("cellml", model)
+world.run(duration=1.0)
+print(world.get_outputs("cellml")["state"].value)
 ```
 
 The model repository keeps the original CellML artifact and upstream metadata;

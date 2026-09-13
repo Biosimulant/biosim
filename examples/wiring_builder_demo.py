@@ -12,24 +12,18 @@ import biosimulant as biosim
 
 
 class Eye(biosim.BioModule):
-    def __init__(self):
-        self._outputs = {}
+    execution_policy = biosim.ExecutionPolicy.EACH_WINDOW
 
     def outputs(self):
         return {"visual_stream": biosim.SignalSpec.scalar(dtype="float64")}
 
-    def advance_window(self, start: float, end: float) -> None:
-        self._outputs = {
-            "visual_stream": biosim.ScalarSignal(source="eye", name="visual_stream", value=end, emitted_at=end)
-        }
-
-    def get_outputs(self):
-        return dict(self._outputs)
+    def execute(self, inputs, *, context: biosim.ExecutionContext):
+        assert context.window_end is not None
+        return {"visual_stream": context.window_end}
 
 
 class LGN(biosim.BioModule):
-    def __init__(self):
-        self._outputs = {}
+    execution_policy = biosim.ExecutionPolicy.EACH_WINDOW
 
     def inputs(self):
         return {"retina": biosim.SignalSpec.scalar(dtype="float64", max_age=0.2)}
@@ -37,32 +31,21 @@ class LGN(biosim.BioModule):
     def outputs(self):
         return {"thalamus": biosim.SignalSpec.scalar(dtype="float64")}
 
-    def set_inputs(self, signals):
-        if "retina" in signals:
-            sig = signals["retina"]
-            self._outputs = {
-                "thalamus": biosim.ScalarSignal(source="lgn", name="thalamus", value=sig.value, emitted_at=sig.emitted_at)
-            }
-
-    def advance_window(self, start: float, end: float) -> None:
-        return
-
-    def get_outputs(self):
-        return dict(self._outputs)
+    def execute(self, inputs, *, context: biosim.ExecutionContext):
+        signal = inputs.get("retina")
+        return {} if signal is None else {"thalamus": signal.value}
 
 
 class SC(biosim.BioModule):
+    execution_policy = biosim.ExecutionPolicy.EACH_WINDOW
+
     def inputs(self):
         return {"vision": biosim.SignalSpec.scalar(dtype="float64", max_age=0.2)}
 
-    def set_inputs(self, signals):
-        if "vision" in signals:
-            print("[SC] vision:", signals["vision"].value)
-
-    def advance_window(self, start: float, end: float) -> None:
-        return
-
-    def get_outputs(self):
+    def execute(self, inputs, *, context: biosim.ExecutionContext):
+        signal = inputs.get("vision")
+        if signal is not None:
+            print("[SC] vision:", signal.value)
         return {}
 
 

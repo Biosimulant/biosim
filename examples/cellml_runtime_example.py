@@ -24,6 +24,7 @@ import json
 from pathlib import Path
 import sys
 
+from biosimulant import BioWorld
 from biosimulant.contrib.cellml import CellMLRuntimeError, LibCellMLBioModule
 
 
@@ -54,8 +55,10 @@ class PhysioMeCellMLModel(LibCellMLBioModule):
 
 
 def _run(model: LibCellMLBioModule, duration: float) -> dict[str, object]:
-    model.advance_window(0.0, duration)
-    outputs = model.get_outputs()
+    world = BioWorld(communication_step=model.integration_step)
+    world.add_biomodule("cellml", model)
+    world.run(duration=duration)
+    outputs = world.get_outputs("cellml")
     return {
         "state": outputs[model._STATE_OUTPUT_NAME].value,
         "summary": outputs[model._SUMMARY_OUTPUT_NAME].value,

@@ -269,10 +269,12 @@ Minimal usage:
 
 ```python
 import biosimulant as biosim
-from biosimulant import ScalarSignal, SignalSpec
+from biosimulant import ExecutionContext, ExecutionPolicy, SignalSpec
 
 
 class Counter(biosim.BioModule):
+    execution_policy = ExecutionPolicy.EACH_WINDOW
+
     def __init__(self):
         self.value = 0
         self._t = 0.0
@@ -280,21 +282,11 @@ class Counter(biosim.BioModule):
     def outputs(self):
         return {"count": SignalSpec.scalar(dtype="int64", emitted_unit="1")}
 
-    def advance_window(self, start: float, end: float) -> None:
-        _ = start
+    def execute(self, inputs, *, context: ExecutionContext):
+        assert context.window_end is not None
         self.value += 1
-        self._t = end
-
-    def get_outputs(self):
-        return {
-            "count": ScalarSignal(
-                source="counter",
-                name="count",
-                value=self.value,
-                emitted_at=self._t,
-                spec=self.outputs()["count"],
-            )
-        }
+        self._t = context.window_end
+        return {"count": self.value}
 
     def snapshot(self) -> dict:
         return {"value": self.value, "t": self._t}
@@ -322,10 +314,9 @@ Modules may optionally expose visuals via `visualize()`, returning a dict or lis
 
 ```python
 class MyModule(biosim.BioModule):
-    def advance_window(self, start: float, end: float) -> None:
-        _ = start, end
+    execution_policy = biosim.ExecutionPolicy.EACH_WINDOW
 
-    def get_outputs(self):
+    def execute(self, inputs, *, context: biosim.ExecutionContext):
         return {}
 
     def snapshot(self) -> dict:
@@ -451,7 +442,7 @@ Understanding the core concepts is essential for working with Biosimulant effect
 | Term | Description |
 |------|-------------|
 | **BioWorld** | Runtime container that orchestrates multi-rate biomodules, routes signals, and publishes lifecycle events. |
-| **BioModule** | Pluggable unit of behavior with local state. Implements the runnable contract (`setup/reset/advance_to/...`). |
+| **BioModule** | Pluggable unit of behavior with typed ports and a canonical `execute(inputs, *, context)` hook. |
 | **BioSignal** | Typed, versioned data payload exchanged between modules via named ports. |
 | **WorldEvent** | Runtime events emitted by the BioWorld (`STARTED`, `TICK`, `FINISHED`, etc.). |
 | **Wiring** | Module connection graph. Defined programmatically, via `WiringBuilder`, or loaded from YAML/TOML configs. |

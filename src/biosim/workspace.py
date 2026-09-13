@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
+from ._starter import write_starter_model
 from .pack import (
     DEFAULT_PACKAGE_NAMESPACE,
     DEFAULT_PACKAGE_VERSION,
@@ -95,7 +96,7 @@ def create_lab(
         starter_model = None
     else:
         starter_model_path = target / "models" / "hello"
-        _write_starter_model(starter_model_path)
+        write_starter_model(starter_model_path)
         models_block = """models:
   - path: models/hello
     alias: hello
@@ -687,58 +688,6 @@ def _json_string(value: str) -> str:
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-
-
-def _write_starter_model(path: Path) -> None:
-    path.mkdir(parents=True, exist_ok=True)
-    (path / "model.yaml").write_text(
-        """schema_version: "2.0"
-title: "Hello Model"
-description: "Starter local Biosimulant model"
-standard: other
-tags: [starter]
-authors: ["Biosimulant"]
-package: local/hello
-version: 0.1.0
-biosim:
-  entrypoint: "src.hello:HelloModule"
-  communication_step: 1.0
-""",
-        encoding="utf-8",
-    )
-    src_dir = path / "src"
-    src_dir.mkdir(exist_ok=True)
-    (src_dir / "hello.py").write_text(
-        '''from biosim import BioModule, ScalarSignal, SignalSpec
-
-
-class HelloModule(BioModule):
-    def __init__(self):
-        self.time = 0.0
-
-    def outputs(self):
-        return {"time": SignalSpec.scalar(dtype="float64")}
-
-    def advance_window(self, _start, end):
-        self.time = float(end)
-
-    def get_outputs(self):
-        spec = self.outputs()["time"]
-        return {
-            "time": ScalarSignal(
-                source="hello",
-                name="time",
-                value=self.time,
-                emitted_at=self.time,
-                spec=spec,
-            )
-        }
-
-    def snapshot(self):
-        return {"time": self.time}
-''',
-        encoding="utf-8",
-    )
 
 
 __all__ = [

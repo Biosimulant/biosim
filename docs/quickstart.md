@@ -30,37 +30,25 @@ biosimulant labs serve ./my-lab
 `labs serve` opens `http://127.0.0.1:8765/` by default. Use `--no-open` to
 start the server without opening a browser.
 
-## Minimal 1.5 example
+## Minimal example
 
 ```python
 import biosimulant as biosim
 
 
 class Eye(biosim.BioModule):
-    def __init__(self):
-        self._outputs = {}
+    execution_policy = biosim.ExecutionPolicy.EACH_WINDOW
 
     def outputs(self):
         return {"visual_stream": biosim.SignalSpec.scalar(dtype="float64")}
 
-    def advance_window(self, start: float, end: float) -> None:
-        self._outputs = {
-            "visual_stream": biosim.ScalarSignal(
-                source="eye",
-                name="visual_stream",
-                value=end,
-                emitted_at=end,
-                spec=self.outputs()["visual_stream"],
-            )
-        }
-
-    def get_outputs(self):
-        return dict(self._outputs)
+    def execute(self, inputs, *, context: biosim.ExecutionContext):
+        assert context.window_end is not None
+        return {"visual_stream": context.window_end}
 
 
 class LGN(biosim.BioModule):
-    def __init__(self):
-        self._inputs = {}
+    execution_policy = biosim.ExecutionPolicy.EACH_WINDOW
 
     def inputs(self):
         return {"retina": biosim.SignalSpec.scalar(dtype="float64", max_age=0.2)}
@@ -68,25 +56,11 @@ class LGN(biosim.BioModule):
     def outputs(self):
         return {"thalamus": biosim.SignalSpec.scalar(dtype="float64")}
 
-    def set_inputs(self, signals):
-        self._inputs = dict(signals)
-
-    def advance_window(self, start: float, end: float) -> None:
-        return
-
-    def get_outputs(self):
-        signal = self._inputs.get("retina")
+    def execute(self, inputs, *, context: biosim.ExecutionContext):
+        signal = inputs.get("retina")
         if signal is None:
             return {}
-        return {
-            "thalamus": biosim.ScalarSignal(
-                source="lgn",
-                name="thalamus",
-                value=signal.value,
-                emitted_at=signal.emitted_at,
-                spec=self.outputs()["thalamus"],
-            )
-        }
+        return {"thalamus": signal.value}
 
 
 world = biosim.BioWorld(communication_step=0.1)
@@ -96,7 +70,7 @@ builder.connect("eye.visual_stream", ["lgn.retina"]).apply()
 world.run(duration=0.3)
 ```
 
-## Finite models and AI inference
+## Choose an invocation policy
 
 A finite input-to-output model remains a `BioModule` and uses the canonical
 execution method:
@@ -112,12 +86,9 @@ class Predictor(biosim.BioModule):
         return {"score": 0.95}
 ```
 
-Use `ONCE_AFTER_RUN` for final analysis of simulation outputs. Explicitly declare
-`EACH_WINDOW` when a temporal or AI model must run against evolving state at every
-positive communication window; temporal code reads the window bounds from
-`context`. Existing `advance_window()` packages remain supported. Canonical
-modules do not run during zero-time settle. Manifests and Lab runtime fields do
-not change.
+Use `ONCE_AFTER_RUN` for final analysis of simulation outputs. Use `EACH_WINDOW`
+when temporal or AI computation consumes evolving state; temporal code reads the
+window bounds from `context`. Manifests and Lab runtime fields do not change.
 
 ## Run the built-in examples
 
@@ -130,4 +101,3 @@ not change.
 - `docs/biomodule.md`
 - `docs/bioworld.md`
 - `docs/wiring.md`
-- `docs/migration-1-5.md`

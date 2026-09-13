@@ -8,7 +8,19 @@ import pytest
 
 from biosim.__main__ import main
 from biosim.pack import validate_package
+from biosim.workspace import create_lab
 from tests.test_pack import _write_lab, _write_lab_release_identity
+
+
+def _assert_canonical_starter(lab_dir: Path) -> None:
+    source = (lab_dir / "models" / "hello" / "src" / "hello.py").read_text(
+        encoding="utf-8"
+    )
+    assert "from biosimulant import" in source
+    assert "execution_policy = ExecutionPolicy.EACH_WINDOW" in source
+    assert "def execute(self, inputs, *, context: ExecutionContext):" in source
+    assert "def advance_window" not in source
+    assert "def get_outputs" not in source
 
 
 def test_labs_init_validate_and_run_without_desktop(tmp_path: Path, capsys) -> None:
@@ -19,6 +31,7 @@ def test_labs_init_validate_and_run_without_desktop(tmp_path: Path, capsys) -> N
     assert "Biosimulant lab initialized." in init_output
     assert (lab_dir / "lab.yaml").is_file()
     assert (lab_dir / "models" / "hello" / "model.yaml").is_file()
+    _assert_canonical_starter(lab_dir)
 
     main(["labs", "validate", str(lab_dir), "--json"], prog="biosimulant")
     validate_payload = json.loads(capsys.readouterr().out)
@@ -56,12 +69,21 @@ def test_labs_init_validate_and_run_without_desktop(tmp_path: Path, capsys) -> N
     assert run_no_open_payload["local_execution"]["local_supported"] is True
 
 
+def test_labs_create_uses_the_same_canonical_starter(tmp_path: Path) -> None:
+    lab_dir = tmp_path / "managed-starter-lab"
+
+    result = create_lab(lab_dir, name="Managed Starter Lab")
+
+    assert result["created"] is True
+    _assert_canonical_starter(lab_dir)
+
+
 def test_root_version_flag(capsys) -> None:
     with pytest.raises(SystemExit) as exc_info:
         main(["--version"], prog="biosimulant")
 
     assert exc_info.value.code == 0
-    assert capsys.readouterr().out.strip() == "biosimulant 0.0.27"
+    assert capsys.readouterr().out.strip() == "biosimulant 0.0.28"
 
 
 def test_labs_serve_uses_local_lab_ui_without_desktop(tmp_path: Path) -> None:

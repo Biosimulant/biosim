@@ -47,6 +47,7 @@ if TYPE_CHECKING:
     from .world import BioWorld
 
 from .__about__ import __version__
+from ._starter import write_starter_model
 from .labs_serve import serve_lab
 from .execution_capabilities import inspect_local_execution_capability
 from .managed_runtime import (
@@ -1353,7 +1354,7 @@ def _init_lab_project(
     if empty:
         models_block = "models: []\nchildren: []\nwiring: []"
     else:
-        _write_starter_model(target / "models" / "hello")
+        write_starter_model(target / "models" / "hello")
         models_block = """models:
   - path: models/hello
     alias: hello
@@ -1377,58 +1378,6 @@ runtime:
         "manifest": str(target / "lab.yaml"),
         "starter_model": None if empty else str(target / "models" / "hello"),
     }
-
-
-def _write_starter_model(path: Path) -> None:
-    path.mkdir(parents=True, exist_ok=True)
-    (path / "model.yaml").write_text(
-        """schema_version: "2.0"
-title: "Hello Model"
-description: "Starter local Biosimulant model"
-standard: other
-tags: [starter]
-authors: ["Biosimulant"]
-package: local/hello
-version: 0.1.0
-biosim:
-  entrypoint: "src.hello:HelloModule"
-  communication_step: 1.0
-""",
-        encoding="utf-8",
-    )
-    src_dir = path / "src"
-    src_dir.mkdir(exist_ok=True)
-    (src_dir / "hello.py").write_text(
-        '''from biosim import BioModule, ScalarSignal, SignalSpec
-
-
-class HelloModule(BioModule):
-    def __init__(self):
-        self.time = 0.0
-
-    def outputs(self):
-        return {"time": SignalSpec.scalar(dtype="float64")}
-
-    def advance_window(self, _start, end):
-        self.time = float(end)
-
-    def get_outputs(self):
-        spec = self.outputs()["time"]
-        return {
-            "time": ScalarSignal(
-                source="hello",
-                name="time",
-                value=self.time,
-                emitted_at=self.time,
-                spec=spec,
-            )
-        }
-
-    def snapshot(self):
-        return {"time": self.time}
-''',
-        encoding="utf-8",
-    )
 
 
 def _validate_local_lab(path: Path) -> Any:

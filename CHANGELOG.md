@@ -7,11 +7,28 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [0.0.28] - 2026-09-13
+
 ### Added
 
 - Add `biosimulant labs capabilities` and
   `labs run --require-local-capability` for conservative, hardware-aware
   local-first execution on declared CPU, memory, CUDA, or Apple MPS resources.
+
+### Changed
+
+- Generate canonical `execute(inputs, *, context)` starter models with an
+  explicit `ExecutionPolicy.EACH_WINDOW` from both Lab creation commands.
+- Route BioModule regression snapshots through `BioWorld` so canonical
+  invocation policies, typed output normalization, and compatibility modules
+  use the same execution path as Labs.
+- Lead active documentation and first-party examples with the canonical
+  execution contract while retaining one explicit temporal compatibility path.
+
+### Removed
+
+- Remove obsolete audit and V1-to-V1.5 migration documents that described
+  superseded execution signatures.
 
 ## [0.0.27] - 2026-09-12
 

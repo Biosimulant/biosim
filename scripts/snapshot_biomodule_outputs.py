@@ -127,7 +127,6 @@ def snapshot_model_dir(
     if install_deps:
         _install_declared_dependencies(manifest)
     module, meta = _instantiate_model_from_dir(model_dir, manifest=manifest)
-    module.setup(meta["setup"])
     runtime = manifest.get("runtime") if isinstance(manifest.get("runtime"), Mapping) else {}
     communication_step = extract_communication_step(
         None,
@@ -136,6 +135,9 @@ def snapshot_model_dir(
         error_cls=PackageError,
     )
     run_duration = float(duration if duration is not None else communication_step)
+    world = BioWorld(communication_step=communication_step)
+    world.add_biomodule("model", module)
+    world.setup({"model": dict(meta["setup"])})
     initial_inputs = runtime.get("initial_inputs") if isinstance(runtime, Mapping) else {}
     if isinstance(initial_inputs, Mapping) and initial_inputs:
         declared_inputs = module.inputs() if isinstance(module.inputs(), dict) else {}
@@ -148,7 +150,7 @@ def snapshot_model_dir(
                 error_cls=PackageError,
             )
         )
-    module.advance_window(0.0, run_duration)
+    world.run(duration=run_duration)
     visuals = module.visualize()
     return {
         "kind": "model",
@@ -156,7 +158,7 @@ def snapshot_model_dir(
         "duration": run_duration,
         "inputs": _specs_to_dict(module.inputs() if isinstance(module.inputs(), dict) else {}),
         "outputs": _specs_to_dict(module.outputs() if isinstance(module.outputs(), dict) else {}),
-        "signals": _signals_to_dict(module.get_outputs()),
+        "signals": _signals_to_dict(world.get_outputs("model")),
         "state": _normalize(module.snapshot()),
         "visuals": _normalize(visuals or []),
     }

@@ -32,32 +32,19 @@ class StepLoggerModule(biosim.BioModule):
 class Eye(biosim.BioModule):
     """Publishes a vision signal each step."""
 
-    def __init__(self):
-        self._outputs = {}
+    execution_policy = biosim.ExecutionPolicy.EACH_WINDOW
 
     def outputs(self):
         return {"vision": biosim.SignalSpec.record(schema={"photon": "bool"})}
 
-    def advance_window(self, start: float, end: float) -> None:
-        self._outputs = {
-            "vision": biosim.RecordSignal(
-                source="eye",
-                name="vision",
-                value={"photon": True},
-                emitted_at=end,
-                spec=self.outputs()["vision"],
-            )
-        }
-
-    def get_outputs(self):
-        return dict(self._outputs)
+    def execute(self, inputs, *, context: biosim.ExecutionContext):
+        return {"vision": {"photon": True}}
 
 
 class LGN(biosim.BioModule):
     """Receives Eye.vision and relays to thalamus channel."""
 
-    def __init__(self):
-        self._outputs = {}
+    execution_policy = biosim.ExecutionPolicy.EACH_WINDOW
 
     def inputs(self):
         return {"vision": biosim.SignalSpec.record(schema={"photon": "bool"})}
@@ -65,39 +52,23 @@ class LGN(biosim.BioModule):
     def outputs(self):
         return {"thalamus": biosim.SignalSpec.record(schema={"photon": "bool"})}
 
-    def set_inputs(self, signals):
-        if "vision" in signals:
-            self._outputs = {
-                "thalamus": biosim.RecordSignal(
-                    source="lgn",
-                    name="thalamus",
-                    value=signals["vision"].value,
-                    emitted_at=signals["vision"].emitted_at,
-                    spec=self.outputs()["thalamus"],
-                )
-            }
-
-    def advance_window(self, start: float, end: float) -> None:
-        return
-
-    def get_outputs(self):
-        return dict(self._outputs)
+    def execute(self, inputs, *, context: biosim.ExecutionContext):
+        signal = inputs.get("vision")
+        return {} if signal is None else {"thalamus": signal.value}
 
 
 class SuperiorColliculus(biosim.BioModule):
     """Receives LGN.thalamus signals."""
 
+    execution_policy = biosim.ExecutionPolicy.EACH_WINDOW
+
     def inputs(self):
         return {"thalamus": biosim.SignalSpec.record(schema={"photon": "bool"})}
 
-    def set_inputs(self, signals):
-        if "thalamus" in signals:
-            print("[SC] received:", signals["thalamus"].value)
-
-    def advance_window(self, start: float, end: float) -> None:
-        return
-
-    def get_outputs(self):
+    def execute(self, inputs, *, context: biosim.ExecutionContext):
+        signal = inputs.get("thalamus")
+        if signal is not None:
+            print("[SC] received:", signal.value)
         return {}
 
 
