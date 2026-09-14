@@ -45,6 +45,9 @@ biosimulant = "biosimulant.__main__:main"
 [tool.hatch.version]
 path = "src/biosim/__about__.py"
 
+[tool.hatch.metadata]
+allow-direct-references = true
+
 [tool.hatch.envs.types]
 extra-dependencies = [
   "mypy>=1.0.0",
