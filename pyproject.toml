@@ -93,6 +93,7 @@ addopts = "-q"
 
 [project.optional-dependencies]
 dev = [
+  "biosimulant-model-compatibility-standard @ https://codeload.github.com/Biosimulant/model-compatibility-standard/tar.gz/88b1d17283337ab273521627609773782e79354b",
   "pytest>=7",
   "pytest-cov>=4",
   "httpx>=0.26",
