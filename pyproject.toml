@@ -102,9 +102,12 @@ cellml = [
   "libcellml>=0.6.3,<0.7",
   "scipy>=1.11,<2",
 ]
+compatibility = [
+  "biosimulant-model-compatibility-standard @ https://codeload.github.com/Biosimulant/model-compatibility-standard/tar.gz/88b1d17283337ab273521627609773782e79354b",
+]
 # Everything
 all = [
-  "biosimulant[dev,ml,cellml]",
+  "biosimulant[dev,ml,cellml,compatibility]",
 ]
 
 [tool.hatch.build]

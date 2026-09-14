@@ -12,6 +12,7 @@ from typing import Any, Callable, Dict, List, Mapping, Optional
 from .modules import BioModule, ExecutionContext, ExecutionPolicy
 from .signals import (
     BioSignal,
+    SignalEnvelope,
     SignalSpec,
     make_signal,
     validate_connection_specs,
@@ -140,8 +141,18 @@ class BioWorld:
         if name in self._modules and self._modules[name].module is not module:
             raise ValueError(f"Module name already registered: {name}")
 
-        input_specs = self._normalize_port_specs(module.inputs(), direction="input", module_name=name)
-        output_specs = self._normalize_port_specs(module.outputs(), direction="output", module_name=name)
+        manifest_inputs = getattr(module, "_biosimulant_manifest_input_specs", None)
+        manifest_outputs = getattr(module, "_biosimulant_manifest_output_specs", None)
+        input_specs = self._normalize_port_specs(
+            module.inputs() if manifest_inputs is None else manifest_inputs,
+            direction="input",
+            module_name=name,
+        )
+        output_specs = self._normalize_port_specs(
+            module.outputs() if manifest_outputs is None else manifest_outputs,
+            direction="output",
+            module_name=name,
+        )
         execution_policy, execution_contract = self._validate_module_execution_contract(name, module)
 
         try:
@@ -330,15 +341,20 @@ class BioWorld:
                 raise TypeError(
                     f"Module '{module_name}' output '{port}' must be a typed BioSignal, got {type(signal)!r}"
                 )
+            compatibility_envelope = getattr(signal, "compatibility_envelope", None)
+            if isinstance(compatibility_envelope, SignalEnvelope):
+                compatibility_envelope.validate_contract(declared[port].contract)
             bound = signal.with_spec(declared[port]) if signal.spec is None else signal.with_spec(declared[port])
             if bound.source != module_name:
-                bound = bound.__class__(
+                previous = bound
+                bound = previous.__class__(
                     source=module_name,
-                    name=bound.name,
-                    value=copy.deepcopy(bound.value),
-                    emitted_at=bound.emitted_at,
-                    spec=bound.spec,
+                    name=previous.name,
+                    value=copy.deepcopy(previous.value),
+                    emitted_at=previous.emitted_at,
+                    spec=previous.spec,
                 )
+                previous._copy_compatibility_envelope(bound)
             if bound.name != port:
                 bound = bound.retarget(name=port)
             normalized[port] = bound
@@ -362,14 +378,27 @@ class BioWorld:
                 )
             if port not in declared:
                 raise KeyError(f"Module '{module_name}' produced undeclared output port '{port}'")
-            payload = value.value if isinstance(value, BioSignal) else value
-            normalized[port] = make_signal(
+            compatibility_envelope = None
+            if (
+                isinstance(value, Mapping)
+                and value.get("schema_version") == "0.1"
+                and "contract_digest" in value
+            ):
+                compatibility_envelope = SignalEnvelope.from_dict(value)
+                compatibility_envelope.validate_contract(declared[port].contract)
+                payload = compatibility_envelope.payload
+            else:
+                payload = value.value if isinstance(value, BioSignal) else value
+            signal = make_signal(
                 declared[port],
                 source=module_name,
                 name=port,
                 value=payload,
                 emitted_at=float(emitted_at),
             )
+            if compatibility_envelope is not None:
+                signal.compatibility_envelope = compatibility_envelope
+            normalized[port] = signal
         return normalized
 
     def _commit_outputs(self, module_name: str, outputs: Mapping[str, BioSignal]) -> None:

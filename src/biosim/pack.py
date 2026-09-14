@@ -389,6 +389,15 @@ def _collect_model_entries(source_dir: Path) -> tuple[dict[str, Any], dict[str, 
     _validate_dependencies(manifest)
 
     entries: dict[str, bytes] = {"payload/model.yaml": manifest_bytes}
+    if "compatibility" in manifest:
+        from .compatibility import CompatibilitySupportUnavailable, lock_bytes
+
+        try:
+            compatibility_lock = lock_bytes(manifest)
+        except (CompatibilitySupportUnavailable, ValueError) as exc:
+            raise PackageError(str(exc)) from exc
+        if compatibility_lock is not None:
+            entries["payload/compatibility.lock.json"] = compatibility_lock
     for name in ("src", "artifacts", "data", "tests"):
         entries.update(_collect_tree(source_dir, name))
     entries.update(_collect_glob_files(source_dir, ("README*", "*.md")))
@@ -965,6 +974,13 @@ def _instantiate_model_from_package(
         sys.path[:] = original_sys_path
     if not isinstance(module, BioModule):
         raise PackageError(f"Entrypoint {entrypoint} did not construct a BioModule")
+    if "compatibility" in manifest:
+        from .compatibility import bind_manifest_ports
+
+        try:
+            bind_manifest_ports(module, manifest)
+        except (TypeError, ValueError) as exc:
+            raise PackageError(f"Manifest/Python compatibility contradiction: {exc}") from exc
     return module, {
         "communication_step": bsim_block.get("communication_step"),
         "setup": (
@@ -1254,7 +1270,12 @@ def _run_model_loaded_package(
         else {}
     )
     if initial_inputs:
-        declared_inputs = module.inputs() if isinstance(module.inputs(), dict) else {}
+        manifest_inputs = getattr(module, "_biosimulant_manifest_input_specs", None)
+        declared_inputs = (
+            manifest_inputs
+            if isinstance(manifest_inputs, Mapping)
+            else module.inputs() if isinstance(module.inputs(), dict) else {}
+        )
         module.set_inputs(
             coerce_typed_inputs(
                 initial_inputs,
@@ -1900,6 +1921,18 @@ def _validate_model_manifest(manifest: Mapping[str, Any]) -> None:
     entrypoint = bsim.get("entrypoint")
     if not isinstance(entrypoint, str) or not entrypoint.strip():
         raise PackageError("Model manifest must contain biosim.entrypoint")
+    if "compatibility" in manifest:
+        from .compatibility import CompatibilitySupportUnavailable, validate_manifest
+
+        try:
+            findings = validate_manifest(manifest)
+        except CompatibilitySupportUnavailable as exc:
+            raise PackageError(str(exc)) from exc
+        if findings:
+            details = "; ".join(
+                f"{item.get('path') or '/'}: {item['message']}" for item in findings
+            )
+            raise PackageError(f"Invalid compatibility declaration: {details}")
 
 
 def _package_children(manifest: Mapping[str, Any]) -> list[tuple[str, str]]:

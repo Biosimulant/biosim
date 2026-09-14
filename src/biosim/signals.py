@@ -200,6 +200,7 @@ class AcceptedSignalProfile:
     schema: Optional[dict[str, str]] = None
     accepted_units: Optional[tuple[str, ...]] = None
     description: Optional[str] = None
+    contract: Optional[dict[str, Any]] = None
 
     def __post_init__(self) -> None:
         shape = self.shape
@@ -235,6 +236,7 @@ class AcceptedSignalProfile:
                 raise ValueError("record accepted profiles cannot declare shape")
         if self.signal_type == "event" and self.shape is not None:
             raise ValueError("event accepted profiles cannot declare shape")
+        object.__setattr__(self, "contract", _normalize_json_mapping(self.contract, field="contract"))
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -244,6 +246,7 @@ class AcceptedSignalProfile:
             "schema": dict(self.schema) if self.schema is not None else None,
             "accepted_units": list(self.accepted_units) if self.accepted_units is not None else None,
             "description": self.description,
+            "contract": copy.deepcopy(self.contract) if self.contract is not None else None,
         }
 
     @classmethod
@@ -255,6 +258,7 @@ class AcceptedSignalProfile:
             schema=dict(data["schema"]) if data.get("schema") is not None else None,
             accepted_units=tuple(data["accepted_units"]) if data.get("accepted_units") is not None else None,
             description=data.get("description"),
+            contract=copy.deepcopy(data["contract"]) if data.get("contract") is not None else None,
         )
 
     def matches_output(self, source: "SignalSpec") -> bool:
@@ -298,6 +302,7 @@ class SignalSpec:
     allowed_values: Optional[tuple[Any, ...]] = None
     file: Optional[dict[str, Any]] = None
     ui: Optional[dict[str, Any]] = None
+    contract: Optional[dict[str, Any]] = None
 
     def __post_init__(self) -> None:
         shape = self.shape
@@ -379,6 +384,7 @@ class SignalSpec:
         )
         object.__setattr__(self, "file", _normalize_json_mapping(self.file, field="file"))
         object.__setattr__(self, "ui", _normalize_json_mapping(self.ui, field="ui"))
+        object.__setattr__(self, "contract", _normalize_json_mapping(self.contract, field="contract"))
 
     @classmethod
     def scalar(
@@ -400,6 +406,7 @@ class SignalSpec:
         allowed_values: Optional[list[Any] | tuple[Any, ...]] = None,
         file: Optional[Mapping[str, Any]] = None,
         ui: Optional[Mapping[str, Any]] = None,
+        contract: Optional[Mapping[str, Any]] = None,
     ) -> "SignalSpec":
         return cls(
             signal_type="scalar",
@@ -420,6 +427,7 @@ class SignalSpec:
             allowed_values=tuple(allowed_values) if allowed_values is not None else None,
             file=dict(file) if file is not None else None,
             ui=dict(ui) if ui is not None else None,
+            contract=dict(contract) if contract is not None else None,
         )
 
     @classmethod
@@ -443,6 +451,7 @@ class SignalSpec:
         allowed_values: Optional[list[Any] | tuple[Any, ...]] = None,
         file: Optional[Mapping[str, Any]] = None,
         ui: Optional[Mapping[str, Any]] = None,
+        contract: Optional[Mapping[str, Any]] = None,
     ) -> "SignalSpec":
         return cls(
             signal_type="array",
@@ -464,6 +473,7 @@ class SignalSpec:
             allowed_values=tuple(allowed_values) if allowed_values is not None else None,
             file=dict(file) if file is not None else None,
             ui=dict(ui) if ui is not None else None,
+            contract=dict(contract) if contract is not None else None,
         )
 
     @classmethod
@@ -485,6 +495,7 @@ class SignalSpec:
         allowed_values: Optional[list[Any] | tuple[Any, ...]] = None,
         file: Optional[Mapping[str, Any]] = None,
         ui: Optional[Mapping[str, Any]] = None,
+        contract: Optional[Mapping[str, Any]] = None,
     ) -> "SignalSpec":
         return cls(
             signal_type="record",
@@ -504,6 +515,7 @@ class SignalSpec:
             allowed_values=tuple(allowed_values) if allowed_values is not None else None,
             file=dict(file) if file is not None else None,
             ui=dict(ui) if ui is not None else None,
+            contract=dict(contract) if contract is not None else None,
         )
 
     @classmethod
@@ -525,6 +537,7 @@ class SignalSpec:
         allowed_values: Optional[list[Any] | tuple[Any, ...]] = None,
         file: Optional[Mapping[str, Any]] = None,
         ui: Optional[Mapping[str, Any]] = None,
+        contract: Optional[Mapping[str, Any]] = None,
     ) -> "SignalSpec":
         return cls(
             signal_type="event",
@@ -545,6 +558,7 @@ class SignalSpec:
             allowed_values=tuple(allowed_values) if allowed_values is not None else None,
             file=dict(file) if file is not None else None,
             ui=dict(ui) if ui is not None else None,
+            contract=dict(contract) if contract is not None else None,
         )
 
     @property
@@ -594,6 +608,7 @@ class SignalSpec:
             "allowed_values": list(self.allowed_values) if self.allowed_values is not None else None,
             "file": dict(self.file) if self.file is not None else None,
             "ui": dict(self.ui) if self.ui is not None else None,
+            "contract": copy.deepcopy(self.contract) if self.contract is not None else None,
         }
 
     @classmethod
@@ -621,6 +636,7 @@ class SignalSpec:
             allowed_values=tuple(data["allowed_values"]) if data.get("allowed_values") is not None else None,
             file=dict(data["file"]) if data.get("file") is not None else None,
             ui=dict(data["ui"]) if data.get("ui") is not None else None,
+            contract=copy.deepcopy(data["contract"]) if data.get("contract") is not None else None,
         )
 
 
@@ -673,6 +689,114 @@ def scalar_or_record_input(unit: str, description: str, *, dtype: str = "float64
     )
 
 
+@dataclass(frozen=True)
+class SignalEnvelope:
+    """Compatibility evidence carried with one runtime value or artifact."""
+
+    contract_digest: str
+    value: Any = None
+    artifact: Optional[dict[str, Any]] = None
+    actual_context: Optional[dict[str, Any]] = None
+    origin: Optional[dict[str, Any]] = None
+    uncertainty: Optional[dict[str, Any]] = None
+    provenance: Optional[dict[str, Any]] = None
+    observation_time: Any = None
+    schema_version: str = "0.1"
+
+    def __post_init__(self) -> None:
+        if self.schema_version != "0.1":
+            raise ValueError("SignalEnvelope schema_version must be '0.1'")
+        if not isinstance(self.contract_digest, str) or not self.contract_digest.startswith(
+            "sha256:"
+        ):
+            raise ValueError("SignalEnvelope contract_digest must be a sha256 digest")
+        if self.artifact is not None and self.value is not None:
+            raise ValueError("SignalEnvelope must carry value or artifact, not both")
+        if self.artifact is None and self.value is None:
+            raise ValueError("SignalEnvelope must carry value or artifact")
+        for field_name in (
+            "artifact",
+            "actual_context",
+            "origin",
+            "uncertainty",
+            "provenance",
+        ):
+            value = getattr(self, field_name)
+            if value is not None:
+                object.__setattr__(
+                    self,
+                    field_name,
+                    _normalize_json_mapping(value, field=field_name),
+                )
+        _ensure_json_serializable(self.value)
+        _ensure_json_serializable(self.observation_time)
+
+    @property
+    def payload(self) -> Any:
+        return self.artifact if self.artifact is not None else self.value
+
+    def to_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "schema_version": self.schema_version,
+            "contract_digest": self.contract_digest,
+        }
+        result["artifact" if self.artifact is not None else "value"] = copy.deepcopy(
+            self.payload
+        )
+        for field_name in (
+            "actual_context",
+            "origin",
+            "uncertainty",
+            "provenance",
+            "observation_time",
+        ):
+            value = getattr(self, field_name)
+            if value is not None:
+                result[field_name] = copy.deepcopy(value)
+        return result
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "SignalEnvelope":
+        if "value" in data and "artifact" in data:
+            raise ValueError("SignalEnvelope must carry value or artifact, not both")
+        return cls(
+            schema_version=str(data.get("schema_version", "")),
+            contract_digest=str(data.get("contract_digest", "")),
+            value=copy.deepcopy(data.get("value")) if "value" in data else None,
+            artifact=(
+                copy.deepcopy(data.get("artifact")) if "artifact" in data else None
+            ),
+            actual_context=copy.deepcopy(data.get("actual_context")),
+            origin=copy.deepcopy(data.get("origin")),
+            uncertainty=copy.deepcopy(data.get("uncertainty")),
+            provenance=copy.deepcopy(data.get("provenance")),
+            observation_time=copy.deepcopy(data.get("observation_time")),
+        )
+
+    def validate_contract(self, contract: Mapping[str, Any] | None) -> None:
+        from .compatibility import _standard
+
+        standard = _standard()
+        findings = standard.validate_object(
+            self.to_dict(), "signal-envelope.schema.json"
+        )
+        if findings:
+            raise ValueError(
+                "Invalid SignalEnvelope: "
+                + "; ".join(f"{item.path}: {item.message}" for item in findings)
+            )
+        if contract is None:
+            raise ValueError(
+                "SignalEnvelope cannot be verified because the target port has no contract"
+            )
+        expected = standard.digest(dict(contract))
+        if self.contract_digest != expected:
+            raise ValueError(
+                "SignalEnvelope contract digest does not match the bound port contract: "
+                f"expected {expected}, got {self.contract_digest}"
+            )
+
+
 class BioSignal:
     """Base class for all typed signals."""
 
@@ -722,10 +846,18 @@ class BioSignal:
 
     def with_spec(self, spec: SignalSpec) -> "BioSignal":
         cloned = self._clone(spec=spec)
+        self._copy_compatibility_envelope(cloned)
         return cloned
 
     def retarget(self, *, name: str) -> "BioSignal":
-        return self._clone(name=name)
+        cloned = self._clone(name=name)
+        self._copy_compatibility_envelope(cloned)
+        return cloned
+
+    def _copy_compatibility_envelope(self, target: "BioSignal") -> None:
+        envelope = getattr(self, "compatibility_envelope", None)
+        if envelope is not None:
+            target.compatibility_envelope = envelope
 
     def _clone(self, *, spec: Optional[SignalSpec] = None, name: Optional[str] = None) -> "BioSignal":
         return self.__class__(
@@ -801,7 +933,7 @@ class BioSignal:
     def to_dict(self) -> dict[str, Any]:
         if self.spec is None:
             raise ValueError("cannot serialize a signal without a bound SignalSpec")
-        return {
+        result = {
             "type": self.signal_type,
             "source": self.source,
             "name": self.name,
@@ -809,6 +941,10 @@ class BioSignal:
             "spec": self.spec.to_dict(),
             "value": self._to_wire_value(),
         }
+        envelope = getattr(self, "compatibility_envelope", None)
+        if isinstance(envelope, SignalEnvelope):
+            result["compatibility_envelope"] = envelope.to_dict()
+        return result
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> "BioSignal":
@@ -823,7 +959,11 @@ class BioSignal:
         }.get(signal_type)
         if signal_cls is None:
             raise ValueError(f"unknown signal type: {signal_type!r}")
-        return signal_cls.from_wire_dict(data, spec=spec)
+        signal = signal_cls.from_wire_dict(data, spec=spec)
+        envelope = data.get("compatibility_envelope")
+        if isinstance(envelope, Mapping):
+            signal.compatibility_envelope = SignalEnvelope.from_dict(envelope)
+        return signal
 
     @property
     def is_scalar(self) -> bool:
