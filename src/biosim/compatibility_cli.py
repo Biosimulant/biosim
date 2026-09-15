@@ -1,13 +1,26 @@
-"""Local compatibility CLI backed by the pinned public specification bundle."""
+"""The `biosimulant compatibility` commands."""
 
 from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
-from .compatibility import _standard, build_lock, load_yaml, normalize_manifest, validate_manifest
+import yaml
+
+from .compatibility import (
+    CompatibilitySupportUnavailable,
+    _standard,
+    build_lock,
+    load_yaml,
+    normalize_manifest,
+    validate_manifest,
+)
+
+# Port direction in a selector -> (role in `compare`, port kind).
+_PORT_ROLES = {"outputs": ("source", "output"), "inputs": ("target", "input")}
 
 
 def _json(value: Any) -> str:
@@ -15,54 +28,100 @@ def _json(value: Any) -> str:
 
 
 def _parser(prog: str) -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog=prog, description="Validate and resolve BioSimulant model compatibility contracts.")
+    parser = argparse.ArgumentParser(
+        prog=prog,
+        description=(
+            "Check whether model ports can connect, using the Biosimulant Model "
+            "Compatibility Standard."
+        ),
+    )
     commands = parser.add_subparsers(dest="command", required=True)
 
-    validate = commands.add_parser("validate", help="Validate an opted-in model.yaml")
-    validate.add_argument("manifest", type=Path)
+    validate = commands.add_parser("validate", help="Check the compatibility block in a model.yaml")
+    validate.add_argument("manifest", type=Path, help="Path to model.yaml")
 
-    normalize = commands.add_parser("normalize", help="Normalize an opted-in model.yaml")
-    normalize.add_argument("manifest", type=Path)
-    normalize.add_argument("--output", type=Path)
+    normalize = commands.add_parser(
+        "normalize", help="Print a model.yaml's compatibility data in normalized JSON form"
+    )
+    normalize.add_argument("manifest", type=Path, help="Path to model.yaml")
+    normalize.add_argument(
+        "--output", type=Path, help="Write the JSON to this file instead of printing it"
+    )
 
-    compare = commands.add_parser("compare", help="Compare producer and consumer model ports")
-    compare.add_argument("producer", help="model.yaml#outputs.port")
-    compare.add_argument("consumer", help="model.yaml#inputs.port")
+    compare = commands.add_parser(
+        "compare", help="Check whether an output port can feed an input port"
+    )
+    compare.add_argument(
+        "producer", metavar="SOURCE", help="Output port, e.g. model.yaml#outputs.concentration"
+    )
+    compare.add_argument(
+        "consumer", metavar="TARGET", help="Input port, e.g. model.yaml#inputs.dose"
+    )
 
-    profiles = commands.add_parser("profiles", help="Inspect installed profile definitions")
+    profiles = commands.add_parser("profiles", help="List or show compatibility profiles")
     profile_commands = profiles.add_subparsers(dest="profiles_command", required=True)
-    list_profiles = profile_commands.add_parser("list")
-    list_profiles.add_argument("--domain")
-    show_profile = profile_commands.add_parser("show")
-    show_profile.add_argument("profile_ref")
+    list_profiles = profile_commands.add_parser("list", help="List the available profiles")
+    list_profiles.add_argument("--domain", help="Only list profiles in this domain, e.g. core")
+    show_profile = profile_commands.add_parser("show", help="Print one profile's full definition")
+    show_profile.add_argument("profile_ref", help="Profile ref (a URL), as shown by `profiles list`")
 
-    lock = commands.add_parser("lock", help="Create an inspectable compatibility lock")
-    lock.add_argument("manifest", type=Path)
-    lock.add_argument("--output", type=Path, default=Path("compatibility.lock.json"))
+    lock = commands.add_parser("lock", help="Write compatibility.lock.json for a model")
+    lock.add_argument("manifest", type=Path, help="Path to model.yaml")
+    lock.add_argument(
+        "--output",
+        type=Path,
+        default=Path("compatibility.lock.json"),
+        help="Where to write the lock file (default: compatibility.lock.json)",
+    )
 
-    plan = commands.add_parser("plan", help="Compare every local wiring edge in a lab")
-    plan.add_argument("lab", type=Path)
-    plan.add_argument("--policy", type=Path)
-    plan.add_argument("--capabilities", type=Path)
-    plan.add_argument("--output", type=Path)
+    plan = commands.add_parser(
+        "plan", help="Check every wiring connection in a lab and print a plan"
+    )
+    plan.add_argument("lab", type=Path, help="Path to lab.yaml, or the folder that contains it")
+    plan.add_argument(
+        "--policy",
+        type=Path,
+        help="JSON file with the compatibility policy that decides which connections are allowed",
+    )
+    plan.add_argument(
+        "--capabilities",
+        type=Path,
+        help="JSON file listing adapter or inference capabilities that can convert data between ports",
+    )
+    plan.add_argument(
+        "--output", type=Path, help="Write the plan to this file instead of printing it"
+    )
 
-    commands.add_parser("conformance", help="Execute all installed profile fixtures")
+    commands.add_parser("conformance", help="Run the standard's conformance tests")
     return parser
 
 
 def _select_port(selector: str, expected_direction: str) -> tuple[dict[str, Any] | None, list[str]]:
+    role, kind = _PORT_ROLES[expected_direction]
     if "#" not in selector:
-        raise ValueError("Port selectors must use model.yaml#inputs.port or model.yaml#outputs.port")
+        raise ValueError(
+            "Point to a port like model.yaml#outputs.concentration or "
+            f"model.yaml#inputs.dose (got {selector!r})"
+        )
     path_text, fragment = selector.rsplit("#", 1)
     direction, separator, name = fragment.partition(".")
     if not separator or direction != expected_direction or not name:
-        raise ValueError(f"Expected #{expected_direction}.<port-name>")
+        raise ValueError(
+            f"The {role} must be an {kind} port: PATH#{expected_direction}.PORT (got {selector!r})"
+        )
     manifest = load_yaml(path_text)
     for port in manifest.get("io", {}).get(direction, []):
         if port.get("name") == name:
             contract = port.get("contract")
             return contract, list(contract.get("profile_refs", [])) if isinstance(contract, dict) else []
-    raise ValueError(f"No {direction} port named {name!r} in {path_text}")
+    raise ValueError(f"No {kind} port named {name!r} in {path_text}")
+
+
+def _read_json(path: Path) -> Any:
+    try:
+        return json.loads(path.read_text())
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{path} is not valid JSON: {exc}") from exc
 
 
 def _local_lab_plan(
@@ -92,12 +151,12 @@ def _local_lab_plan(
                 return contract, list(contract.get("profile_refs", [])) if isinstance(contract, dict) else []
         return None, []
 
-    policy = json.loads(policy_path.read_text()) if policy_path else {}
-    capabilities = json.loads(capabilities_path.read_text()) if capabilities_path else []
+    policy = _read_json(policy_path) if policy_path else {}
+    capabilities = _read_json(capabilities_path) if capabilities_path else []
     if not isinstance(policy, dict):
-        raise ValueError("Compatibility policy must be a JSON object")
+        raise ValueError("The --policy file must contain a JSON object")
     if not isinstance(capabilities, list) or not all(isinstance(item, dict) for item in capabilities):
-        raise ValueError("Capabilities must be a JSON array of capability objects")
+        raise ValueError("The --capabilities file must contain a JSON array of objects")
 
     reports = []
     materialized_nodes: list[dict[str, Any]] = []
@@ -178,31 +237,62 @@ def _local_lab_plan(
     result = {**plan_without_digest, "digest": standard.digest(plan_without_digest)}
     findings = standard.validate_object(result, "resolution-plan.schema.json")
     if findings:
-        raise ValueError("Generated resolution plan is invalid: " + "; ".join(item.message for item in findings))
+        raise ValueError(
+            "Internal error: the generated plan failed schema validation: "
+            + "; ".join(item.message for item in findings)
+        )
     return result
 
 
 def _conformance() -> dict[str, Any]:
     standard = _standard()
     bundle = standard.get_bundle()
+    profiles = bundle.catalogue["profiles"]
     passed = 0
-    for summary in bundle.catalogue["profiles"]:
+    for summary in profiles:
         fixture = bundle.read_json(f"fixtures/profiles/{summary['domain']}/{summary['name']}.json")
+        profile_ref = fixture["profile_ref"]
         positive, negative, unknown = fixture["cases"]
-        if standard.validate_contract(positive["contract"], [fixture["profile_ref"]]):
-            raise ValueError(f"Positive fixture failed for {fixture['profile_ref']}")
-        negative_findings = standard.validate_contract(negative["contract"], [fixture["profile_ref"]])
+        if standard.validate_contract(positive["contract"], [profile_ref]):
+            raise ValueError(f"Conformance failed for {profile_ref}: valid example was rejected")
+        negative_findings = standard.validate_contract(negative["contract"], [profile_ref])
         if not any(item.reason_code == negative["reason_code"] for item in negative_findings):
-            raise ValueError(f"Negative fixture failed for {fixture['profile_ref']}")
-        report = standard.compare_contracts(unknown["source"], unknown["target"], target_profile_refs=[fixture["profile_ref"]])
+            raise ValueError(
+                f"Conformance failed for {profile_ref}: invalid example was not rejected "
+                f"with {negative['reason_code']}"
+            )
+        report = standard.compare_contracts(unknown["source"], unknown["target"], target_profile_refs=[profile_ref])
         if report["status"] != "UNKNOWN":
-            raise ValueError(f"UNKNOWN fixture failed for {fixture['profile_ref']}: {report['status']}")
+            raise ValueError(
+                f"Conformance failed for {profile_ref}: expected UNKNOWN, got {report['status']}"
+            )
         passed += 3
-    return {"valid": True, "profiles": 650, "profile_fixtures_passed": passed, "bundle_sha256": bundle.digest}
+    return {
+        "valid": True,
+        "profiles": len(profiles),
+        "profile_fixtures_passed": passed,
+        "bundle_sha256": bundle.digest,
+    }
+
+
+def _error_message(exc: Exception) -> str:
+    if isinstance(exc, OSError) and exc.filename is not None and exc.strerror:
+        return f"{exc.filename}: {exc.strerror}"
+    if isinstance(exc, yaml.YAMLError):
+        return f"invalid YAML: {exc}"
+    return str(exc)
 
 
 def main(argv: list[str], *, prog: str = "biosimulant compatibility") -> None:
     args = _parser(prog).parse_args(argv)
+    try:
+        _run(args, prog=prog)
+    except (ValueError, OSError, yaml.YAMLError, CompatibilitySupportUnavailable) as exc:
+        print(f"error: {_error_message(exc)}", file=sys.stderr)
+        raise SystemExit(2) from exc
+
+
+def _run(args: argparse.Namespace, *, prog: str) -> None:
     if args.command == "validate":
         manifest = load_yaml(args.manifest)
         findings = validate_manifest(manifest)
@@ -226,7 +316,14 @@ def main(argv: list[str], *, prog: str = "biosimulant compatibility") -> None:
     if args.command == "profiles":
         bundle = _standard().get_bundle()
         if args.profiles_command == "show":
-            print(_json(bundle.profile(args.profile_ref)))
+            try:
+                profile = bundle.profile(args.profile_ref)
+            except KeyError:
+                raise ValueError(
+                    f"Unknown profile {args.profile_ref!r}. "
+                    f"Run `{prog} profiles list` to see available profiles."
+                ) from None
+            print(_json(profile))
         else:
             profiles = bundle.catalogue["profiles"]
             if args.domain:
@@ -236,7 +333,9 @@ def main(argv: list[str], *, prog: str = "biosimulant compatibility") -> None:
     if args.command == "lock":
         result = build_lock(load_yaml(args.manifest))
         if result is None:
-            raise ValueError("The manifest has not opted into compatibility")
+            raise ValueError(
+                f"{args.manifest} has no `compatibility` block, so there's nothing to lock"
+            )
         args.output.write_text(_json(result) + "\n", encoding="utf-8")
         print(_json({"output": str(args.output), "digest": result["digest"]}))
         return

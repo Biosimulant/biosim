@@ -1,8 +1,7 @@
-"""Optional integration with the BioSimulant Model Compatibility Standard.
+"""Optional support for the Biosimulant Model Compatibility Standard.
 
-Legacy manifests do not need the optional dependency. Once a manifest opts in,
-the pinned standard package is required so invalid claims cannot silently fall
-back to structural-only behavior.
+Manifests without a `compatibility` block don't need the extra package.
+Manifests with one do, so a bad declaration fails instead of being ignored.
 """
 
 from __future__ import annotations
@@ -20,14 +19,17 @@ class CompatibilitySupportUnavailable(RuntimeError):
     pass
 
 
-def _standard():
+_MANIFEST_NEEDS_PACKAGE = (
+    "This model.yaml has a `compatibility` block, which needs an optional package."
+)
+
+
+def _standard(reason: str = "Compatibility checks need an optional package."):
     try:
         import biosimulant_model_compatibility_standard as standard
     except ImportError as exc:
         raise CompatibilitySupportUnavailable(
-            "Compatibility support requires "
-            "the pinned biosimulant-model-compatibility-standard bundle. "
-            "Install biosimulant[compatibility]."
+            f"{reason} Run: pip install 'biosimulant[compatibility]'"
         ) from exc
     return standard
 
@@ -35,13 +37,16 @@ def _standard():
 def validate_manifest(manifest: Mapping[str, Any]) -> list[dict[str, Any]]:
     if "compatibility" not in manifest:
         return []
-    return [finding.to_dict() for finding in _standard().validate_manifest(dict(manifest))]
+    return [
+        finding.to_dict()
+        for finding in _standard(_MANIFEST_NEEDS_PACKAGE).validate_manifest(dict(manifest))
+    ]
 
 
 def normalize_manifest(manifest: Mapping[str, Any]) -> dict[str, Any]:
     if "compatibility" not in manifest:
         return dict(manifest)
-    return _standard().normalize_manifest(dict(manifest))
+    return _standard(_MANIFEST_NEEDS_PACKAGE).normalize_manifest(dict(manifest))
 
 
 def compare_contracts(source: Mapping[str, Any] | None, target: Mapping[str, Any] | None, **kwargs: Any) -> dict[str, Any]:
@@ -69,7 +74,7 @@ def resolve_contracts(
 def build_lock(manifest: Mapping[str, Any]) -> dict[str, Any] | None:
     if "compatibility" not in manifest:
         return None
-    return _standard().build_compatibility_lock(dict(manifest))
+    return _standard(_MANIFEST_NEEDS_PACKAGE).build_compatibility_lock(dict(manifest))
 
 
 def lock_bytes(manifest: Mapping[str, Any]) -> bytes | None:
@@ -126,12 +131,12 @@ def _ports_by_name(manifest: Mapping[str, Any], direction: str) -> dict[str, dic
     ports: dict[str, dict[str, Any]] = {}
     for index, value in enumerate(raw):
         if not isinstance(value, Mapping):
-            raise ValueError(f"io.{direction}[{index}] must be an object")
+            raise ValueError(f"io.{direction}[{index}] must be a mapping")
         name = value.get("name")
         if not isinstance(name, str) or not name:
             raise ValueError(f"io.{direction}[{index}].name must be a non-empty string")
         if name in ports:
-            raise ValueError(f"io.{direction} contains duplicate port '{name}'")
+            raise ValueError(f"io.{direction} lists port '{name}' more than once")
         ports[name] = dict(value)
     return ports
 
@@ -150,7 +155,7 @@ def _check_fields(
         actual = implemented.get(field)
         if not _field_matches(field, expected, actual):
             raise ValueError(
-                f"{label}.{field} contradicts Python: manifest={expected!r}, Python={actual!r}"
+                f"{label}.{field} is {expected!r} in model.yaml but {actual!r} in the Python module"
             )
 
 
@@ -180,18 +185,18 @@ def _bind_port(
         if implemented_profiles is None:
             if declared_profiles:
                 raise ValueError(
-                    f"{label}.accepted_profiles contradicts Python: the manifest declares "
-                    f"{len(declared_profiles)} profile(s), Python declares none"
+                    f"model.yaml lists {len(declared_profiles)} accepted profile(s) for "
+                    f"{label}; the Python module lists none"
                 )
             implemented_profiles = []
         if len(declared_profiles) != len(implemented_profiles):
             raise ValueError(
-                f"{label}.accepted_profiles contradicts Python: manifest has "
-                f"{len(declared_profiles)}, Python has {len(implemented_profiles)}"
+                f"model.yaml lists {len(declared_profiles)} accepted profile(s) for "
+                f"{label}; the Python module lists {len(implemented_profiles)}"
             )
         for index, declared_profile in enumerate(declared_profiles):
             if not isinstance(declared_profile, Mapping):
-                raise ValueError(f"{label}.accepted_profiles[{index}] must be an object")
+                raise ValueError(f"{label}.accepted_profiles[{index}] must be a mapping")
             _check_fields(
                 label=f"{label}.accepted_profiles[{index}]",
                 declared=declared_profile,
@@ -212,17 +217,16 @@ def _bind_port(
 def bind_manifest_ports(
     module: BioModule, manifest: Mapping[str, Any]
 ) -> tuple[dict[str, SignalSpec], dict[str, SignalSpec]]:
-    """Verify and bind an opted-in manifest to one instantiated BioModule.
+    """Check that model.yaml ports match the module's inputs()/outputs(), then
+    attach each port's `contract` from model.yaml.
 
-    Structural declarations remain executable Python invariants, but the
-    packaged manifest is authoritative for biological compatibility metadata.
-    The bound maps are consumed by BioWorld without modifying the model class.
+    Structural fields must agree. BioWorld uses the returned specs automatically.
     """
 
     raw_inputs = module.inputs()
     raw_outputs = module.outputs()
     if not isinstance(raw_inputs, Mapping) or not isinstance(raw_outputs, Mapping):
-        raise ValueError("Python inputs() and outputs() must return mappings")
+        raise ValueError("The Python module's inputs() and outputs() must each return a dict")
 
     code_inputs = {
         name: spec if isinstance(spec, SignalSpec) else SignalSpec.from_dict(spec)
@@ -244,10 +248,13 @@ def bind_manifest_ports(
         if missing or extra:
             details: list[str] = []
             if missing:
-                details.append(f"missing in Python: {', '.join(missing)}")
+                details.append(f"only in model.yaml: {', '.join(missing)}")
             if extra:
-                details.append(f"missing in manifest: {', '.join(extra)}")
-            raise ValueError(f"Manifest/Python {label} ports contradict ({'; '.join(details)})")
+                details.append(f"only in Python: {', '.join(extra)}")
+            raise ValueError(
+                f"{label.capitalize()} ports in model.yaml don't match the Python module "
+                f"({'; '.join(details)})"
+            )
 
     bound_inputs = {
         name: _bind_port(
@@ -277,5 +284,5 @@ def load_yaml(path: str | Path) -> dict[str, Any]:
 
     value = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
     if not isinstance(value, dict):
-        raise ValueError("Manifest must be a mapping")
+        raise ValueError(f"{path}: top level must be a YAML mapping")
     return value

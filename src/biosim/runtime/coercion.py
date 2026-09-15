@@ -256,7 +256,7 @@ def _make_typed_signal(
         try:
             compatibility_envelope.validate_contract(signal_spec.contract)
         except ValueError as exc:
-            _raise(error_cls, f"Input '{name}' compatibility envelope is invalid: {exc}", exc)
+            _raise(error_cls, f"Input '{name}': SignalEnvelope doesn't fit this port: {exc}", exc)
     signal = signal_cls(
         source=source, name=name, value=value, emitted_at=emitted_at, spec=signal_spec
     )
@@ -292,7 +292,7 @@ def coerce_typed_inputs(
             try:
                 compatibility_envelope = SignalEnvelope.from_dict(value)
             except (TypeError, ValueError) as exc:
-                _raise(error_cls, f"Input '{key}' has an invalid compatibility envelope: {exc}", exc)
+                _raise(error_cls, f"Input '{key}': invalid SignalEnvelope: {exc}", exc)
             value = compatibility_envelope.payload
 
         if isinstance(value, BioSignal):

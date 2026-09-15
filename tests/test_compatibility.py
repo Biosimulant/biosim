@@ -96,8 +96,10 @@ def test_cli_validate_and_conformance(tmp_path: Path, capsys):
 
     main(["compatibility", "conformance"])
     result = json.loads(capsys.readouterr().out)
-    assert result["profiles"] == 650
-    assert result["profile_fixtures_passed"] == 1950
+    profile_count = len(get_bundle().catalogue["profiles"])
+    assert profile_count > 0
+    assert result["profiles"] == profile_count
+    assert result["profile_fixtures_passed"] == 3 * profile_count
 
 
 def test_compatibility_wrappers_keep_legacy_optional_and_execute_opt_in():
@@ -184,41 +186,54 @@ def test_cli_inspection_compare_normalize_and_lock(tmp_path: Path, capsys):
     assert json.loads(lock_path.read_text())["digest"] == lock_result["digest"]
 
 
-def test_cli_and_yaml_errors_are_explicit(tmp_path: Path):
+def _cli_error(capsys, argv: list[str]) -> str:
+    """Run a compatibility command that should fail and return its stderr."""
+    with pytest.raises(SystemExit) as raised:
+        main(["compatibility", *argv])
+    assert raised.value.code == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err.startswith("error: ")
+    return captured.err
+
+
+def test_cli_and_yaml_errors_are_explicit(tmp_path: Path, capsys):
     invalid_yaml = tmp_path / "invalid.yaml"
     invalid_yaml.write_text("- not\n- a\n- mapping\n", encoding="utf-8")
-    with pytest.raises(ValueError, match="must be a mapping"):
+    with pytest.raises(ValueError, match="top level must be a YAML mapping"):
         load_yaml(invalid_yaml)
+    assert "top level must be a YAML mapping" in _cli_error(
+        capsys, ["validate", str(invalid_yaml)]
+    )
 
     legacy = tmp_path / "legacy.yaml"
     legacy.write_text("schema_version: '2.0'\n", encoding="utf-8")
-    with pytest.raises(ValueError, match="has not opted"):
-        main(["compatibility", "lock", str(legacy)])
+    assert "has no `compatibility` block" in _cli_error(capsys, ["lock", str(legacy)])
 
-    with pytest.raises(ValueError, match="Port selectors"):
-        main(["compatibility", "compare", str(legacy), str(legacy)])
+    assert "Point to a port like model.yaml#outputs." in _cli_error(
+        capsys, ["compare", str(legacy), str(legacy)]
+    )
 
-    with pytest.raises(ValueError, match="No outputs port"):
-        main(
-            [
-                "compatibility",
-                "compare",
-                f"{legacy}#outputs.x",
-                f"{legacy}#outputs.x",
-            ]
-        )
+    assert "No output port named 'x'" in _cli_error(
+        capsys, ["compare", f"{legacy}#outputs.x", f"{legacy}#outputs.x"]
+    )
 
     producer = tmp_path / "producer.yaml"
     producer.write_text(yaml.safe_dump(_manifest()), encoding="utf-8")
-    with pytest.raises(ValueError, match="Expected #inputs"):
-        main(
-            [
-                "compatibility",
-                "compare",
-                f"{producer}#outputs.quantity",
-                f"{legacy}#outputs.x",
-            ]
-        )
+    assert "The target must be an input port" in _cli_error(
+        capsys, ["compare", f"{producer}#outputs.quantity", f"{legacy}#outputs.x"]
+    )
+
+    missing = tmp_path / "missing.yaml"
+    assert str(missing) in _cli_error(capsys, ["validate", str(missing)])
+
+    broken_yaml = tmp_path / "broken.yaml"
+    broken_yaml.write_text("io: [unclosed\n", encoding="utf-8")
+    assert "invalid YAML" in _cli_error(capsys, ["validate", str(broken_yaml)])
+
+    assert "Unknown profile 'not-a-profile'" in _cli_error(
+        capsys, ["profiles", "show", "not-a-profile"]
+    )
 
 
 def test_manifest_port_shape_and_profile_contradictions_are_explicit():
@@ -231,7 +246,7 @@ def test_manifest_port_shape_and_profile_contradictions_are_explicit():
             "accepted_profiles": [{"dtype": "float32"}],
         }
     ]
-    with pytest.raises(ValueError, match="declares 1 profile"):
+    with pytest.raises(ValueError, match="lists 1 accepted profile"):
         bind_manifest_ports(_ContractBoundModel(), manifest)
 
     malformed = {"io": {"inputs": "not-a-list", "outputs": []}}
@@ -247,7 +262,7 @@ def test_manifest_port_shape_and_profile_contradictions_are_explicit():
             "outputs": [{"name": "quantity"}],
         }
     }
-    with pytest.raises(ValueError, match="duplicate port"):
+    with pytest.raises(ValueError, match="lists port 'dose' more than once"):
         bind_manifest_ports(_ContractBoundModel(), duplicate)
 
 
@@ -294,7 +309,7 @@ def test_manifest_profile_refinement_is_bound_and_bad_ports_fail():
     inputs, _ = bind_manifest_ports(AcceptedModel(), manifest)
     assert inputs["dose"].accepted_profiles[0].contract == refinement
 
-    for bad_port, message in ((42, "must be an object"), ({"name": ""}, "non-empty")):
+    for bad_port, message in ((42, "must be a mapping"), ({"name": ""}, "non-empty")):
         with pytest.raises(ValueError, match=message):
             bind_manifest_ports(
                 AcceptedModel(), {"io": {"inputs": [bad_port], "outputs": []}}
@@ -307,7 +322,7 @@ def test_manifest_profile_refinement_is_bound_and_bad_ports_fail():
         def outputs(self):
             return {}
 
-    with pytest.raises(ValueError, match="must return mappings"):
+    with pytest.raises(ValueError, match="must each return a dict"):
         bind_manifest_ports(NonMappingModel(), manifest)
 
 
@@ -350,7 +365,9 @@ def test_opted_in_manifest_python_contradiction_is_rejected():
         "dtype": "float64",
         "shape": [2],
     }]
-    with pytest.raises(ValueError, match="contradicts Python"):
+    with pytest.raises(
+        ValueError, match="is 'array' in model.yaml but 'scalar' in the Python module"
+    ):
         bind_manifest_ports(_ContractBoundModel(), manifest)
 
 
@@ -432,7 +449,7 @@ def test_signal_envelope_is_digest_bound_and_survives_signal_serialization():
     assert standard.digest.startswith("sha256:")
 
     invalid = SignalEnvelope(contract_digest="sha256:" + "0" * 64, value=2.5)
-    with pytest.raises(ValueError, match="does not match"):
+    with pytest.raises(ValueError, match="made for a different contract"):
         invalid.validate_contract(contract)
 
 

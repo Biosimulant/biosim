@@ -691,7 +691,7 @@ def scalar_or_record_input(unit: str, description: str, *, dtype: str = "float64
 
 @dataclass(frozen=True)
 class SignalEnvelope:
-    """Compatibility evidence carried with one runtime value or artifact."""
+    """A value or artifact, plus the contract digest and provenance that travel with it."""
 
     contract_digest: str
     value: Any = None
@@ -709,11 +709,13 @@ class SignalEnvelope:
         if not isinstance(self.contract_digest, str) or not self.contract_digest.startswith(
             "sha256:"
         ):
-            raise ValueError("SignalEnvelope contract_digest must be a sha256 digest")
+            raise ValueError(
+                "SignalEnvelope contract_digest must look like 'sha256:<64 hex chars>'"
+            )
         if self.artifact is not None and self.value is not None:
-            raise ValueError("SignalEnvelope must carry value or artifact, not both")
+            raise ValueError("Give SignalEnvelope a value or an artifact, not both")
         if self.artifact is None and self.value is None:
-            raise ValueError("SignalEnvelope must carry value or artifact")
+            raise ValueError("SignalEnvelope needs a value or an artifact")
         for field_name in (
             "artifact",
             "actual_context",
@@ -758,7 +760,7 @@ class SignalEnvelope:
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> "SignalEnvelope":
         if "value" in data and "artifact" in data:
-            raise ValueError("SignalEnvelope must carry value or artifact, not both")
+            raise ValueError("Give SignalEnvelope a value or an artifact, not both")
         return cls(
             schema_version=str(data.get("schema_version", "")),
             contract_digest=str(data.get("contract_digest", "")),
@@ -786,14 +788,12 @@ class SignalEnvelope:
                 + "; ".join(f"{item.path}: {item.message}" for item in findings)
             )
         if contract is None:
-            raise ValueError(
-                "SignalEnvelope cannot be verified because the target port has no contract"
-            )
+            raise ValueError("Can't check SignalEnvelope: this port has no contract")
         expected = standard.digest(dict(contract))
         if self.contract_digest != expected:
             raise ValueError(
-                "SignalEnvelope contract digest does not match the bound port contract: "
-                f"expected {expected}, got {self.contract_digest}"
+                "SignalEnvelope was made for a different contract "
+                f"(port expects {expected}, envelope has {self.contract_digest})"
             )
 
 

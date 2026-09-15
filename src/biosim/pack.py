@@ -980,7 +980,7 @@ def _instantiate_model_from_package(
         try:
             bind_manifest_ports(module, manifest)
         except (TypeError, ValueError) as exc:
-            raise PackageError(f"Manifest/Python compatibility contradiction: {exc}") from exc
+            raise PackageError(f"model.yaml doesn't match the Python module: {exc}") from exc
     return module, {
         "communication_step": bsim_block.get("communication_step"),
         "setup": (
@@ -1932,7 +1932,7 @@ def _validate_model_manifest(manifest: Mapping[str, Any]) -> None:
             details = "; ".join(
                 f"{item.get('path') or '/'}: {item['message']}" for item in findings
             )
-            raise PackageError(f"Invalid compatibility declaration: {details}")
+            raise PackageError(f"Invalid compatibility block in model.yaml: {details}")
 
 
 def _package_children(manifest: Mapping[str, Any]) -> list[tuple[str, str]]:
