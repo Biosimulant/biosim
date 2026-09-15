@@ -35,9 +35,9 @@ dependencies = [
 ]
 
 [project.urls]
-Documentation = "https://github.com/Biosimulant/biosim#readme"
-Issues = "https://github.com/Biosimulant/biosim/issues"
-Source = "https://github.com/Biosimulant/biosim"
+Documentation = "https://github.com/Biosimulant/biosimulant#readme"
+Issues = "https://github.com/Biosimulant/biosimulant/issues"
+Source = "https://github.com/Biosimulant/biosimulant"
 
 [project.scripts]
 biosimulant = "biosimulant.__main__:main"
