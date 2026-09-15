@@ -213,6 +213,48 @@ def _local_lab_plan(
             if not isinstance(target_ref, str):
                 continue
             target, target_refs = port(target_ref, "inputs")
+            # resolve_contracts takes no profile refs, so a port that does not satisfy the profile
+            # it declares would otherwise produce an ALLOWed edge. Check each side against its own
+            # declared profiles first, and block the edge when it does not hold up.
+            contract_findings = [
+                {"port": ref, "reason_code": finding.reason_code, "message": finding.message, "path": finding.path}
+                for contract, refs, ref in (
+                    (source, source_refs, source_ref),
+                    (target, target_refs, target_ref),
+                )
+                if isinstance(contract, dict) and refs
+                for finding in standard.validate_contract(dict(contract), list(refs))
+            ]
+            if contract_findings:
+                reports.append(
+                    {
+                        "edge_index": edge_index,
+                        "source": source_ref,
+                        "target": target_ref,
+                        "report": {
+                            "schema_version": "0.1",
+                            "standard": "https://biosimulant.com/standards/model-compatibility/v0.1",
+                            "bundle_sha256": standard.get_bundle().digest,
+                            "status": "INCOMPATIBLE",
+                            "policy_decision": "BLOCK",
+                            "findings": [
+                                {
+                                    "dimension": "contract",
+                                    "state": "INCOMPATIBLE",
+                                    "severity": "error",
+                                    "reason_code": item["reason_code"],
+                                    "explanation": f"{item['port']}: {item['message']}",
+                                }
+                                for item in contract_findings
+                            ],
+                            "source": {"contract_digest": None, "profile_refs": sorted(set(source_refs))},
+                            "target": {"contract_digest": None, "profile_refs": sorted(set(target_refs))},
+                        },
+                        "resolution": "UNRESOLVED",
+                    }
+                )
+                decisions.append("BLOCK")
+                continue
             resolution = standard.resolve_contracts(
                 source,
                 target,
