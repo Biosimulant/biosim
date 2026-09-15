@@ -118,8 +118,11 @@ def _select_port(selector: str, expected_direction: str) -> tuple[dict[str, Any]
 
 
 def _read_json(path: Path) -> Any:
+    data = path.read_bytes()
+    if len(data) > 4 * 1024 * 1024:
+        raise ValueError(f"{path} is larger than the 4 MiB safety limit")
     try:
-        return json.loads(path.read_text())
+        return json.loads(data)
     except json.JSONDecodeError as exc:
         raise ValueError(f"{path} is not valid JSON: {exc}") from exc
 
@@ -247,6 +250,7 @@ def _local_lab_plan(
 def _conformance() -> dict[str, Any]:
     standard = _standard()
     bundle = standard.get_bundle()
+    bundle.verify_integrity()
     profiles = bundle.catalogue["profiles"]
     passed = 0
     for summary in profiles:
@@ -269,9 +273,12 @@ def _conformance() -> dict[str, Any]:
         passed += 3
     return {
         "valid": True,
+        "release": bundle.manifest["release"],
         "profiles": len(profiles),
         "profile_fixtures_passed": passed,
         "bundle_sha256": bundle.digest,
+        "ga_ready": bool(bundle.manifest.get("ga_ready", False)),
+        "ga_blockers": list(bundle.manifest.get("ga_blockers", [])),
     }
 
 

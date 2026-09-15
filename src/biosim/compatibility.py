@@ -22,15 +22,20 @@ class CompatibilitySupportUnavailable(RuntimeError):
 _MANIFEST_NEEDS_PACKAGE = (
     "This model.yaml has a `compatibility` block, which needs an optional package."
 )
+_STANDARD_VERIFIED = False
 
 
 def _standard(reason: str = "Compatibility checks need an optional package."):
+    global _STANDARD_VERIFIED
     try:
         import biosimulant_model_compatibility_standard as standard
     except ImportError as exc:
         raise CompatibilitySupportUnavailable(
             f"{reason} Run: pip install 'biosimulant[compatibility]'"
         ) from exc
+    if not _STANDARD_VERIFIED:
+        standard.get_bundle().verify_integrity()
+        _STANDARD_VERIFIED = True
     return standard
 
 
@@ -282,7 +287,11 @@ def bind_manifest_ports(
 def load_yaml(path: str | Path) -> dict[str, Any]:
     import yaml
 
-    value = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
+    manifest_path = Path(path)
+    data = manifest_path.read_bytes()
+    if len(data) > 4 * 1024 * 1024:
+        raise ValueError(f"{path}: file is larger than the 4 MiB safety limit")
+    value = yaml.safe_load(data.decode("utf-8")) or {}
     if not isinstance(value, dict):
         raise ValueError(f"{path}: top level must be a YAML mapping")
     return value

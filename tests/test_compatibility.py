@@ -100,6 +100,9 @@ def test_cli_validate_and_conformance(tmp_path: Path, capsys):
     assert profile_count > 0
     assert result["profiles"] == profile_count
     assert result["profile_fixtures_passed"] == 3 * profile_count
+    assert result["release"] == "0.1.0-alpha.3"
+    assert result["ga_ready"] is False
+    assert result["ga_blockers"]
 
 
 def test_compatibility_wrappers_keep_legacy_optional_and_execute_opt_in():
@@ -451,6 +454,29 @@ def test_signal_envelope_is_digest_bound_and_survives_signal_serialization():
     invalid = SignalEnvelope(contract_digest="sha256:" + "0" * 64, value=2.5)
     with pytest.raises(ValueError, match="made for a different contract"):
         invalid.validate_contract(contract)
+
+
+def test_signal_envelope_uses_normalized_digest_and_rejects_context_conflicts():
+    from biosimulant_model_compatibility_standard import digest, normalize_contract
+
+    contract = {
+        "semantic": {"concept": "expression", "qualifiers": ["z", "a"]},
+        "biological_context": {"species": "NCBITaxon:9606"},
+    }
+    envelope = SignalEnvelope(
+        contract_digest=digest(normalize_contract(contract)),
+        value=[1.0],
+        actual_context={"species": "NCBITaxon:9606", "tissue": "UBERON:0002107"},
+    )
+    envelope.validate_contract(contract)
+
+    conflicting = SignalEnvelope(
+        contract_digest=digest(normalize_contract(contract)),
+        value=[1.0],
+        actual_context={"species": "NCBITaxon:10090"},
+    )
+    with pytest.raises(ValueError, match="actual_context.species"):
+        conflicting.validate_contract(contract)
 
 
 def test_canonical_output_signal_envelope_is_validated_at_world_boundary():

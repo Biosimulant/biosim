@@ -789,12 +789,31 @@ class SignalEnvelope:
             )
         if contract is None:
             raise ValueError("Can't check SignalEnvelope: this port has no contract")
-        expected = standard.digest(dict(contract))
+        normalized_contract = standard.normalize_contract(dict(contract))
+        expected = standard.digest(normalized_contract)
         if self.contract_digest != expected:
             raise ValueError(
                 "SignalEnvelope was made for a different contract "
                 f"(port expects {expected}, envelope has {self.contract_digest})"
             )
+
+        sections = {
+            "actual_context": "biological_context",
+            "origin": "origin",
+            "uncertainty": "uncertainty",
+            "artifact": "artifact",
+        }
+        for envelope_field, contract_field in sections.items():
+            actual = getattr(self, envelope_field)
+            declared = normalized_contract.get(contract_field)
+            if not isinstance(actual, Mapping) or not isinstance(declared, Mapping):
+                continue
+            for name, value in actual.items():
+                if name in declared and declared[name] != value:
+                    raise ValueError(
+                        f"SignalEnvelope {envelope_field}.{name} is {value!r}, but the port "
+                        f"contract declares {declared[name]!r}"
+                    )
 
 
 class BioSignal:
