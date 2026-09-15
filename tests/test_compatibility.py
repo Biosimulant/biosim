@@ -100,7 +100,7 @@ def test_cli_validate_and_conformance(tmp_path: Path, capsys):
     assert profile_count > 0
     assert result["profiles"] == profile_count
     assert result["profile_fixtures_passed"] == 3 * profile_count
-    assert result["release"] == "0.1.0-alpha.4"
+    assert result["release"] == "0.1.0-alpha.5"
     assert result["ga_ready"] is False
     assert result["ga_blockers"]
 
