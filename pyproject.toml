@@ -45,6 +45,9 @@ biosimulant = "biosimulant.__main__:main"
 [tool.hatch.version]
 path = "src/biosim/__about__.py"
 
+[tool.hatch.metadata]
+allow-direct-references = true
+
 [tool.hatch.envs.types]
 extra-dependencies = [
   "mypy>=1.0.0",
@@ -90,6 +93,7 @@ addopts = "-q"
 
 [project.optional-dependencies]
 dev = [
+  "biosimulant-model-compatibility-standard @ https://github.com/Biosimulant/model-compatibility-standard/archive/9a4edf80bbaf77e7046ce243b30bbf57f3e9eb99.tar.gz",
   "pytest>=7",
   "pytest-cov>=4",
   "httpx>=0.26",
@@ -102,9 +106,12 @@ cellml = [
   "libcellml>=0.6.3,<0.7",
   "scipy>=1.11,<2",
 ]
+compatibility = [
+  "biosimulant-model-compatibility-standard @ https://github.com/Biosimulant/model-compatibility-standard/archive/9a4edf80bbaf77e7046ce243b30bbf57f3e9eb99.tar.gz",
+]
 # Everything
 all = [
-  "biosimulant[dev,ml,cellml]",
+  "biosimulant[dev,ml,cellml,compatibility]",
 ]
 
 [tool.hatch.build]

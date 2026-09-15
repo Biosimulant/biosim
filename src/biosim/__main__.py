@@ -321,6 +321,11 @@ def main(argv: list[str] | None = None, *, prog: str = "biosimulant") -> None:
     if args_list and args_list[0] == "labs":
         _main_labs(args_list[1:], prog=f"{prog} labs")
         return
+    if args_list and args_list[0] == "compatibility":
+        from .compatibility_cli import main as compatibility_main
+
+        compatibility_main(args_list[1:], prog=f"{prog} compatibility")
+        return
     if args_list and args_list[0] in {
         "auth",
         "commands",

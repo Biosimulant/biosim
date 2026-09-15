@@ -9,6 +9,17 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 
+def _merge_contract(base: Mapping[str, Any], refinement: Mapping[str, Any]) -> dict[str, Any]:
+    result = dict(base)
+    for key, value in refinement.items():
+        current = result.get(key)
+        if isinstance(current, Mapping) and isinstance(value, Mapping):
+            result[key] = _merge_contract(current, value)
+        else:
+            result[key] = value
+    return result
+
+
 def _raise(
     error_cls: type[Exception], message: str, cause: BaseException | None = None
 ) -> None:
@@ -161,6 +172,7 @@ def _resolve_input_profile(
 
 def _typed_input_signal_spec(
     declared_spec: Any,
+    profile: Any,
     *,
     resolved_signal_type: str,
     resolved_dtype: str | None,
@@ -174,6 +186,9 @@ def _typed_input_signal_spec(
     interpolation = (
         "none" if resolved_signal_type == "event" else declared_spec.interpolation
     )
+    contract = dict(declared_spec.contract or {})
+    if getattr(profile, "contract", None):
+        contract = _merge_contract(contract, profile.contract)
     return SignalSpec(
         signal_type=resolved_signal_type,
         kind=kind,
@@ -194,6 +209,7 @@ def _typed_input_signal_spec(
         allowed_values=getattr(declared_spec, "allowed_values", None),
         file=getattr(declared_spec, "file", None),
         ui=getattr(declared_spec, "ui", None),
+        contract=contract or None,
     )
 
 
@@ -204,17 +220,20 @@ def _make_typed_signal(
     value: Any,
     emitted_at: float,
     declared_spec: Any,
+    profile: Any,
     resolved_signal_type: str,
     resolved_dtype: str | None,
     resolved_shape: tuple[Any, ...] | None,
     resolved_schema: dict[str, Any] | None,
     actual_unit: str | None,
     error_cls: type[Exception],
+    compatibility_envelope: Any = None,
 ):
     from biosim import ArraySignal, EventSignal, RecordSignal, ScalarSignal
 
     signal_spec = _typed_input_signal_spec(
         declared_spec,
+        profile,
         resolved_signal_type=resolved_signal_type,
         resolved_dtype=resolved_dtype,
         resolved_shape=resolved_shape,
@@ -233,9 +252,17 @@ def _make_typed_signal(
             error_cls,
             f"Unsupported signal_type on declared input port '{name}': {signal_spec.signal_type!r}",
         )
-    return signal_cls(
+    if compatibility_envelope is not None:
+        try:
+            compatibility_envelope.validate_contract(signal_spec.contract)
+        except ValueError as exc:
+            _raise(error_cls, f"Input '{name}': SignalEnvelope doesn't fit this port: {exc}", exc)
+    signal = signal_cls(
         source=source, name=name, value=value, emitted_at=emitted_at, spec=signal_spec
     )
+    if compatibility_envelope is not None:
+        signal.compatibility_envelope = compatibility_envelope
+    return signal
 
 
 def coerce_typed_inputs(
@@ -248,13 +275,25 @@ def coerce_typed_inputs(
 ) -> dict[str, Any]:
     """Coerce raw initial input values into typed BioSignal instances."""
 
-    from biosim import BioSignal
+    from biosim import BioSignal, SignalEnvelope
 
     coerced: dict[str, Any] = {}
     for key, value in values.items():
         declared_spec = declared_ports.get(key)
         if declared_spec is None:
             _raise(error_cls, f"Input '{key}' is not declared by the target module")
+
+        compatibility_envelope = None
+        if (
+            isinstance(value, Mapping)
+            and value.get("schema_version") == "0.1"
+            and "contract_digest" in value
+        ):
+            try:
+                compatibility_envelope = SignalEnvelope.from_dict(value)
+            except (TypeError, ValueError) as exc:
+                _raise(error_cls, f"Input '{key}': invalid SignalEnvelope: {exc}", exc)
+            value = compatibility_envelope.payload
 
         if isinstance(value, BioSignal):
             if (
@@ -314,7 +353,7 @@ def coerce_typed_inputs(
             explicit_schema = _normalize_schema_dict(value.get("schema"))
 
         (
-            _,
+            profile,
             resolved_signal_type,
             resolved_dtype,
             resolved_shape,
@@ -338,11 +377,13 @@ def coerce_typed_inputs(
             value=signal_value,
             emitted_at=emitted_at,
             declared_spec=declared_spec,
+            profile=profile,
             resolved_signal_type=resolved_signal_type,
             resolved_dtype=resolved_dtype,
             resolved_shape=resolved_shape,
             resolved_schema=resolved_schema,
             actual_unit=actual_unit,
             error_cls=error_cls,
+            compatibility_envelope=compatibility_envelope,
         )
     return coerced
