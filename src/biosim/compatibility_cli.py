@@ -57,6 +57,16 @@ def _parser(prog: str) -> argparse.ArgumentParser:
     compare.add_argument(
         "consumer", metavar="TARGET", help="Input port, e.g. model.yaml#inputs.dose"
     )
+    compare.add_argument(
+        "--ontology-snapshots",
+        type=Path,
+        help="JSON file with exact ontology snapshots used by comparison rules",
+    )
+    compare.add_argument(
+        "--mapping-snapshots",
+        type=Path,
+        help="JSON file with exact identifier-mapping snapshots used by comparison rules",
+    )
 
     profiles = commands.add_parser("profiles", help="List or show compatibility profiles")
     profile_commands = profiles.add_subparsers(dest="profiles_command", required=True)
@@ -87,6 +97,16 @@ def _parser(prog: str) -> argparse.ArgumentParser:
         "--capabilities",
         type=Path,
         help="JSON file listing adapter or inference capabilities that can convert data between ports",
+    )
+    plan.add_argument(
+        "--ontology-snapshots",
+        type=Path,
+        help="JSON file with exact ontology snapshots used by rules and preconditions",
+    )
+    plan.add_argument(
+        "--mapping-snapshots",
+        type=Path,
+        help="JSON file with exact identifier-mapping snapshots used by rules and preconditions",
     )
     plan.add_argument(
         "--output", type=Path, help="Write the plan to this file instead of printing it"
@@ -127,10 +147,19 @@ def _read_json(path: Path) -> Any:
         raise ValueError(f"{path} is not valid JSON: {exc}") from exc
 
 
+def _read_object_list(path: Path | None, option: str) -> list[dict[str, Any]]:
+    value = _read_json(path) if path else []
+    if not isinstance(value, list) or not all(isinstance(item, dict) for item in value):
+        raise ValueError(f"The {option} file must contain a JSON array of objects")
+    return value
+
+
 def _local_lab_plan(
     path: Path,
     policy_path: Path | None,
     capabilities_path: Path | None,
+    ontology_snapshots_path: Path | None,
+    mapping_snapshots_path: Path | None,
 ) -> dict[str, Any]:
     standard = _standard()
     lab_path = path / "lab.yaml" if path.is_dir() else path
@@ -155,11 +184,15 @@ def _local_lab_plan(
         return None, []
 
     policy = _read_json(policy_path) if policy_path else {}
-    capabilities = _read_json(capabilities_path) if capabilities_path else []
+    capabilities = _read_object_list(capabilities_path, "--capabilities")
+    ontology_snapshots = _read_object_list(
+        ontology_snapshots_path, "--ontology-snapshots"
+    )
+    mapping_snapshots = _read_object_list(
+        mapping_snapshots_path, "--mapping-snapshots"
+    )
     if not isinstance(policy, dict):
         raise ValueError("The --policy file must contain a JSON object")
-    if not isinstance(capabilities, list) or not all(isinstance(item, dict) for item in capabilities):
-        raise ValueError("The --capabilities file must contain a JSON array of objects")
 
     reports = []
     materialized_nodes: list[dict[str, Any]] = []
@@ -185,6 +218,8 @@ def _local_lab_plan(
                 target,
                 capabilities,
                 policy=policy,
+                ontology_snapshots=ontology_snapshots,
+                mapping_snapshots=mapping_snapshots,
             )
             report = resolution["report"]
             reports.append(
@@ -318,7 +353,24 @@ def _run(args: argparse.Namespace, *, prog: str) -> None:
     if args.command == "compare":
         source, source_refs = _select_port(args.producer, "outputs")
         target, target_refs = _select_port(args.consumer, "inputs")
-        print(_json(_standard().compare_contracts(source, target, source_profile_refs=source_refs, target_profile_refs=target_refs)))
+        ontology_snapshots = _read_object_list(
+            args.ontology_snapshots, "--ontology-snapshots"
+        )
+        mapping_snapshots = _read_object_list(
+            args.mapping_snapshots, "--mapping-snapshots"
+        )
+        print(
+            _json(
+                _standard().compare_contracts(
+                    source,
+                    target,
+                    source_profile_refs=source_refs,
+                    target_profile_refs=target_refs,
+                    ontology_snapshots=ontology_snapshots,
+                    mapping_snapshots=mapping_snapshots,
+                )
+            )
+        )
         return
     if args.command == "profiles":
         bundle = _standard().get_bundle()
@@ -347,7 +399,13 @@ def _run(args: argparse.Namespace, *, prog: str) -> None:
         print(_json({"output": str(args.output), "digest": result["digest"]}))
         return
     if args.command == "plan":
-        result = _local_lab_plan(args.lab, args.policy, args.capabilities)
+        result = _local_lab_plan(
+            args.lab,
+            args.policy,
+            args.capabilities,
+            args.ontology_snapshots,
+            args.mapping_snapshots,
+        )
         content = _json(result) + "\n"
         if args.output:
             args.output.write_text(content, encoding="utf-8")

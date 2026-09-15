@@ -28,7 +28,7 @@ from biosim.compatibility import (
     validate_manifest,
 )
 from biosim.pack import build_package
-from biosimulant_model_compatibility_standard import get_bundle
+from biosimulant_model_compatibility_standard import digest, get_bundle
 
 
 def _manifest() -> dict:
@@ -100,7 +100,7 @@ def test_cli_validate_and_conformance(tmp_path: Path, capsys):
     assert profile_count > 0
     assert result["profiles"] == profile_count
     assert result["profile_fixtures_passed"] == 3 * profile_count
-    assert result["release"] == "0.1.0-alpha.3"
+    assert result["release"] == "0.1.0-alpha.4"
     assert result["ga_ready"] is False
     assert result["ga_blockers"]
 
@@ -157,15 +157,28 @@ def test_cli_inspection_compare_normalize_and_lock(tmp_path: Path, capsys):
     consumer_path.write_text(
         yaml.safe_dump(consumer, sort_keys=False), encoding="utf-8"
     )
+    snapshot_unsigned = {
+        "ref": "https://biosimulant.com/snapshots/example-ontology/v1",
+        "equivalences": [],
+    }
+    snapshot = {**snapshot_unsigned, "sha256": digest(snapshot_unsigned)}
+    snapshots_path = tmp_path / "ontology-snapshots.json"
+    snapshots_path.write_text(json.dumps([snapshot]), encoding="utf-8")
     main(
         [
             "compatibility",
             "compare",
             f"{manifest_path}#outputs.quantity",
             f"{consumer_path}#inputs.quantity",
+            "--ontology-snapshots",
+            str(snapshots_path),
         ]
     )
-    assert json.loads(capsys.readouterr().out)["status"] == "EXACT"
+    report = json.loads(capsys.readouterr().out)
+    assert report["status"] == "EXACT"
+    assert report["snapshots"]["ontology"] == [
+        {"ref": snapshot["ref"], "sha256": snapshot["sha256"]}
+    ]
 
     main(["compatibility", "profiles", "list", "--domain", "core"])
     listed = json.loads(capsys.readouterr().out)
@@ -421,11 +434,31 @@ def test_cli_plan_materializes_a_schema_valid_direct_edge(tmp_path: Path, capsys
         ),
         encoding="utf-8",
     )
-    main(["compatibility", "plan", str(lab)])
+    snapshot_unsigned = {
+        "ref": "https://biosimulant.com/snapshots/example-ontology/v1",
+        "equivalences": [],
+    }
+    snapshot = {**snapshot_unsigned, "sha256": digest(snapshot_unsigned)}
+    snapshots_path = tmp_path / "ontology-snapshots.json"
+    snapshots_path.write_text(json.dumps([snapshot]), encoding="utf-8")
+    main(
+        [
+            "compatibility",
+            "plan",
+            str(lab),
+            "--ontology-snapshots",
+            str(snapshots_path),
+        ]
+    )
     plan = json.loads(capsys.readouterr().out)
     assert plan["policy"]["decision"] == "ALLOW"
     assert plan["reports"][0]["report"]["status"] == "EXACT"
     assert len(plan["edges"]) == 1
+    assert {
+        "kind": "ontology_snapshot",
+        "ref": snapshot["ref"],
+        "sha256": snapshot["sha256"],
+    } in plan["immutable_references"]
 
 
 def test_signal_envelope_is_digest_bound_and_survives_signal_serialization():
