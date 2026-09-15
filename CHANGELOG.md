@@ -244,14 +244,14 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Preserve the legacy `biosim` import path and `python -m biosim` compatibility
   command for existing model packages.
 
-[Unreleased]: https://github.com/Biosimulant/biosim/compare/v0.0.19...HEAD
-[0.0.19]: https://github.com/Biosimulant/biosim/compare/v0.0.18...v0.0.19
-[0.0.18]: https://github.com/Biosimulant/biosim/compare/v0.0.17...v0.0.18
-[0.0.17]: https://github.com/Biosimulant/biosim/compare/v0.0.16...v0.0.17
-[0.0.16]: https://github.com/Biosimulant/biosim/compare/v0.0.15...v0.0.16
-[0.0.15]: https://github.com/Biosimulant/biosim/compare/v0.0.14...v0.0.15
-[0.0.14]: https://github.com/Biosimulant/biosim/compare/v0.0.13...v0.0.14
-[0.0.13]: https://github.com/Biosimulant/biosim/compare/v0.0.12...v0.0.13
-[0.0.12]: https://github.com/Biosimulant/biosim/compare/v0.0.11...v0.0.12
-[0.0.11]: https://github.com/Biosimulant/biosim/compare/v0.0.10...v0.0.11
-[0.0.10]: https://github.com/Biosimulant/biosim/releases/tag/v0.0.10
+[Unreleased]: https://github.com/Biosimulant/biosimulant/compare/v0.0.19...HEAD
+[0.0.19]: https://github.com/Biosimulant/biosimulant/compare/v0.0.18...v0.0.19
+[0.0.18]: https://github.com/Biosimulant/biosimulant/compare/v0.0.17...v0.0.18
+[0.0.17]: https://github.com/Biosimulant/biosimulant/compare/v0.0.16...v0.0.17
+[0.0.16]: https://github.com/Biosimulant/biosimulant/compare/v0.0.15...v0.0.16
+[0.0.15]: https://github.com/Biosimulant/biosimulant/compare/v0.0.14...v0.0.15
+[0.0.14]: https://github.com/Biosimulant/biosimulant/compare/v0.0.13...v0.0.14
+[0.0.13]: https://github.com/Biosimulant/biosimulant/compare/v0.0.12...v0.0.13
+[0.0.12]: https://github.com/Biosimulant/biosimulant/compare/v0.0.11...v0.0.12
+[0.0.11]: https://github.com/Biosimulant/biosimulant/compare/v0.0.10...v0.0.11
+[0.0.10]: https://github.com/Biosimulant/biosimulant/releases/tag/v0.0.10

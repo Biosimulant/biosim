@@ -36,7 +36,7 @@ Provide a small, stable composition layer for simulations: wire reusable compone
 Preferred (pinned GitHub ref):
 
 ```console
-pip install "biosimulant @ git+https://github.com/<org>/biosim.git@<ref>"
+pip install "biosimulant @ git+https://github.com/Biosimulant/biosimulant.git@<ref>"
 ```
 
 Alternative (package index):
